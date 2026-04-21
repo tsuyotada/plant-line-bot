@@ -1,65 +1,666 @@
-import Image from "next/image";
+import { supabase } from "../src/lib/supabase";
 
-export default function Home() {
+function addDays(dateString: string, days: number) {
+  const d = new Date(dateString);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function todayString() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function getPlantLabel(plantType: string | null) {
+  switch (plantType) {
+    case "tomato":
+      return "トマト";
+    case "coriander":
+      return "コリアンダー";
+    default:
+      return "植物";
+  }
+}
+
+function getTaskMessage(plantType: string | null, taskType: string | null) {
+if (plantType === "tomato") {
+  if (taskType === "tomato_establishment_check") {
+    return "🍅 活着チェック：朝も葉がしおれていないか確認しましょう";
+  }
+
+  if (taskType === "tomato_support_and_tying") {
+    return "🍅 支柱と誘引：茎が倒れないよう軽く固定しましょう";
+  }
+
+  if (taskType === "tomato_first_feed_check") {
+    return "🍅 初回追肥：生長が順調なら少量の肥料を検討しましょう";
+  }
+
+  if (taskType === "tomato_leaf_health_check") {
+    return "🍅 葉の状態チェック：黄化・斑点・虫食いがないか見ましょう";
+  }
+
+  if (taskType === "tomato_sucker_check") {
+    return "🍅 脇芽チェック：小さいうちに取り除きましょう";
+  }
+
+  if (taskType === "tomato_feed_check") {
+    return "🍅 追肥チェック：実や生長の様子を見て調整しましょう";
+  }
+}
+
+  if (plantType === "coriander") {
+    if (taskType === "coriander_thinning") {
+      return "🌿 コリアンダーを間引きしましょう";
+    }
+  }
+
+  return "植物のお世話をしましょう";
+}
+
+function buildTodayLineMessage(
+  today: string,
+  todayEvents: any[],
+  plantMap: Map<string, any>
+) {
+  if (todayEvents.length === 0) {
+    return `【${today} のお世話メモ】
+今日はお世話の予定はありません🌱`;
+  }
+
+  const lines = todayEvents.map((event, index) => {
+    const plant = plantMap.get(event.plant_id);
+    const taskMessage = getTaskMessage(plant?.plant_type ?? null, event.task_type);
+    return `${index + 1}. ${taskMessage}`;
+  });
+
+  return `【${today} の今日やること】
+${lines.join("\n")}
+
+無理のない範囲で進めましょう🌱`;
+}
+
+async function addPlant(formData: FormData) {
+  "use server";
+
+  const plantType = String(formData.get("plant_type") || "");
+  const plantedAt = String(formData.get("planted_at") || "");
+
+  if (!plantType || !plantedAt) return;
+
+  const { data: plant, error: plantError } = await supabase
+    .from("plants")
+    .insert([
+      {
+        plant_type: plantType,
+        planted_at: plantedAt,
+      },
+    ])
+    .select()
+    .single();
+
+  if (plantError || !plant) {
+    console.error("plants insert error:", plantError);
+    return;
+  }
+
+  const events: {
+    plant_id: string;
+    scheduled_for: string;
+    status: string;
+    task_type: string;
+    rule_id?: string | null;
+  }[] = [];
+
+if (plantType === "tomato") {
+  // 単発イベント
+  events.push({
+    plant_id: plant.id,
+    scheduled_for: addDays(plantedAt, 2),
+    status: "pending",
+    task_type: "tomato_establishment_check",
+  });
+
+  events.push({
+    plant_id: plant.id,
+    scheduled_for: addDays(plantedAt, 7),
+    status: "pending",
+    task_type: "tomato_support_and_tying",
+  });
+
+  events.push({
+    plant_id: plant.id,
+    scheduled_for: addDays(plantedAt, 14),
+    status: "pending",
+    task_type: "tomato_first_feed_check",
+  });
+
+  // 繰り返しイベント（最初の30日分を作る）
+  for (let i = 3; i <= 30; i += 3) {
+    events.push({
+      plant_id: plant.id,
+      scheduled_for: addDays(plantedAt, i),
+      status: "pending",
+      task_type: "tomato_leaf_health_check",
+    });
+  }
+
+  for (let i = 7; i <= 30; i += 7) {
+    events.push({
+      plant_id: plant.id,
+      scheduled_for: addDays(plantedAt, i),
+      status: "pending",
+      task_type: "tomato_sucker_check",
+    });
+  }
+
+  for (let i = 14; i <= 30; i += 14) {
+    events.push({
+      plant_id: plant.id,
+      scheduled_for: addDays(plantedAt, i),
+      status: "pending",
+      task_type: "tomato_feed_check",
+    });
+  }
+}
+
+  if (plantType === "coriander") {
+    events.push({
+      plant_id: plant.id,
+      scheduled_for: addDays(plantedAt, 14),
+      status: "pending",
+      task_type: "coriander_thinning",
+      rule_id: null,
+    });
+  }
+
+  if (events.length > 0) {
+    const { error: eventError } = await supabase.from("care_events").insert(events);
+
+    if (eventError) {
+      console.error("care_events insert error:", eventError);
+    }
+  }
+}
+
+async function completeCareEvent(formData: FormData) {
+  "use server";
+
+  const eventId = String(formData.get("event_id") || "");
+  if (!eventId) return;
+
+  const { error } = await supabase
+    .from("care_events")
+    .update({ status: "done" })
+    .eq("id", eventId);
+
+  if (error) {
+    console.error("complete care event error:", error);
+  }
+}
+
+async function snoozeCareEvent(formData: FormData) {
+  "use server";
+
+  const eventId = String(formData.get("event_id") || "");
+  const scheduledFor = String(formData.get("scheduled_for") || "");
+
+  if (!eventId || !scheduledFor) return;
+
+  const nextDate = addDays(scheduledFor, 1);
+
+  const { error } = await supabase
+    .from("care_events")
+    .update({ scheduled_for: nextDate })
+    .eq("id", eventId);
+
+  if (error) {
+    console.error("snooze care event error:", error);
+  }
+}
+
+export default async function Home() {
+  const today = todayString();
+
+  const { data: plantsRaw, error: plantsError } = await supabase
+    .from("plants")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  const { data: careEventsRaw, error: careEventsError } = await supabase
+    .from("care_events")
+    .select("*")
+    .order("scheduled_for", { ascending: true });
+
+  const plants = plantsRaw ?? [];
+  const careEvents = careEventsRaw ?? [];
+
+  const plantMap = new Map(plants.map((plant) => [plant.id, plant]));
+
+  const todayEvents = careEvents.filter(
+    (event) => event.scheduled_for === today && event.status === "pending"
+  );
+
+  const upcomingEvents = careEvents.filter(
+    (event) => event.scheduled_for > today && event.status === "pending"
+  );
+
+  const todayLineMessage = buildTodayLineMessage(today, todayEvents, plantMap);
+  const lineShareUrl = `https://line.me/R/msg/text/?${encodeURIComponent(
+    todayLineMessage
+  )}`;
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <main
+      style={{
+        padding: 24,
+        maxWidth: 820,
+        margin: "0 auto",
+        fontFamily:
+          'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        background: "#f8fafc",
+        minHeight: "100vh",
+      }}
+    >
+      <div style={{ marginBottom: 24 }}>
+        <h1
+          style={{
+            fontSize: 32,
+            fontWeight: 800,
+            marginBottom: 8,
+            color: "#111827",
+          }}
+        >
+          plant-line-bot
+        </h1>
+        <p
+          style={{
+            color: "#6b7280",
+            fontSize: 15,
+            lineHeight: 1.6,
+          }}
+        >
+          植物を登録して、お世話の予定を確認できます
+        </p>
+      </div>
+
+      <section
+        style={{
+          marginBottom: 24,
+          padding: 20,
+          border: "1px solid #e5e7eb",
+          borderRadius: 16,
+          background: "#ffffff",
+          boxShadow: "0 8px 24px rgba(15, 23, 42, 0.06)",
+        }}
+      >
+        <h2
+          style={{
+            fontSize: 20,
+            fontWeight: 700,
+            marginBottom: 16,
+            color: "#111827",
+          }}
+        >
+          植物を登録する
+        </h2>
+
+        <form action={addPlant}>
+          <div style={{ marginBottom: 14 }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: 14,
+                fontWeight: 600,
+                color: "#374151",
+                marginBottom: 6,
+              }}
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+              植物
+            </label>
+            <select
+              name="plant_type"
+              defaultValue="tomato"
+              style={{
+                width: "100%",
+                maxWidth: 280,
+                padding: "10px 12px",
+                borderRadius: 10,
+                border: "1px solid #d1d5db",
+                background: "#fff",
+                fontSize: 15,
+              }}
             >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+              <option value="tomato">トマト</option>
+              <option value="coriander">コリアンダー</option>
+            </select>
+          </div>
+
+          <div style={{ marginBottom: 18 }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: 14,
+                fontWeight: 600,
+                color: "#374151",
+                marginBottom: 6,
+              }}
+            >
+              植えた日
+            </label>
+            <input
+              type="date"
+              name="planted_at"
+              defaultValue={today}
+              style={{
+                width: "100%",
+                maxWidth: 280,
+                padding: "10px 12px",
+                borderRadius: 10,
+                border: "1px solid #d1d5db",
+                background: "#fff",
+                fontSize: 15,
+              }}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+          </div>
+
+          <button
+            type="submit"
+            style={{
+              padding: "12px 18px",
+              backgroundColor: "#111827",
+              color: "#fff",
+              border: "none",
+              borderRadius: 10,
+              cursor: "pointer",
+              fontSize: 15,
+              fontWeight: 700,
+            }}
           >
-            Documentation
-          </a>
+            植物を追加
+          </button>
+        </form>
+      </section>
+
+      <section
+        style={{
+          marginBottom: 24,
+          padding: 20,
+          border: "1px solid #bbf7d0",
+          borderRadius: 16,
+          background: "#ecfdf5",
+          boxShadow: "0 8px 24px rgba(15, 23, 42, 0.05)",
+        }}
+      >
+        <h2
+          style={{
+            fontSize: 20,
+            fontWeight: 700,
+            marginBottom: 16,
+            color: "#166534",
+          }}
+        >
+          LINEに送る文章
+        </h2>
+
+        <div
+          style={{
+            whiteSpace: "pre-wrap",
+            padding: 16,
+            borderRadius: 12,
+            background: "#ffffff",
+            border: "1px solid #dcfce7",
+            color: "#111827",
+            lineHeight: 1.7,
+            fontSize: 15,
+            marginBottom: 14,
+          }}
+        >
+          {todayLineMessage}
         </div>
-      </main>
-    </div>
+
+        <a
+          href={lineShareUrl}
+          target="_blank"
+          rel="noreferrer"
+          style={{
+            display: "inline-block",
+            padding: "10px 14px",
+            backgroundColor: "#16a34a",
+            color: "#ffffff",
+            textDecoration: "none",
+            borderRadius: 10,
+            fontWeight: 700,
+          }}
+        >
+          LINEで開く
+        </a>
+      </section>
+
+      <section
+        style={{
+          marginBottom: 24,
+          padding: 20,
+          border: "1px solid #e5e7eb",
+          borderRadius: 16,
+          background: "#f0fdf4",
+          boxShadow: "0 8px 24px rgba(15, 23, 42, 0.05)",
+        }}
+      >
+        <h2
+          style={{
+            fontSize: 20,
+            fontWeight: 700,
+            marginBottom: 16,
+            color: "#166534",
+          }}
+        >
+          今日やること
+        </h2>
+
+        {todayEvents.length === 0 ? (
+          <p style={{ color: "#4b5563", margin: 0 }}>今日は予定はありません</p>
+        ) : (
+          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+            {todayEvents.map((event) => {
+              const plant = plantMap.get(event.plant_id);
+
+              return (
+                <li
+                  key={event.id}
+                  style={{
+                    padding: 16,
+                    marginBottom: 12,
+                    background: "#ffffff",
+                    border: "1px solid #dcfce7",
+                    borderRadius: 12,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      fontSize: 16,
+                      color: "#111827",
+                      marginBottom: 8,
+                    }}
+                  >
+                    {getTaskMessage(plant?.plant_type ?? null, event.task_type)}
+                  </div>
+
+                  <div
+                    style={{
+                      color: "#6b7280",
+                      fontSize: 14,
+                      marginBottom: 12,
+                    }}
+                  >
+                    予定日: {event.scheduled_for}
+                  </div>
+
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <form action={completeCareEvent}>
+                      <input type="hidden" name="event_id" value={event.id} />
+                      <button
+                        type="submit"
+                        style={{
+                          padding: "8px 12px",
+                          backgroundColor: "#16a34a",
+                          color: "#fff",
+                          border: "none",
+                          borderRadius: 8,
+                          cursor: "pointer",
+                          fontWeight: 700,
+                        }}
+                      >
+                        やった
+                      </button>
+                    </form>
+
+                    <form action={snoozeCareEvent}>
+                      <input type="hidden" name="event_id" value={event.id} />
+                      <input
+                        type="hidden"
+                        name="scheduled_for"
+                        value={event.scheduled_for}
+                      />
+                      <button
+                        type="submit"
+                        style={{
+                          padding: "8px 12px",
+                          backgroundColor: "#f59e0b",
+                          color: "#fff",
+                          border: "none",
+                          borderRadius: 8,
+                          cursor: "pointer",
+                          fontWeight: 700,
+                        }}
+                      >
+                        あとで
+                      </button>
+                    </form>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      <section
+        style={{
+          marginBottom: 24,
+          padding: 20,
+          border: "1px solid #e5e7eb",
+          borderRadius: 16,
+          background: "#ffffff",
+          boxShadow: "0 8px 24px rgba(15, 23, 42, 0.05)",
+        }}
+      >
+        <h2
+          style={{
+            fontSize: 20,
+            fontWeight: 700,
+            marginBottom: 16,
+            color: "#111827",
+          }}
+        >
+          育てている植物
+        </h2>
+
+        {plantsError ? (
+          <p style={{ color: "#b91c1c" }}>植物データの取得でエラーが出ました</p>
+        ) : plants.length === 0 ? (
+          <p style={{ color: "#4b5563" }}>まだ植物は登録されていません</p>
+        ) : (
+          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+            {plants.map((plant) => (
+              <li
+                key={plant.id}
+                style={{
+                  padding: 14,
+                  marginBottom: 10,
+                  border: "1px solid #e5e7eb",
+                  borderRadius: 12,
+                  background: "#fafafa",
+                }}
+              >
+                <div
+                  style={{
+                    fontWeight: 700,
+                    fontSize: 16,
+                    color: "#111827",
+                    marginBottom: 4,
+                  }}
+                >
+                  {getPlantLabel(plant.plant_type)}
+                </div>
+                <div style={{ color: "#6b7280", fontSize: 14 }}>
+                  植えた日: {plant.planted_at}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section
+        style={{
+          padding: 20,
+          border: "1px solid #e5e7eb",
+          borderRadius: 16,
+          background: "#ffffff",
+          boxShadow: "0 8px 24px rgba(15, 23, 42, 0.05)",
+        }}
+      >
+        <h2
+          style={{
+            fontSize: 20,
+            fontWeight: 700,
+            marginBottom: 16,
+            color: "#111827",
+          }}
+        >
+          これからの予定
+        </h2>
+
+        {careEventsError ? (
+          <p style={{ color: "#b91c1c" }}>予定データの取得でエラーが出ました</p>
+        ) : upcomingEvents.length === 0 ? (
+          <p style={{ color: "#4b5563" }}>今後の予定はありません</p>
+        ) : (
+          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+            {upcomingEvents.slice(0, 10).map((event) => {
+              const plant = plantMap.get(event.plant_id);
+
+              return (
+                <li
+                  key={event.id}
+                  style={{
+                    padding: 14,
+                    marginBottom: 10,
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 12,
+                    background: "#fafafa",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      fontSize: 16,
+                      color: "#111827",
+                      marginBottom: 4,
+                    }}
+                  >
+                    {getTaskMessage(plant?.plant_type ?? null, event.task_type)}
+                  </div>
+                  <div style={{ color: "#6b7280", fontSize: 14 }}>
+                    予定日: {event.scheduled_for}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+    </main>
   );
 }
