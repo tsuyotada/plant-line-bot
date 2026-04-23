@@ -215,85 +215,14 @@ async function addPlant(formData: FormData) {
     return;
   }
 
-  const events: {
-    plant_id: string;
-    scheduled_for: string;
-    status: string;
-    task_type: string;
-    rule_id?: string | null;
-  }[] = [];
+  const careRules = await fetchCareRules();
 
-if (plantType === "tomato") {
-  // 単発イベント
-  events.push({
-    plant_id: plant.id,
-    scheduled_for: addDays(plantedAt, 2),
-    status: "pending",
-    task_type: "tomato_establishment_check",
-  });
-
-  events.push({
-    plant_id: plant.id,
-    scheduled_for: addDays(plantedAt, 7),
-    status: "pending",
-    task_type: "tomato_support_and_tying",
-  });
-
-  events.push({
-    plant_id: plant.id,
-    scheduled_for: addDays(plantedAt, 14),
-    status: "pending",
-    task_type: "tomato_first_feed_check",
-  });
-
-  // 繰り返しイベント（最初の30日分を作る）
-  for (let i = 3; i <= 30; i += 3) {
-    events.push({
-      plant_id: plant.id,
-      scheduled_for: addDays(plantedAt, i),
-      status: "pending",
-      task_type: "tomato_leaf_health_check",
-    });
-  }
-
-  for (let i = 7; i <= 30; i += 7) {
-    events.push({
-      plant_id: plant.id,
-      scheduled_for: addDays(plantedAt, i),
-      status: "pending",
-      task_type: "tomato_sucker_check",
-    });
-  }
-
-  for (let i = 14; i <= 30; i += 14) {
-    events.push({
-      plant_id: plant.id,
-      scheduled_for: addDays(plantedAt, i),
-      status: "pending",
-      task_type: "tomato_feed_check",
-    });
-  }
-}
-
-  if (plantType === "coriander") {
-    events.push({
-      plant_id: plant.id,
-      scheduled_for: addDays(plantedAt, 14),
-      status: "pending",
-      task_type: "coriander_thinning",
-      rule_id: null,
-    });
-  }
-
-  if (events.length > 0) {
-    const { error: eventError } = await supabase.from("care_events").insert(events);
-
-    if (eventError) {
-      console.error("care_events insert error:", eventError);
-    }
-  }
-}
-
+  const events = buildCareEventsFromRules(
+    plant.id,
+    plantType,
+    plantedAt,
+    careRules
+  );
 
   if (events.length > 0) {
     const { error: eventError } = await supabase.from("care_events").insert(events);
