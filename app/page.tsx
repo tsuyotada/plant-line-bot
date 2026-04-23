@@ -1,5 +1,117 @@
 import { supabase } from "../src/lib/supabase";
 
+const PLANTS_MASTER_URL =
+  "https://opensheet.elk.sh/1XmNK_IFrsQfZ7D65ECBKLDHEHJ7VK9TTFCdwa7_mjrk/plants_master";
+
+const CARE_RULES_URL =
+  "https://opensheet.elk.sh/1XmNK_IFrsQfZ7D65ECBKLDHEHJ7VK9TTFCdwa7_mjrk/care_rules";
+
+const ADVICE_MESSAGES_URL =
+  "https://opensheet.elk.sh/1XmNK_IFrsQfZ7D65ECBKLDHEHJ7VK9TTFCdwa7_mjrk/advice_messages";
+
+  type PlantMasterRow = {
+  plant_code: string;
+  plant_name: string;
+  enabled: string;
+};
+
+type CareRuleRow = {
+  plant_code: string;
+  event_code: string;
+  days_after_planting: string;
+  repeat_every_days: string;
+  is_repeat: string;
+  enabled: string;
+};
+
+type AdviceMessageRow = {
+  event_code: string;
+  title: string;
+  message: string;
+};
+
+async function fetchPlantsMaster(): Promise<PlantMasterRow[]> {
+  const res = await fetch(PLANTS_MASTER_URL, { cache: "no-store" });
+  if (!res.ok) throw new Error("plants_master の取得に失敗しました");
+  return res.json();
+}
+
+async function fetchCareRules(): Promise<CareRuleRow[]> {
+  const res = await fetch(CARE_RULES_URL, { cache: "no-store" });
+  if (!res.ok) throw new Error("care_rules の取得に失敗しました");
+  return res.json();
+}
+
+async function fetchAdviceMessages(): Promise<AdviceMessageRow[]> {
+  const res = await fetch(ADVICE_MESSAGES_URL, { cache: "no-store" });
+  if (!res.ok) throw new Error("advice_messages の取得に失敗しました");
+  return res.json();
+}
+
+function isTrueLike(value: string | null | undefined) {
+  return String(value).toLowerCase() === "true";
+}
+
+function toNumberOrNull(value: string | null | undefined) {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  return Number.isNaN(n) ? null : n;
+}
+
+function buildCareEventsFromRules(
+  plantId: string,
+  plantType: string,
+  plantedAt: string,
+  rules: CareRuleRow[]
+) {
+  const events: {
+    plant_id: string;
+    scheduled_for: string;
+    status: string;
+    task_type: string;
+    rule_id?: string | null;
+  }[] = [];
+
+  const targetRules = rules.filter(
+    (rule) =>
+      rule.plant_code === plantType &&
+      isTrueLike(rule.enabled)
+  );
+
+  for (const rule of targetRules) {
+    const daysAfterPlanting = toNumberOrNull(rule.days_after_planting);
+    const repeatEveryDays = toNumberOrNull(rule.repeat_every_days);
+    const isRepeat = isTrueLike(rule.is_repeat);
+
+    if (daysAfterPlanting == null) continue;
+
+    if (!isRepeat) {
+      events.push({
+        plant_id: plantId,
+        scheduled_for: addDays(plantedAt, daysAfterPlanting),
+        status: "pending",
+        task_type: rule.event_code,
+        rule_id: null,
+      });
+      continue;
+    }
+
+    if (repeatEveryDays == null || repeatEveryDays <= 0) continue;
+
+    for (let day = daysAfterPlanting; day <= 30; day += repeatEveryDays) {
+      events.push({
+        plant_id: plantId,
+        scheduled_for: addDays(plantedAt, day),
+        status: "pending",
+        task_type: rule.event_code,
+        rule_id: null,
+      });
+    }
+  }
+
+  return events;
+}
+
 function addDays(dateString: string, days: number) {
   const d = new Date(dateString);
   d.setDate(d.getDate() + days);
@@ -182,6 +294,16 @@ if (plantType === "tomato") {
   }
 }
 
+
+  if (events.length > 0) {
+    const { error: eventError } = await supabase.from("care_events").insert(events);
+
+    if (eventError) {
+      console.error("care_events insert error:", eventError);
+    }
+  }
+}
+
 async function completeCareEvent(formData: FormData) {
   "use server";
 
@@ -219,6 +341,13 @@ async function snoozeCareEvent(formData: FormData) {
 }
 
 export default async function Home() {
+
+const plantsMaster = await fetchPlantsMaster();
+
+const enabledPlantOptions = plantsMaster.filter(
+  (plant) => String(plant.enabled).toLowerCase() === "true"
+);
+
   const today = todayString();
 
   const { data: plantsRaw, error: plantsError } = await supabase
@@ -317,22 +446,25 @@ export default async function Home() {
             >
               植物
             </label>
-            <select
-              name="plant_type"
-              defaultValue="tomato"
-              style={{
-                width: "100%",
-                maxWidth: 280,
-                padding: "10px 12px",
-                borderRadius: 10,
-                border: "1px solid #d1d5db",
-                background: "#fff",
-                fontSize: 15,
-              }}
-            >
-              <option value="tomato">トマト</option>
-              <option value="coriander">コリアンダー</option>
-            </select>
+<select
+  name="plant_type"
+  defaultValue={enabledPlantOptions[0]?.plant_code ?? "tomato"}
+  style={{
+    width: "100%",
+    maxWidth: 280,
+    padding: "10px 12px",
+    borderRadius: 10,
+    border: "1px solid #d1d5db",
+    background: "#fff",
+    fontSize: 15,
+  }}
+>
+  {enabledPlantOptions.map((plant) => (
+    <option key={plant.plant_code} value={plant.plant_code}>
+      {plant.plant_name}
+    </option>
+  ))}
+</select>
           </div>
 
           <div style={{ marginBottom: 18 }}>
