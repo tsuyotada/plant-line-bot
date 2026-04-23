@@ -9,7 +9,7 @@ const CARE_RULES_URL =
 const ADVICE_MESSAGES_URL =
   "https://opensheet.elk.sh/1XmNK_IFrsQfZ7D65ECBKLDHEHJ7VK9TTFCdwa7_mjrk/advice_messages";
 
-  type PlantMasterRow = {
+type PlantMasterRow = {
   plant_code: string;
   plant_name: string;
   enabled: string;
@@ -29,6 +29,27 @@ type AdviceMessageRow = {
   title: string;
   message: string;
 };
+
+function addDays(dateString: string, days: number) {
+  const d = new Date(dateString);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function todayString() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function getPlantLabel(plantType: string | null) {
+  switch (plantType) {
+    case "tomato":
+      return "トマト";
+    case "coriander":
+      return "コリアンダー";
+    default:
+      return "植物";
+  }
+}
 
 async function fetchPlantsMaster(): Promise<PlantMasterRow[]> {
   const res = await fetch(PLANTS_MASTER_URL, { cache: "no-store" });
@@ -101,9 +122,7 @@ function buildCareEventsFromRules(
   }[] = [];
 
   const targetRules = rules.filter(
-    (rule) =>
-      rule.plant_code === plantType &&
-      isTrueLike(rule.enabled)
+    (rule) => rule.plant_code === plantType && isTrueLike(rule.enabled)
   );
 
   for (const rule of targetRules) {
@@ -139,29 +158,6 @@ function buildCareEventsFromRules(
 
   return events;
 }
-
-function addDays(dateString: string, days: number) {
-  const d = new Date(dateString);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
-function todayString() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function getPlantLabel(plantType: string | null) {
-  switch (plantType) {
-    case "tomato":
-      return "トマト";
-    case "coriander":
-      return "コリアンダー";
-    default:
-      return "植物";
-  }
-}
-
-
 
 function buildTodayLineMessage(
   today: string,
@@ -267,12 +263,11 @@ async function snoozeCareEvent(formData: FormData) {
 }
 
 export default async function Home() {
+  const plantsMaster = await fetchPlantsMaster();
 
-const plantsMaster = await fetchPlantsMaster();
-
-const enabledPlantOptions = plantsMaster.filter(
-  (plant) => String(plant.enabled).toLowerCase() === "true"
-);
+  const enabledPlantOptions = plantsMaster.filter(
+    (plant) => String(plant.enabled).toLowerCase() === "true"
+  );
 
   const adviceMessages = await fetchAdviceMessages();
   const adviceMap = buildAdviceMap(adviceMessages);
@@ -298,15 +293,15 @@ const enabledPlantOptions = plantsMaster.filter(
     (event) => event.scheduled_for === today && event.status === "pending"
   );
 
-const groupedTodayTasks = Array.from(
-  new Set(todayEvents.map((e) => e.task_type))
-);
+  const groupedTodayTasks = Array.from(
+    new Set(todayEvents.map((e) => e.task_type))
+  );
 
   const upcomingEvents = careEvents.filter(
     (event) => event.scheduled_for > today && event.status === "pending"
   );
 
-const todayLineMessage = buildTodayLineMessage(today, todayEvents, adviceMap);
+  const todayLineMessage = buildTodayLineMessage(today, todayEvents, adviceMap);
   const lineShareUrl = `https://line.me/R/msg/text/?${encodeURIComponent(
     todayLineMessage
   )}`;
@@ -379,25 +374,25 @@ const todayLineMessage = buildTodayLineMessage(today, todayEvents, adviceMap);
             >
               植物
             </label>
-<select
-  name="plant_type"
-  defaultValue={enabledPlantOptions[0]?.plant_code ?? "tomato"}
-  style={{
-    width: "100%",
-    maxWidth: 280,
-    padding: "10px 12px",
-    borderRadius: 10,
-    border: "1px solid #d1d5db",
-    background: "#fff",
-    fontSize: 15,
-  }}
->
-  {enabledPlantOptions.map((plant) => (
-    <option key={plant.plant_code} value={plant.plant_code}>
-      {plant.plant_name}
-    </option>
-  ))}
-</select>
+            <select
+              name="plant_type"
+              defaultValue={enabledPlantOptions[0]?.plant_code ?? "tomato"}
+              style={{
+                width: "100%",
+                maxWidth: 280,
+                padding: "10px 12px",
+                borderRadius: 10,
+                border: "1px solid #d1d5db",
+                background: "#fff",
+                fontSize: 15,
+              }}
+            >
+              {enabledPlantOptions.map((plant) => (
+                <option key={plant.plant_code} value={plant.plant_code}>
+                  {plant.plant_name}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div style={{ marginBottom: 18 }}>
@@ -526,48 +521,19 @@ const todayLineMessage = buildTodayLineMessage(today, todayEvents, adviceMap);
           <p style={{ color: "#4b5563", margin: 0 }}>今日は予定はありません</p>
         ) : (
           <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-      {groupedTodayTasks.map((taskType, index) => {
-  const advice = getAdviceText(adviceMap, taskType);
-
-  return (
-    <div key={taskType}>
-      <div
-        style={{
-          fontWeight: 700,
-          fontSize: 16,
-          color: "#111827",
-          marginBottom: 6,
-        }}
-      >
-        {index + 1}. {advice.title}
-      </div>
-
-      <div
-        style={{
-          color: "#374151",
-          fontSize: 14,
-          marginBottom: 12,
-          lineHeight: 1.6,
-        }}
-      >
-        {advice.message}
-      </div>
-    </div>
-  );
-})}
-              const plant = plantMap.get(event.plant_id);
-
-const advice = getAdviceText(adviceMap, event.task_type);
+            {groupedTodayTasks.map((taskType, index) => {
+              const advice = getAdviceText(adviceMap, taskType);
 
               return (
                 <li
-                  key={event.id}
+                  key={taskType}
                   style={{
                     padding: 16,
                     marginBottom: 12,
                     background: "#ffffff",
                     border: "1px solid #dcfce7",
                     borderRadius: 12,
+                    listStyle: "none",
                   }}
                 >
                   <div
@@ -575,83 +541,77 @@ const advice = getAdviceText(adviceMap, event.task_type);
                       fontWeight: 700,
                       fontSize: 16,
                       color: "#111827",
-                      marginBottom: 8,
+                      marginBottom: 6,
                     }}
                   >
-<div
-  style={{
-    fontWeight: 700,
-    fontSize: 16,
-    color: "#111827",
-    marginBottom: 6,
-  }}
->
-  {advice.title}
-</div>
-
-<div
-  style={{
-    color: "#374151",
-    fontSize: 14,
-    marginBottom: 8,
-    lineHeight: 1.6,
-  }}
->
-  {advice.message}
-</div>
+                    {index + 1}. {advice.title}
                   </div>
 
                   <div
                     style={{
-                      color: "#6b7280",
+                      color: "#374151",
                       fontSize: 14,
                       marginBottom: 12,
+                      lineHeight: 1.6,
                     }}
                   >
-                    予定日: {event.scheduled_for}
+                    {advice.message}
                   </div>
 
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <form action={completeCareEvent}>
-                      <input type="hidden" name="event_id" value={event.id} />
-                      <button
-                        type="submit"
-                        style={{
-                          padding: "8px 12px",
-                          backgroundColor: "#16a34a",
-                          color: "#fff",
-                          border: "none",
-                          borderRadius: 8,
-                          cursor: "pointer",
-                          fontWeight: 700,
-                        }}
-                      >
-                        やった
-                      </button>
-                    </form>
+                    {todayEvents
+                      .filter((event) => event.task_type === taskType)
+                      .map((event) => (
+                        <div
+                          key={event.id}
+                          style={{
+                            display: "flex",
+                            gap: 8,
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <form action={completeCareEvent}>
+                            <input type="hidden" name="event_id" value={event.id} />
+                            <button
+                              type="submit"
+                              style={{
+                                padding: "8px 12px",
+                                backgroundColor: "#16a34a",
+                                color: "#fff",
+                                border: "none",
+                                borderRadius: 8,
+                                cursor: "pointer",
+                                fontWeight: 700,
+                              }}
+                            >
+                              やった
+                            </button>
+                          </form>
 
-                    <form action={snoozeCareEvent}>
-                      <input type="hidden" name="event_id" value={event.id} />
-                      <input
-                        type="hidden"
-                        name="scheduled_for"
-                        value={event.scheduled_for}
-                      />
-                      <button
-                        type="submit"
-                        style={{
-                          padding: "8px 12px",
-                          backgroundColor: "#f59e0b",
-                          color: "#fff",
-                          border: "none",
-                          borderRadius: 8,
-                          cursor: "pointer",
-                          fontWeight: 700,
-                        }}
-                      >
-                        あとで
-                      </button>
-                    </form>
+                          <form action={snoozeCareEvent}>
+                            <input type="hidden" name="event_id" value={event.id} />
+                            <input
+                              type="hidden"
+                              name="scheduled_for"
+                              value={event.scheduled_for}
+                            />
+                            <button
+                              type="submit"
+                              style={{
+                                padding: "8px 12px",
+                                backgroundColor: "#f59e0b",
+                                color: "#fff",
+                                border: "none",
+                                borderRadius: 8,
+                                cursor: "pointer",
+                                fontWeight: 700,
+                              }}
+                            >
+                              あとで
+                            </button>
+                          </form>
+                        </div>
+                      ))}
                   </div>
                 </li>
               );
@@ -744,8 +704,6 @@ const advice = getAdviceText(adviceMap, event.task_type);
         ) : (
           <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
             {upcomingEvents.slice(0, 10).map((event) => {
-              const plant = plantMap.get(event.plant_id);
-
               const advice = getAdviceText(adviceMap, event.task_type);
 
               return (
@@ -767,32 +725,20 @@ const advice = getAdviceText(adviceMap, event.task_type);
                       marginBottom: 4,
                     }}
                   >
-<div
-  style={{
-    fontWeight: 700,
-    fontSize: 16,
-    color: "#111827",
-    marginBottom: 4,
-  }}
->
-  {advice.title}
-</div>
-
-<div
-  style={{
-    color: "#374151",
-    fontSize: 14,
-    marginBottom: 6,
-    lineHeight: 1.6,
-  }}
->
-  {advice.message}
-</div>
-
-<div style={{ color: "#6b7280", fontSize: 14 }}>
-  予定日: {event.scheduled_for}
-</div>
+                    {advice.title}
                   </div>
+
+                  <div
+                    style={{
+                      color: "#374151",
+                      fontSize: 14,
+                      marginBottom: 6,
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    {advice.message}
+                  </div>
+
                   <div style={{ color: "#6b7280", fontSize: 14 }}>
                     予定日: {event.scheduled_for}
                   </div>
