@@ -48,6 +48,34 @@ async function fetchAdviceMessages(): Promise<AdviceMessageRow[]> {
   return res.json();
 }
 
+function buildAdviceMap(adviceMessages: AdviceMessageRow[]) {
+  return new Map(
+    adviceMessages.map((row) => [
+      row.event_code,
+      {
+        title: row.title,
+        message: row.message,
+      },
+    ])
+  );
+}
+
+function getAdviceText(
+  adviceMap: Map<string, { title: string; message: string }>,
+  taskType: string | null | undefined
+) {
+  const advice = adviceMap.get(taskType ?? "");
+
+  if (!advice) {
+    return {
+      title: "植物のお世話",
+      message: "植物のお世話をしましょう",
+    };
+  }
+
+  return advice;
+}
+
 function isTrueLike(value: string | null | undefined) {
   return String(value).toLowerCase() === "true";
 }
@@ -133,46 +161,12 @@ function getPlantLabel(plantType: string | null) {
   }
 }
 
-function getTaskMessage(plantType: string | null, taskType: string | null) {
-if (plantType === "tomato") {
-  if (taskType === "tomato_establishment_check") {
-    return "🍅 活着チェック：朝も葉がしおれていないか確認しましょう";
-  }
 
-  if (taskType === "tomato_support_and_tying") {
-    return "🍅 支柱と誘引：茎が倒れないよう軽く固定しましょう";
-  }
-
-  if (taskType === "tomato_first_feed_check") {
-    return "🍅 初回追肥：生長が順調なら少量の肥料を検討しましょう";
-  }
-
-  if (taskType === "tomato_leaf_health_check") {
-    return "🍅 葉の状態チェック：黄化・斑点・虫食いがないか見ましょう";
-  }
-
-  if (taskType === "tomato_sucker_check") {
-    return "🍅 脇芽チェック：小さいうちに取り除きましょう";
-  }
-
-  if (taskType === "tomato_feed_check") {
-    return "🍅 追肥チェック：実や生長の様子を見て調整しましょう";
-  }
-}
-
-  if (plantType === "coriander") {
-    if (taskType === "coriander_thinning") {
-      return "🌿 コリアンダーを間引きしましょう";
-    }
-  }
-
-  return "植物のお世話をしましょう";
-}
 
 function buildTodayLineMessage(
   today: string,
   todayEvents: any[],
-  plantMap: Map<string, any>
+  adviceMap: Map<string, { title: string; message: string }>
 ) {
   if (todayEvents.length === 0) {
     return `【${today} のお世話メモ】
@@ -180,9 +174,8 @@ function buildTodayLineMessage(
   }
 
   const lines = todayEvents.map((event, index) => {
-    const plant = plantMap.get(event.plant_id);
-    const taskMessage = getTaskMessage(plant?.plant_type ?? null, event.task_type);
-    return `${index + 1}. ${taskMessage}`;
+    const advice = getAdviceText(adviceMap, event.task_type);
+    return `${index + 1}. ${advice.title}：${advice.message}`;
   });
 
   return `【${today} の今日やること】
@@ -277,6 +270,9 @@ const enabledPlantOptions = plantsMaster.filter(
   (plant) => String(plant.enabled).toLowerCase() === "true"
 );
 
+  const adviceMessages = await fetchAdviceMessages();
+  const adviceMap = buildAdviceMap(adviceMessages);
+
   const today = todayString();
 
   const { data: plantsRaw, error: plantsError } = await supabase
@@ -302,7 +298,7 @@ const enabledPlantOptions = plantsMaster.filter(
     (event) => event.scheduled_for > today && event.status === "pending"
   );
 
-  const todayLineMessage = buildTodayLineMessage(today, todayEvents, plantMap);
+const todayLineMessage = buildTodayLineMessage(today, todayEvents, adviceMap);
   const lineShareUrl = `https://line.me/R/msg/text/?${encodeURIComponent(
     todayLineMessage
   )}`;
@@ -525,6 +521,8 @@ const enabledPlantOptions = plantsMaster.filter(
             {todayEvents.map((event) => {
               const plant = plantMap.get(event.plant_id);
 
+const advice = getAdviceText(adviceMap, event.task_type);
+
               return (
                 <li
                   key={event.id}
@@ -544,7 +542,27 @@ const enabledPlantOptions = plantsMaster.filter(
                       marginBottom: 8,
                     }}
                   >
-                    {getTaskMessage(plant?.plant_type ?? null, event.task_type)}
+<div
+  style={{
+    fontWeight: 700,
+    fontSize: 16,
+    color: "#111827",
+    marginBottom: 6,
+  }}
+>
+  {advice.title}
+</div>
+
+<div
+  style={{
+    color: "#374151",
+    fontSize: 14,
+    marginBottom: 8,
+    lineHeight: 1.6,
+  }}
+>
+  {advice.message}
+</div>
                   </div>
 
                   <div
@@ -692,6 +710,8 @@ const enabledPlantOptions = plantsMaster.filter(
             {upcomingEvents.slice(0, 10).map((event) => {
               const plant = plantMap.get(event.plant_id);
 
+              const advice = getAdviceText(adviceMap, event.task_type);
+
               return (
                 <li
                   key={event.id}
@@ -711,7 +731,31 @@ const enabledPlantOptions = plantsMaster.filter(
                       marginBottom: 4,
                     }}
                   >
-                    {getTaskMessage(plant?.plant_type ?? null, event.task_type)}
+<div
+  style={{
+    fontWeight: 700,
+    fontSize: 16,
+    color: "#111827",
+    marginBottom: 4,
+  }}
+>
+  {advice.title}
+</div>
+
+<div
+  style={{
+    color: "#374151",
+    fontSize: 14,
+    marginBottom: 6,
+    lineHeight: 1.6,
+  }}
+>
+  {advice.message}
+</div>
+
+<div style={{ color: "#6b7280", fontSize: 14 }}>
+  予定日: {event.scheduled_for}
+</div>
                   </div>
                   <div style={{ color: "#6b7280", fontSize: 14 }}>
                     予定日: {event.scheduled_for}
