@@ -40,15 +40,19 @@ function todayString() {
   return new Date().toISOString().slice(0, 10);
 }
 
+const plantLabelMap: Record<string, string> = {
+  tomato: "トマト",
+  coriander: "コリアンダー",
+  makrut_lime: "コブミカン",
+  mint: "ミント",
+  everbearing_strawberry: "四季成りイチゴ",
+  italian_parsley: "イタリアンパセリ",
+  shiso: "大葉",
+  perilla: "えごま",
+};
+
 function getPlantLabel(plantType: string | null) {
-  switch (plantType) {
-    case "tomato":
-      return "トマト";
-    case "coriander":
-      return "コリアンダー";
-    default:
-      return "植物";
-  }
+  return plantType ? plantLabelMap[plantType] ?? "植物" : "植物";
 }
 
 async function fetchPlantsMaster(): Promise<PlantMasterRow[]> {
