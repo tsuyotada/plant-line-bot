@@ -173,9 +173,13 @@ function buildTodayLineMessage(
 今日はお世話の予定はありません🌱`;
   }
 
-  const lines = todayEvents.map((event, index) => {
-    const advice = getAdviceText(adviceMap, event.task_type);
-    return `${index + 1}. ${advice.title}：${advice.message}`;
+  const uniqueTaskTypes = Array.from(
+    new Set(todayEvents.map((e) => e.task_type))
+  );
+
+  const lines = uniqueTaskTypes.map((taskType, index) => {
+    const advice = getAdviceText(adviceMap, taskType);
+    return `${index + 1}. ${advice.title}`;
   });
 
   return `【${today} の今日やること】
@@ -293,6 +297,10 @@ const enabledPlantOptions = plantsMaster.filter(
   const todayEvents = careEvents.filter(
     (event) => event.scheduled_for === today && event.status === "pending"
   );
+
+const groupedTodayTasks = Array.from(
+  new Set(todayEvents.map((e) => e.task_type))
+);
 
   const upcomingEvents = careEvents.filter(
     (event) => event.scheduled_for > today && event.status === "pending"
@@ -518,7 +526,35 @@ const todayLineMessage = buildTodayLineMessage(today, todayEvents, adviceMap);
           <p style={{ color: "#4b5563", margin: 0 }}>今日は予定はありません</p>
         ) : (
           <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-            {todayEvents.map((event) => {
+      {groupedTodayTasks.map((taskType, index) => {
+  const advice = getAdviceText(adviceMap, taskType);
+
+  return (
+    <div key={taskType}>
+      <div
+        style={{
+          fontWeight: 700,
+          fontSize: 16,
+          color: "#111827",
+          marginBottom: 6,
+        }}
+      >
+        {index + 1}. {advice.title}
+      </div>
+
+      <div
+        style={{
+          color: "#374151",
+          fontSize: 14,
+          marginBottom: 12,
+          lineHeight: 1.6,
+        }}
+      >
+        {advice.message}
+      </div>
+    </div>
+  );
+})}
               const plant = plantMap.get(event.plant_id);
 
 const advice = getAdviceText(adviceMap, event.task_type);
