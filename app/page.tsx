@@ -1,4 +1,5 @@
 import { supabase } from "../src/lib/supabase";
+import { BackgroundLayer } from "./BackgroundLayer";
 
 const PLANTS_MASTER_URL =
   "https://opensheet.elk.sh/1XmNK_IFrsQfZ7D65ECBKLDHEHJ7VK9TTFCdwa7_mjrk/plants_master";
@@ -28,6 +29,20 @@ type AdviceMessageRow = {
   event_code: string;
   title: string;
   message: string;
+};
+
+/*
+ * 将来的に plants テーブルに以下の列を追加してください:
+ *   ALTER TABLE plants ADD COLUMN plant_condition TEXT;
+ *   ALTER TABLE plants ADD COLUMN plant_note TEXT;
+ *
+ * plant_condition の想定値: 'seed' | 'seedling' | 'cutting' | 'established'
+ */
+const plantConditionLabelMap: Record<string, string> = {
+  seed: "種まき",
+  seedling: "苗",
+  cutting: "挿し木",
+  established: "育っている株",
 };
 
 function addDays(dateString: string, days: number) {
@@ -182,6 +197,10 @@ async function addPlant(formData: FormData) {
   const plantType = String(formData.get("plant_type") || "");
   const plantedAt = String(formData.get("planted_at") || "");
 
+  // plant_condition と plant_note は DB列追加後に保存実装予定
+  // const plantCondition = String(formData.get("plant_condition") || "");
+  // const plantNote = String(formData.get("plant_note") || "");
+
   if (!plantType || !plantedAt) return;
 
   const { data: plant, error: plantError } = await supabase
@@ -196,10 +215,17 @@ async function addPlant(formData: FormData) {
   }
 
   const careRules = await fetchCareRules();
-  const events = buildCareEventsFromRules(plant.id, plantType, plantedAt, careRules);
+  const events = buildCareEventsFromRules(
+    plant.id,
+    plantType,
+    plantedAt,
+    careRules
+  );
 
   if (events.length > 0) {
-    const { error: eventError } = await supabase.from("care_events").insert(events);
+    const { error: eventError } = await supabase
+      .from("care_events")
+      .insert(events);
     if (eventError) {
       console.error("care_events insert error:", eventError);
     }
@@ -285,7 +311,9 @@ export default async function Home() {
   );
 
   const todayLineMessage = buildTodayLineMessage(today, todayEvents, adviceMap);
-  const lineShareUrl = `https://line.me/R/msg/text/?${encodeURIComponent(todayLineMessage)}`;
+  const lineShareUrl = `https://line.me/R/msg/text/?${encodeURIComponent(
+    todayLineMessage
+  )}`;
 
   const fontFamily =
     'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
@@ -293,26 +321,6 @@ export default async function Home() {
   return (
     <>
       <style>{`
-        /* ─────────────────────────────────────────
-           Background
-           Replace background-image URL to swap photo.
-           e.g. url('https://images.unsplash.com/photo-XXXXX?auto=format&fit=crop&w=1920&q=80')
-        ───────────────────────────────────────── */
-        .app-bg {
-          position: fixed;
-          inset: 0;
-          z-index: -1;
-          background: linear-gradient(160deg, #c8dfc4 0%, #a3c4a0 45%, #7aaa78 100%);
-          /* background-image: url('YOUR_PLANT_PHOTO_URL_HERE'); */
-          background-size: cover;
-          background-position: center;
-        }
-        .app-bg-overlay {
-          position: absolute;
-          inset: 0;
-          background: rgba(242, 249, 244, 0.91);
-        }
-
         /* ─── Board grid ─── */
         .board-grid {
           display: grid;
@@ -324,27 +332,27 @@ export default async function Home() {
           .board-grid { grid-template-columns: 1fr; }
         }
 
-        /* ─── Column panel (frosted glass) ─── */
+        /* ─── Column panel — warm cream frosted glass ─── */
         .col-board {
-          background: rgba(255, 255, 255, 0.76);
+          background: rgba(253, 250, 244, 0.84);
           backdrop-filter: blur(12px);
           -webkit-backdrop-filter: blur(12px);
-          border: 1px solid rgba(255, 255, 255, 0.88);
+          border: 1px solid rgba(255, 255, 255, 0.90);
           border-radius: 14px;
           padding: 18px;
-          box-shadow: 0 2px 14px rgba(30, 60, 40, 0.08);
+          box-shadow: 0 2px 12px rgba(60, 50, 30, 0.07);
         }
 
         /* ─── Column heading ─── */
         .col-heading {
-          font-size: 13px;
+          font-size: 12px;
           font-weight: 700;
-          color: #1a3d2b;
-          margin: 0 0 16px;
-          letter-spacing: 0.5px;
+          color: #2d4a3e;
+          margin: 0 0 14px;
+          letter-spacing: 0.6px;
           text-transform: uppercase;
           padding-left: 10px;
-          border-left: 3px solid #4ade80;
+          border-left: 3px solid #6db07b;
           line-height: 1.4;
         }
 
@@ -364,25 +372,24 @@ export default async function Home() {
           background: #ffffff;
           border-radius: 10px;
           overflow: hidden;
-          box-shadow: 0 1px 4px rgba(30, 60, 40, 0.08);
+          box-shadow: 0 1px 3px rgba(60, 50, 30, 0.08);
           transition: box-shadow 0.15s;
         }
         .plant-card:hover {
-          box-shadow: 0 3px 10px rgba(30, 60, 40, 0.13);
+          box-shadow: 0 3px 10px rgba(60, 50, 30, 0.13);
         }
         .plant-photo-area {
-          height: 72px;
-          background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 55%, #6ee7b7 100%);
+          height: 68px;
+          background: linear-gradient(135deg, #d4edda 0%, #b8dfbf 55%, #93c9a0 100%);
           display: flex;
           align-items: center;
           justify-content: center;
-          position: relative;
         }
         .plant-photo-label {
           font-size: 10px;
           font-weight: 600;
-          color: rgba(110, 231, 183, 0.9);
-          letter-spacing: 1px;
+          color: rgba(147, 201, 160, 0.95);
+          letter-spacing: 1.2px;
           text-transform: uppercase;
           user-select: none;
         }
@@ -390,28 +397,64 @@ export default async function Home() {
           padding: 10px 11px 12px;
         }
 
-        /* ─── Generic cards ─── */
+        /* ─── Generic white cards ─── */
         .todo-card,
-        .upcoming-card,
         .form-card,
         .line-card {
           background: #ffffff;
           border-radius: 10px;
           padding: 14px;
           margin-bottom: 8px;
-          box-shadow: 0 1px 4px rgba(30, 60, 40, 0.07);
+          box-shadow: 0 1px 3px rgba(60, 50, 30, 0.07);
+        }
+
+        /* ─── Active todo card (has tasks) — left accent ─── */
+        .todo-card-active {
+          background: #ffffff;
+          border-radius: 10px;
+          padding: 14px;
+          margin-bottom: 8px;
+          box-shadow: 0 1px 3px rgba(60, 50, 30, 0.07);
+          border-left: 3px solid #06c755;
+        }
+
+        /* ─── Empty today card ─── */
+        .empty-today-card {
+          background: linear-gradient(135deg, #f2faf4 0%, #faf8f3 100%);
+          border-radius: 10px;
+          padding: 28px 16px;
+          margin-bottom: 8px;
+          text-align: center;
+          border: 1px dashed #c8e6cc;
+        }
+
+        /* ─── Upcoming 2-col grid ─── */
+        .upcoming-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+          margin-bottom: 4px;
+        }
+        @media (max-width: 640px) {
+          .upcoming-grid { grid-template-columns: 1fr; }
+        }
+        .upcoming-card {
+          background: #ffffff;
+          border-radius: 10px;
+          padding: 12px;
+          box-shadow: 0 1px 3px rgba(60, 50, 30, 0.06);
         }
 
         /* ─── Sub-section label ─── */
         .sub-heading {
           font-size: 11px;
           font-weight: 700;
-          color: #9ca3af;
+          color: #a0a8a2;
           text-transform: uppercase;
           letter-spacing: 0.8px;
           margin: 20px 0 10px;
           padding-bottom: 6px;
-          border-bottom: 1px solid #e5e7eb;
+          border-bottom: 1px solid #e8e4dc;
         }
 
         /* ─── Badges ─── */
@@ -430,40 +473,64 @@ export default async function Home() {
           border-radius: 4px;
           font-size: 10px;
           font-weight: 700;
-          background: #dcfce7;
-          color: #166534;
+          background: #dcf5e4;
+          color: #1a5c36;
         }
 
-        /* ─── Date input ─── */
-        .date-input {
+        /* ─── Form inputs ─── */
+        .form-input {
           width: 100%;
           padding: 8px 10px;
           border-radius: 8px;
-          border: 1px solid #d1d5db;
-          background: #ffffff;
-          font-size: 14px;
+          border: 1px solid #ddd8cf;
+          background: #fdfcfa;
+          font-size: 13px;
           box-sizing: border-box;
           font-family: inherit;
+          color: #374151;
         }
-
-        /* ─── Select ─── */
-        .plant-select {
+        .form-input:focus {
+          outline: none;
+          border-color: #6db07b;
+          box-shadow: 0 0 0 2px rgba(109, 176, 123, 0.18);
+        }
+        .form-textarea {
           width: 100%;
           padding: 8px 10px;
           border-radius: 8px;
-          border: 1px solid #d1d5db;
-          background: #ffffff;
-          font-size: 14px;
+          border: 1px solid #ddd8cf;
+          background: #fdfcfa;
+          font-size: 13px;
+          box-sizing: border-box;
           font-family: inherit;
-          cursor: pointer;
+          color: #374151;
+          resize: vertical;
+          min-height: 60px;
+          line-height: 1.5;
+        }
+        .form-textarea:focus {
+          outline: none;
+          border-color: #6db07b;
+          box-shadow: 0 0 0 2px rgba(109, 176, 123, 0.18);
+        }
+
+        /* ─── Form label ─── */
+        .form-label {
+          display: block;
+          font-size: 11px;
+          font-weight: 600;
+          color: #7a8a7a;
+          margin-bottom: 5px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
         }
 
         /* ─── QR placeholder ─── */
         .qr-placeholder {
           width: 88px;
           height: 88px;
-          background: #f0fdf4;
-          border: 2px dashed #86efac;
+          background: #f2faf4;
+          border: 2px dashed #93c9a0;
           border-radius: 10px;
           display: flex;
           align-items: center;
@@ -479,52 +546,46 @@ export default async function Home() {
           font-weight: 700;
           font-family: inherit;
         }
+        .btn-primary {
+          border: none;
+          border-radius: 8px;
+          cursor: pointer;
+          font-weight: 700;
+          font-family: inherit;
+          background: #06c755;
+          color: #ffffff;
+        }
       `}</style>
 
-      {/* Fixed background layer */}
-      <div className="app-bg">
-        <div className="app-bg-overlay" />
-      </div>
+      {/* Client Component: background layer + controls */}
+      <BackgroundLayer />
 
       <main
         style={{
           minHeight: "100vh",
-          padding: "32px 20px 40px",
+          padding: "14px 20px 48px",
           fontFamily,
         }}
       >
-        {/* ── Header ── */}
-        <header
+        {/* ── Minimal header strip ── */}
+        <div
           style={{
             maxWidth: 1440,
-            margin: "0 auto 26px",
-            padding: "0 4px",
+            margin: "0 auto 14px",
+            paddingRight: 200, // right space for fixed bg controls
           }}
         >
-          <h1
+          <span
             style={{
-              fontSize: 30,
-              fontWeight: 700,
-              color: "#1a3d2b",
-              margin: 0,
-              letterSpacing: -0.8,
-              lineHeight: 1.15,
-            }}
-          >
-            Green Care
-          </h1>
-          <p
-            style={{
-              color: "#4b7a5a",
-              fontSize: 13,
-              margin: "6px 0 0",
-              fontWeight: 400,
-              letterSpacing: 0.15,
+              fontSize: 12,
+              color: "#8a9a8a",
+              fontWeight: 500,
+              letterSpacing: 0.2,
             }}
           >
             Keep every balcony plant healthy.
-          </p>
-        </header>
+          </span>
+        </div>
 
         {/* ── Board ── */}
         <div
@@ -546,7 +607,7 @@ export default async function Home() {
               </div>
             ) : plants.length === 0 ? (
               <div className="todo-card">
-                <p style={{ color: "#6b7280", margin: 0, fontSize: 13 }}>
+                <p style={{ color: "#9ca3af", margin: 0, fontSize: 13 }}>
                   まだ植物は登録されていません
                 </p>
               </div>
@@ -555,20 +616,24 @@ export default async function Home() {
                 {plants.map((plant) => {
                   const hasTodayEvent =
                     plantHasTodayEvent.get(plant.id) ?? false;
+                  const conditionLabel =
+                    plant.plant_condition
+                      ? (plantConditionLabelMap[plant.plant_condition] ??
+                        plant.plant_condition)
+                      : null;
                   return (
                     <div key={plant.id} className="plant-card">
-                      {/* Photo area — replace with <img> when photo upload is ready */}
+                      {/* Photo area — replaced with <img> when photo upload is ready */}
                       <div className="plant-photo-area">
                         <span className="plant-photo-label">photo</span>
                       </div>
-
                       <div className="plant-info">
                         <div
                           style={{
                             fontWeight: 700,
                             fontSize: 14,
-                            color: "#1a3d2b",
-                            marginBottom: 3,
+                            color: "#2d4a3e",
+                            marginBottom: 2,
                             lineHeight: 1.3,
                           }}
                         >
@@ -576,18 +641,34 @@ export default async function Home() {
                         </div>
                         <div
                           style={{
-                            color: "#9ca3af",
+                            color: "#b0b8b0",
                             fontSize: 11,
-                            marginBottom: 8,
+                            marginBottom: 4,
                           }}
                         >
                           {plant.planted_at}
                         </div>
+                        {/* Condition / note — shown once plants table columns are added */}
+                        {(conditionLabel || plant.plant_note) && (
+                          <div
+                            style={{
+                              fontSize: 10,
+                              color: "#9ca3af",
+                              marginBottom: 6,
+                              lineHeight: 1.4,
+                            }}
+                          >
+                            {conditionLabel}
+                            {conditionLabel && plant.plant_note ? " · " : ""}
+                            {plant.plant_note ?? ""}
+                          </div>
+                        )}
                         <div
                           style={{
                             display: "flex",
                             justifyContent: "space-between",
                             alignItems: "center",
+                            marginTop: 4,
                           }}
                         >
                           <span
@@ -597,11 +678,11 @@ export default async function Home() {
                           >
                             {hasTodayEvent ? "要対応" : "良好"}
                           </span>
-                          {/* Operations — reserved for edit / delete / photo upload */}
+                          {/* Operations area — reserved for edit / delete / photo upload */}
                           <span
                             style={{
-                              fontSize: 15,
-                              color: "#d1d5db",
+                              fontSize: 14,
+                              color: "#ddd8cf",
                               cursor: "default",
                               letterSpacing: 1,
                               userSelect: "none",
@@ -623,8 +704,8 @@ export default async function Home() {
                 style={{
                   fontSize: 12,
                   fontWeight: 700,
-                  color: "#1a3d2b",
-                  marginBottom: 12,
+                  color: "#2d4a3e",
+                  marginBottom: 14,
                   letterSpacing: 0.3,
                 }}
               >
@@ -632,25 +713,9 @@ export default async function Home() {
               </div>
               <form action={addPlant}>
                 <div style={{ marginBottom: 10 }}>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: 11,
-                      fontWeight: 600,
-                      color: "#6b7280",
-                      marginBottom: 4,
-                      textTransform: "uppercase",
-                      letterSpacing: 0.5,
-                    }}
-                  >
-                    植物
-                  </label>
-                  <select
-                    name="plant_type"
-                    defaultValue={
-                      enabledPlantOptions[0]?.plant_code ?? "tomato"
-                    }
-                    className="plant-select"
+                  <label className="form-label">植物</label>
+                  <select name="plant_type" className="form-input"
+                    defaultValue={enabledPlantOptions[0]?.plant_code ?? "tomato"}
                   >
                     {enabledPlantOptions.map((plant) => (
                       <option key={plant.plant_code} value={plant.plant_code}>
@@ -659,37 +724,42 @@ export default async function Home() {
                     ))}
                   </select>
                 </div>
-                <div style={{ marginBottom: 14 }}>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: 11,
-                      fontWeight: 600,
-                      color: "#6b7280",
-                      marginBottom: 4,
-                      textTransform: "uppercase",
-                      letterSpacing: 0.5,
-                    }}
-                  >
-                    植えた日
-                  </label>
+
+                <div style={{ marginBottom: 10 }}>
+                  <label className="form-label">植えた日</label>
                   <input
                     type="date"
                     name="planted_at"
                     defaultValue={today}
-                    className="date-input"
+                    className="form-input"
                   />
                 </div>
+
+                {/* 植えたときの状態 — UI only. DB保存は次ステップで実装 */}
+                <div style={{ marginBottom: 10 }}>
+                  <label className="form-label">植えたときの状態</label>
+                  <select name="plant_condition" className="form-input">
+                    <option value="">— 選択してください —</option>
+                    <option value="seed">種</option>
+                    <option value="seedling">苗</option>
+                    <option value="cutting">挿し木</option>
+                    <option value="established">育っている株</option>
+                  </select>
+                </div>
+
+                <div style={{ marginBottom: 14 }}>
+                  <label className="form-label">メモ</label>
+                  <textarea
+                    name="plant_note"
+                    placeholder="例：10cmくらいの苗、種まきから2週間"
+                    className="form-textarea"
+                  />
+                </div>
+
                 <button
                   type="submit"
-                  className="btn"
-                  style={{
-                    width: "100%",
-                    padding: "10px 16px",
-                    background: "#2d6a4f",
-                    color: "#fff",
-                    fontSize: 14,
-                  }}
+                  className="btn-primary"
+                  style={{ width: "100%", padding: "10px 16px", fontSize: 14 }}
                 >
                   追加する
                 </button>
@@ -705,9 +775,16 @@ export default async function Home() {
 
             {/* Today event cards */}
             {todayEvents.length === 0 ? (
-              <div className="todo-card">
-                <p style={{ color: "#6b7280", margin: 0, fontSize: 13 }}>
-                  今日のお世話の予定はありません
+              <div className="empty-today-card">
+                <p
+                  style={{
+                    color: "#7a9a7a",
+                    margin: 0,
+                    fontSize: 14,
+                    lineHeight: 1.6,
+                  }}
+                >
+                  今日はゆっくり見守る日です 🌿
                 </p>
               </div>
             ) : (
@@ -716,12 +793,12 @@ export default async function Home() {
                 const plant = plantMap.get(event.plant_id);
                 const plantName = getPlantLabel(plant?.plant_type);
                 return (
-                  <div key={event.id} className="todo-card">
+                  <div key={event.id} className="todo-card-active">
                     <div
                       style={{
                         fontWeight: 700,
                         fontSize: 14,
-                        color: "#1a3d2b",
+                        color: "#2d4a3e",
                         marginBottom: 5,
                       }}
                     >
@@ -729,7 +806,7 @@ export default async function Home() {
                     </div>
                     <div
                       style={{
-                        color: "#374151",
+                        color: "#4a5568",
                         fontSize: 13,
                         lineHeight: 1.65,
                         marginBottom: 7,
@@ -740,8 +817,8 @@ export default async function Home() {
                     <div
                       style={{
                         fontSize: 11,
-                        color: "#9ca3af",
-                        marginBottom: 11,
+                        color: "#a0a8a2",
+                        marginBottom: 12,
                       }}
                     >
                       対象: {plantName}
@@ -755,13 +832,8 @@ export default async function Home() {
                         />
                         <button
                           type="submit"
-                          className="btn"
-                          style={{
-                            padding: "6px 14px",
-                            background: "#16a34a",
-                            color: "#fff",
-                            fontSize: 13,
-                          }}
+                          className="btn-primary"
+                          style={{ padding: "6px 14px", fontSize: 13 }}
                         >
                           やった
                         </button>
@@ -782,7 +854,7 @@ export default async function Home() {
                           className="btn"
                           style={{
                             padding: "6px 14px",
-                            background: "#f59e0b",
+                            background: "#e8a838",
                             color: "#fff",
                             fontSize: 13,
                           }}
@@ -800,48 +872,57 @@ export default async function Home() {
             <div className="sub-heading">これからの予定</div>
 
             {careEventsError ? (
-              <div className="upcoming-card">
-                <p style={{ color: "#b91c1c", margin: 0, fontSize: 13 }}>
-                  予定データの取得でエラーが出ました
-                </p>
+              <div
+                style={{
+                  background: "#fff",
+                  borderRadius: 10,
+                  padding: 14,
+                  fontSize: 13,
+                  color: "#b91c1c",
+                }}
+              >
+                予定データの取得でエラーが出ました
               </div>
             ) : upcomingEvents.length === 0 ? (
-              <p style={{ color: "#9ca3af", fontSize: 13, margin: 0 }}>
+              <p style={{ color: "#a0a8a2", fontSize: 13, margin: 0 }}>
                 今後の予定はありません
               </p>
             ) : (
               <>
-                {upcomingEvents.slice(0, 5).map((event) => {
-                  const advice = getAdviceText(adviceMap, event.task_type);
-                  const plant = plantMap.get(event.plant_id);
-                  const plantName = getPlantLabel(plant?.plant_type);
-                  return (
-                    <div key={event.id} className="upcoming-card">
-                      <div
-                        style={{
-                          fontWeight: 600,
-                          fontSize: 13,
-                          color: "#374151",
-                          marginBottom: 2,
-                        }}
-                      >
-                        {advice.title}
+                <div className="upcoming-grid">
+                  {upcomingEvents.slice(0, 5).map((event) => {
+                    const advice = getAdviceText(adviceMap, event.task_type);
+                    const plant = plantMap.get(event.plant_id);
+                    const plantName = getPlantLabel(plant?.plant_type);
+                    return (
+                      <div key={event.id} className="upcoming-card">
+                        <div
+                          style={{
+                            fontWeight: 600,
+                            fontSize: 12,
+                            color: "#4a5568",
+                            marginBottom: 3,
+                            lineHeight: 1.3,
+                          }}
+                        >
+                          {advice.title}
+                        </div>
+                        <div
+                          style={{
+                            color: "#a0a8a2",
+                            fontSize: 11,
+                            marginBottom: 2,
+                          }}
+                        >
+                          {plantName}
+                        </div>
+                        <div style={{ color: "#c8c0b4", fontSize: 11 }}>
+                          {event.scheduled_for}
+                        </div>
                       </div>
-                      <div
-                        style={{
-                          color: "#9ca3af",
-                          fontSize: 11,
-                          marginBottom: 1,
-                        }}
-                      >
-                        対象: {plantName}
-                      </div>
-                      <div style={{ color: "#d1d5db", fontSize: 11 }}>
-                        {event.scheduled_for}
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
                 {upcomingEvents.length > 5 && (
                   <button
                     type="button"
@@ -850,11 +931,10 @@ export default async function Home() {
                       width: "100%",
                       padding: "8px",
                       background: "transparent",
-                      border: "1px solid #e5e7eb",
-                      fontSize: 13,
-                      color: "#9ca3af",
+                      border: "1px solid #e8e4dc",
+                      fontSize: 12,
+                      color: "#a0a8a2",
                       fontWeight: 500,
-                      marginTop: 4,
                     }}
                   >
                     View More ({upcomingEvents.length - 5} 件)
@@ -876,7 +956,7 @@ export default async function Home() {
                 style={{
                   fontSize: 10,
                   fontWeight: 700,
-                  color: "#9ca3af",
+                  color: "#a0a8a2",
                   textTransform: "uppercase",
                   letterSpacing: 1,
                   marginBottom: 10,
@@ -888,12 +968,12 @@ export default async function Home() {
                 style={{
                   whiteSpace: "pre-wrap",
                   fontSize: 13,
-                  color: "#1a3d2b",
+                  color: "#2d4a3e",
                   lineHeight: 1.75,
                   padding: "12px 14px",
-                  background: "#f0fdf4",
+                  background: "#f2faf4",
                   borderRadius: 8,
-                  border: "1px solid #d1fae5",
+                  border: "1px solid #c8e6cc",
                   marginBottom: 14,
                 }}
               >
@@ -916,12 +996,12 @@ export default async function Home() {
               >
                 LINEで開く
               </a>
-              {/* Last sent timestamp — populated when history feature is added */}
+              {/* Last sent timestamp — populated when sending history is implemented */}
               <div
                 style={{
                   marginTop: 12,
                   fontSize: 11,
-                  color: "#d1d5db",
+                  color: "#c8c0b4",
                   letterSpacing: 0.2,
                 }}
               >
@@ -929,22 +1009,26 @@ export default async function Home() {
               </div>
             </div>
 
-            {/* QR / family join section */}
+            {/* QR / notification join section */}
             <div className="line-card" style={{ marginBottom: 0 }}>
               <div
                 style={{
                   fontSize: 10,
                   fontWeight: 700,
-                  color: "#9ca3af",
+                  color: "#a0a8a2",
                   textTransform: "uppercase",
                   letterSpacing: 1,
                   marginBottom: 14,
                 }}
               >
-                LINEで受け取る
+                通知を受け取る
               </div>
               <div
-                style={{ display: "flex", gap: 14, alignItems: "flex-start" }}
+                style={{
+                  display: "flex",
+                  gap: 14,
+                  alignItems: "flex-start",
+                }}
               >
                 {/* QR placeholder — swap with <QRCode> component when ready */}
                 <div className="qr-placeholder">
@@ -952,7 +1036,7 @@ export default async function Home() {
                     style={{
                       fontSize: 11,
                       fontWeight: 700,
-                      color: "#86efac",
+                      color: "#93c9a0",
                       letterSpacing: 0.5,
                     }}
                   >
@@ -964,22 +1048,32 @@ export default async function Home() {
                     style={{
                       fontSize: 13,
                       fontWeight: 700,
-                      color: "#1a3d2b",
+                      color: "#2d4a3e",
                       marginBottom: 5,
                     }}
                   >
-                    家族と共有する
+                    通知を受け取る
                   </div>
                   <p
                     style={{
                       fontSize: 12,
-                      color: "#6b7280",
-                      margin: 0,
+                      color: "#7a8a7a",
+                      margin: "0 0 10px",
                       lineHeight: 1.65,
                     }}
                   >
-                    Family members can join later.
+                    Receive plant care notifications.
                   </p>
+                  {/* Placeholder for LINE account registration link */}
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: "#c8c0b4",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    — LINE登録はこちら（準備中）
+                  </div>
                 </div>
               </div>
             </div>
