@@ -51,8 +51,8 @@ const plantLabelMap: Record<string, string> = {
   perilla: "えごま",
 };
 
-function getPlantLabel(plantType: string | null) {
-  return plantType ? plantLabelMap[plantType] ?? "植物" : "植物";
+function getPlantLabel(plantType: string | null | undefined) {
+  return plantType ? (plantLabelMap[plantType] ?? "植物") : "植物";
 }
 
 async function fetchPlantsMaster(): Promise<PlantMasterRow[]> {
@@ -297,12 +297,15 @@ export default async function Home() {
     (event) => event.scheduled_for === today && event.status === "pending"
   );
 
-  const groupedTodayTasks = Array.from(
-    new Set(todayEvents.map((e) => e.task_type))
-  );
-
   const upcomingEvents = careEvents.filter(
     (event) => event.scheduled_for > today && event.status === "pending"
+  );
+
+  const plantHasTodayEvent = new Map<string, boolean>(
+    plants.map((plant) => [
+      plant.id,
+      todayEvents.some((e) => e.plant_id === plant.id),
+    ])
   );
 
   const todayLineMessage = buildTodayLineMessage(today, todayEvents, adviceMap);
@@ -310,448 +313,527 @@ export default async function Home() {
     todayLineMessage
   )}`;
 
-  return (
-    <main
-      style={{
-        padding: 24,
-        maxWidth: 820,
-        margin: "0 auto",
-        fontFamily:
-          'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        background: "#f8fafc",
-        minHeight: "100vh",
-      }}
-    >
-      <div style={{ marginBottom: 24 }}>
-        <h1
-          style={{
-            fontSize: 32,
-            fontWeight: 800,
-            marginBottom: 8,
-            color: "#111827",
-          }}
-        >
-          plant-line-bot
-        </h1>
-        <p
-          style={{
-            color: "#6b7280",
-            fontSize: 15,
-            lineHeight: 1.6,
-          }}
-        >
-          植物を登録して、お世話の予定を確認できます
-        </p>
-      </div>
+  const fontFamily =
+    'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 
-      <section
+  return (
+    <>
+      <style>{`
+        .board-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr;
+          gap: 16px;
+          align-items: start;
+        }
+        @media (max-width: 960px) {
+          .board-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+        .plant-card,
+        .todo-card,
+        .upcoming-card {
+          background: #ffffff;
+          border-radius: 10px;
+          padding: 14px;
+          margin-bottom: 8px;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+        .date-input {
+          width: 100%;
+          padding: 8px 10px;
+          border-radius: 8px;
+          border: 1px solid #d1d5db;
+          background: #fff;
+          font-size: 14px;
+          box-sizing: border-box;
+        }
+      `}</style>
+
+      <main
         style={{
-          marginBottom: 24,
-          padding: 20,
-          border: "1px solid #e5e7eb",
-          borderRadius: 16,
-          background: "#ffffff",
-          boxShadow: "0 8px 24px rgba(15, 23, 42, 0.06)",
+          background: "#dde3ea",
+          minHeight: "100vh",
+          padding: "20px 16px",
+          fontFamily,
         }}
       >
-        <h2
-          style={{
-            fontSize: 20,
-            fontWeight: 700,
-            marginBottom: 16,
-            color: "#111827",
-          }}
-        >
-          植物を登録する
-        </h2>
-
-        <form action={addPlant}>
-          <div style={{ marginBottom: 14 }}>
-            <label
-              style={{
-                display: "block",
-                fontSize: 14,
-                fontWeight: 600,
-                color: "#374151",
-                marginBottom: 6,
-              }}
-            >
-              植物
-            </label>
-            <select
-              name="plant_type"
-              defaultValue={enabledPlantOptions[0]?.plant_code ?? "tomato"}
-              style={{
-                width: "100%",
-                maxWidth: 280,
-                padding: "10px 12px",
-                borderRadius: 10,
-                border: "1px solid #d1d5db",
-                background: "#fff",
-                fontSize: 15,
-              }}
-            >
-              {enabledPlantOptions.map((plant) => (
-                <option key={plant.plant_code} value={plant.plant_code}>
-                  {plant.plant_name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div style={{ marginBottom: 18 }}>
-            <label
-              style={{
-                display: "block",
-                fontSize: 14,
-                fontWeight: 600,
-                color: "#374151",
-                marginBottom: 6,
-              }}
-            >
-              植えた日
-            </label>
-            <input
-              type="date"
-              name="planted_at"
-              defaultValue={today}
-              style={{
-                width: "100%",
-                maxWidth: 280,
-                padding: "10px 12px",
-                borderRadius: 10,
-                border: "1px solid #d1d5db",
-                background: "#fff",
-                fontSize: 15,
-              }}
-            />
-          </div>
-
-          <button
-            type="submit"
+        {/* Header */}
+        <div style={{ maxWidth: 1440, margin: "0 auto 16px" }}>
+          <h1
             style={{
-              padding: "12px 18px",
-              backgroundColor: "#111827",
-              color: "#fff",
-              border: "none",
-              borderRadius: 10,
-              cursor: "pointer",
-              fontSize: 15,
-              fontWeight: 700,
+              fontSize: 24,
+              fontWeight: 800,
+              color: "#1e293b",
+              margin: 0,
             }}
           >
-            植物を追加
-          </button>
-        </form>
-      </section>
-
-      <section
-        style={{
-          marginBottom: 24,
-          padding: 20,
-          border: "1px solid #bbf7d0",
-          borderRadius: 16,
-          background: "#ecfdf5",
-          boxShadow: "0 8px 24px rgba(15, 23, 42, 0.05)",
-        }}
-      >
-        <h2
-          style={{
-            fontSize: 20,
-            fontWeight: 700,
-            marginBottom: 16,
-            color: "#166534",
-          }}
-        >
-          LINEに送る文章
-        </h2>
-
-        <div
-          style={{
-            whiteSpace: "pre-wrap",
-            padding: 16,
-            borderRadius: 12,
-            background: "#ffffff",
-            border: "1px solid #dcfce7",
-            color: "#111827",
-            lineHeight: 1.7,
-            fontSize: 15,
-            marginBottom: 14,
-          }}
-        >
-          {todayLineMessage}
+            plant-line-bot
+          </h1>
+          <p style={{ color: "#64748b", fontSize: 14, margin: "4px 0 0" }}>
+            植物を登録して、お世話の予定を確認できます
+          </p>
         </div>
 
-        <a
-          href={lineShareUrl}
-          target="_blank"
-          rel="noreferrer"
-          style={{
-            display: "inline-block",
-            padding: "10px 14px",
-            backgroundColor: "#16a34a",
-            color: "#ffffff",
-            textDecoration: "none",
-            borderRadius: 10,
-            fontWeight: 700,
-          }}
-        >
-          LINEで開く
-        </a>
-      </section>
+        {/* Board */}
+        <div className="board-grid" style={{ maxWidth: 1440, margin: "0 auto" }}>
 
-      <section
-        style={{
-          marginBottom: 24,
-          padding: 20,
-          border: "1px solid #e5e7eb",
-          borderRadius: 16,
-          background: "#f0fdf4",
-          boxShadow: "0 8px 24px rgba(15, 23, 42, 0.05)",
-        }}
-      >
-        <h2
-          style={{
-            fontSize: 20,
-            fontWeight: 700,
-            marginBottom: 16,
-            color: "#166534",
-          }}
-        >
-          今日やること
-        </h2>
+          {/* ── Column 1: 育てている植物 ── */}
+          <div
+            style={{
+              background: "#ebecf0",
+              borderRadius: 12,
+              padding: 16,
+            }}
+          >
+            <h2
+              style={{
+                fontSize: 15,
+                fontWeight: 700,
+                color: "#172b4d",
+                margin: "0 0 12px",
+                letterSpacing: 0.3,
+              }}
+            >
+              育てている植物
+            </h2>
 
-        {todayEvents.length === 0 ? (
-          <p style={{ color: "#4b5563", margin: 0 }}>今日は予定はありません</p>
-        ) : (
-          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-            {groupedTodayTasks.map((taskType, index) => {
-              const advice = getAdviceText(adviceMap, taskType);
-
-              return (
-                <li
-                  key={taskType}
-                  style={{
-                    padding: 16,
-                    marginBottom: 12,
-                    background: "#ffffff",
-                    border: "1px solid #dcfce7",
-                    borderRadius: 12,
-                    listStyle: "none",
-                  }}
-                >
-                  <div
-                    style={{
-                      fontWeight: 700,
-                      fontSize: 16,
-                      color: "#111827",
-                      marginBottom: 6,
-                    }}
-                  >
-                    {index + 1}. {advice.title}
+            {/* Plant cards */}
+            {plantsError ? (
+              <div className="plant-card">
+                <p style={{ color: "#b91c1c", margin: 0, fontSize: 14 }}>
+                  植物データの取得でエラーが出ました
+                </p>
+              </div>
+            ) : plants.length === 0 ? (
+              <div className="plant-card">
+                <p style={{ color: "#64748b", margin: 0, fontSize: 14 }}>
+                  まだ植物は登録されていません
+                </p>
+              </div>
+            ) : (
+              plants.map((plant) => {
+                const hasTodayEvent = plantHasTodayEvent.get(plant.id) ?? false;
+                return (
+                  <div key={plant.id} className="plant-card">
+                    <div
+                      style={{
+                        fontWeight: 700,
+                        fontSize: 15,
+                        color: "#172b4d",
+                        marginBottom: 4,
+                      }}
+                    >
+                      {getPlantLabel(plant.plant_type)}
+                    </div>
+                    <div
+                      style={{
+                        color: "#64748b",
+                        fontSize: 13,
+                        marginBottom: 10,
+                      }}
+                    >
+                      植えた日: {plant.planted_at}
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <span
+                        style={{
+                          display: "inline-block",
+                          padding: "2px 8px",
+                          borderRadius: 4,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          background: hasTodayEvent ? "#fef3c7" : "#dcfce7",
+                          color: hasTodayEvent ? "#92400e" : "#166534",
+                        }}
+                      >
+                        {hasTodayEvent ? "要対応" : "良好"}
+                      </span>
+                      {/* Operations area (reserved for future use) */}
+                      <div style={{ fontSize: 18, color: "#cbd5e1", cursor: "default" }}>
+                        ···
+                      </div>
+                    </div>
                   </div>
+                );
+              })
+            )}
 
-                  <div
-                    style={{
-                      color: "#374151",
-                      fontSize: 14,
-                      marginBottom: 12,
-                      lineHeight: 1.6,
-                    }}
-                  >
-                    {advice.message}
-                  </div>
-
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {todayEvents
-                      .filter((event) => event.task_type === taskType)
-                      .map((event) => (
-                        <div
-                          key={event.id}
-                          style={{
-                            display: "flex",
-                            gap: 8,
-                            flexWrap: "wrap",
-                          }}
-                        >
-                          <form action={completeCareEvent}>
-                            <input type="hidden" name="event_id" value={event.id} />
-                            <button
-                              type="submit"
-                              style={{
-                                padding: "8px 12px",
-                                backgroundColor: "#16a34a",
-                                color: "#fff",
-                                border: "none",
-                                borderRadius: 8,
-                                cursor: "pointer",
-                                fontWeight: 700,
-                              }}
-                            >
-                              やった
-                            </button>
-                          </form>
-
-                          <form action={snoozeCareEvent}>
-                            <input type="hidden" name="event_id" value={event.id} />
-                            <input
-                              type="hidden"
-                              name="scheduled_for"
-                              value={event.scheduled_for}
-                            />
-                            <button
-                              type="submit"
-                              style={{
-                                padding: "8px 12px",
-                                backgroundColor: "#f59e0b",
-                                color: "#fff",
-                                border: "none",
-                                borderRadius: 8,
-                                cursor: "pointer",
-                                fontWeight: 700,
-                              }}
-                            >
-                              あとで
-                            </button>
-                          </form>
-                        </div>
-                      ))}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
-
-      <section
-        style={{
-          marginBottom: 24,
-          padding: 20,
-          border: "1px solid #e5e7eb",
-          borderRadius: 16,
-          background: "#ffffff",
-          boxShadow: "0 8px 24px rgba(15, 23, 42, 0.05)",
-        }}
-      >
-        <h2
-          style={{
-            fontSize: 20,
-            fontWeight: 700,
-            marginBottom: 16,
-            color: "#111827",
-          }}
-        >
-          育てている植物
-        </h2>
-
-        {plantsError ? (
-          <p style={{ color: "#b91c1c" }}>植物データの取得でエラーが出ました</p>
-        ) : plants.length === 0 ? (
-          <p style={{ color: "#4b5563" }}>まだ植物は登録されていません</p>
-        ) : (
-          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-            {plants.map((plant) => (
-              <li
-                key={plant.id}
+            {/* Add plant form */}
+            <div
+              style={{
+                marginTop: 12,
+                background: "#ffffff",
+                borderRadius: 10,
+                padding: 14,
+                boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+              }}
+            >
+              <div
                 style={{
-                  padding: 14,
-                  marginBottom: 10,
-                  border: "1px solid #e5e7eb",
-                  borderRadius: 12,
-                  background: "#fafafa",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: "#172b4d",
+                  marginBottom: 12,
                 }}
               >
-                <div
-                  style={{
-                    fontWeight: 700,
-                    fontSize: 16,
-                    color: "#111827",
-                    marginBottom: 4,
-                  }}
-                >
-                  {getPlantLabel(plant.plant_type)}
-                </div>
-                <div style={{ color: "#6b7280", fontSize: 14 }}>
-                  植えた日: {plant.planted_at}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section
-        style={{
-          padding: 20,
-          border: "1px solid #e5e7eb",
-          borderRadius: 16,
-          background: "#ffffff",
-          boxShadow: "0 8px 24px rgba(15, 23, 42, 0.05)",
-        }}
-      >
-        <h2
-          style={{
-            fontSize: 20,
-            fontWeight: 700,
-            marginBottom: 16,
-            color: "#111827",
-          }}
-        >
-          これからの予定
-        </h2>
-
-        {careEventsError ? (
-          <p style={{ color: "#b91c1c" }}>予定データの取得でエラーが出ました</p>
-        ) : upcomingEvents.length === 0 ? (
-          <p style={{ color: "#4b5563" }}>今後の予定はありません</p>
-        ) : (
-          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-            {upcomingEvents.slice(0, 10).map((event) => {
-              const advice = getAdviceText(adviceMap, event.task_type);
-
-              return (
-                <li
-                  key={event.id}
-                  style={{
-                    padding: 14,
-                    marginBottom: 10,
-                    border: "1px solid #e5e7eb",
-                    borderRadius: 12,
-                    background: "#fafafa",
-                  }}
-                >
-                  <div
+                植物を追加する
+              </div>
+              <form action={addPlant}>
+                <div style={{ marginBottom: 10 }}>
+                  <label
                     style={{
-                      fontWeight: 700,
-                      fontSize: 16,
-                      color: "#111827",
+                      display: "block",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: "#374151",
                       marginBottom: 4,
                     }}
                   >
-                    {advice.title}
-                  </div>
-
-                  <div
+                    植物
+                  </label>
+                  <select
+                    name="plant_type"
+                    defaultValue={enabledPlantOptions[0]?.plant_code ?? "tomato"}
                     style={{
-                      color: "#374151",
+                      width: "100%",
+                      padding: "8px 10px",
+                      borderRadius: 8,
+                      border: "1px solid #d1d5db",
+                      background: "#fff",
                       fontSize: 14,
-                      marginBottom: 6,
-                      lineHeight: 1.6,
                     }}
                   >
-                    {advice.message}
-                  </div>
+                    {enabledPlantOptions.map((plant) => (
+                      <option key={plant.plant_code} value={plant.plant_code}>
+                        {plant.plant_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ marginBottom: 12 }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: "#374151",
+                      marginBottom: 4,
+                    }}
+                  >
+                    植えた日
+                  </label>
+                  <input
+                    type="date"
+                    name="planted_at"
+                    defaultValue={today}
+                    className="date-input"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  style={{
+                    width: "100%",
+                    padding: "9px 16px",
+                    background: "#0052cc",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 8,
+                    cursor: "pointer",
+                    fontSize: 14,
+                    fontWeight: 700,
+                  }}
+                >
+                  追加する
+                </button>
+              </form>
+            </div>
+          </div>
 
-                  <div style={{ color: "#6b7280", fontSize: 14 }}>
-                    予定日: {event.scheduled_for}
+          {/* ── Column 2: 今日やること ── */}
+          <div
+            style={{
+              background: "#ebecf0",
+              borderRadius: 12,
+              padding: 16,
+            }}
+          >
+            <h2
+              style={{
+                fontSize: 15,
+                fontWeight: 700,
+                color: "#172b4d",
+                margin: "0 0 12px",
+                letterSpacing: 0.3,
+              }}
+            >
+              今日やること
+            </h2>
+
+            {/* Today event cards */}
+            {todayEvents.length === 0 ? (
+              <div className="todo-card">
+                <p style={{ color: "#64748b", margin: 0, fontSize: 14 }}>
+                  今日のお世話の予定はありません
+                </p>
+              </div>
+            ) : (
+              todayEvents.map((event) => {
+                const advice = getAdviceText(adviceMap, event.task_type);
+                const plant = plantMap.get(event.plant_id);
+                const plantName = getPlantLabel(plant?.plant_type);
+                return (
+                  <div key={event.id} className="todo-card">
+                    <div
+                      style={{
+                        fontWeight: 700,
+                        fontSize: 15,
+                        color: "#172b4d",
+                        marginBottom: 4,
+                      }}
+                    >
+                      {advice.title}
+                    </div>
+                    <div
+                      style={{
+                        color: "#374151",
+                        fontSize: 13,
+                        lineHeight: 1.6,
+                        marginBottom: 6,
+                      }}
+                    >
+                      {advice.message}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: "#64748b",
+                        marginBottom: 10,
+                      }}
+                    >
+                      対象: {plantName}
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <form action={completeCareEvent}>
+                        <input type="hidden" name="event_id" value={event.id} />
+                        <button
+                          type="submit"
+                          style={{
+                            padding: "6px 12px",
+                            background: "#16a34a",
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: 6,
+                            cursor: "pointer",
+                            fontWeight: 700,
+                            fontSize: 13,
+                          }}
+                        >
+                          やった
+                        </button>
+                      </form>
+                      <form action={snoozeCareEvent}>
+                        <input type="hidden" name="event_id" value={event.id} />
+                        <input
+                          type="hidden"
+                          name="scheduled_for"
+                          value={event.scheduled_for}
+                        />
+                        <button
+                          type="submit"
+                          style={{
+                            padding: "6px 12px",
+                            background: "#f59e0b",
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: 6,
+                            cursor: "pointer",
+                            fontWeight: 700,
+                            fontSize: 13,
+                          }}
+                        >
+                          あとで
+                        </button>
+                      </form>
+                    </div>
                   </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
-    </main>
+                );
+              })
+            )}
+
+            {/* Upcoming events */}
+            <div style={{ marginTop: 20 }}>
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: "#172b4d",
+                  marginBottom: 10,
+                  paddingBottom: 6,
+                  borderBottom: "2px solid #d1d5db",
+                }}
+              >
+                これからの予定
+              </div>
+              {careEventsError ? (
+                <div className="upcoming-card">
+                  <p style={{ color: "#b91c1c", margin: 0, fontSize: 13 }}>
+                    予定データの取得でエラーが出ました
+                  </p>
+                </div>
+              ) : upcomingEvents.length === 0 ? (
+                <p style={{ color: "#64748b", fontSize: 13, margin: 0 }}>
+                  今後の予定はありません
+                </p>
+              ) : (
+                <>
+                  {upcomingEvents.slice(0, 5).map((event) => {
+                    const advice = getAdviceText(adviceMap, event.task_type);
+                    const plant = plantMap.get(event.plant_id);
+                    const plantName = getPlantLabel(plant?.plant_type);
+                    return (
+                      <div key={event.id} className="upcoming-card">
+                        <div
+                          style={{
+                            fontWeight: 600,
+                            fontSize: 13,
+                            color: "#172b4d",
+                            marginBottom: 2,
+                          }}
+                        >
+                          {advice.title}
+                        </div>
+                        <div style={{ color: "#64748b", fontSize: 12, marginBottom: 2 }}>
+                          対象: {plantName}
+                        </div>
+                        <div style={{ color: "#94a3b8", fontSize: 12 }}>
+                          {event.scheduled_for}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {upcomingEvents.length > 5 && (
+                    <button
+                      type="button"
+                      style={{
+                        width: "100%",
+                        padding: "8px",
+                        background: "transparent",
+                        border: "1px solid #94a3b8",
+                        borderRadius: 8,
+                        cursor: "pointer",
+                        fontSize: 13,
+                        color: "#475569",
+                        marginTop: 4,
+                        fontFamily,
+                      }}
+                    >
+                      View More ({upcomingEvents.length - 5} 件)
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* ── Column 3: LINE通知 ── */}
+          <div
+            style={{
+              background: "#ebecf0",
+              borderRadius: 12,
+              padding: 16,
+            }}
+          >
+            <h2
+              style={{
+                fontSize: 15,
+                fontWeight: 700,
+                color: "#172b4d",
+                margin: "0 0 12px",
+                letterSpacing: 0.3,
+              }}
+            >
+              LINE通知
+            </h2>
+
+            {/* Message preview card */}
+            <div
+              style={{
+                background: "#ffffff",
+                borderRadius: 10,
+                padding: 14,
+                boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+                marginBottom: 10,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: "#94a3b8",
+                  textTransform: "uppercase",
+                  letterSpacing: 0.8,
+                  marginBottom: 10,
+                }}
+              >
+                最新メッセージのプレビュー
+              </div>
+              <div
+                style={{
+                  whiteSpace: "pre-wrap",
+                  fontSize: 14,
+                  color: "#172b4d",
+                  lineHeight: 1.7,
+                  padding: "12px",
+                  background: "#f8fafc",
+                  borderRadius: 8,
+                  border: "1px solid #e2e8f0",
+                  marginBottom: 14,
+                }}
+              >
+                {todayLineMessage}
+              </div>
+              <a
+                href={lineShareUrl}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  display: "inline-block",
+                  padding: "9px 16px",
+                  background: "#06c755",
+                  color: "#ffffff",
+                  textDecoration: "none",
+                  borderRadius: 8,
+                  fontWeight: 700,
+                  fontSize: 14,
+                }}
+              >
+                LINEで開く
+              </a>
+            </div>
+
+            {/* Last sent placeholder */}
+            <div
+              style={{
+                padding: "10px 14px",
+                background: "#f1f5f9",
+                borderRadius: 8,
+                fontSize: 13,
+                color: "#94a3b8",
+              }}
+            >
+              最終送信日時: —
+            </div>
+          </div>
+
+        </div>
+      </main>
+    </>
   );
 }
