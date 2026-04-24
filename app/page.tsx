@@ -31,19 +31,18 @@ type AdviceMessageRow = {
   message: string;
 };
 
-/*
- * 将来的に plants テーブルに以下の列を追加してください:
- *   ALTER TABLE plants ADD COLUMN plant_condition TEXT;
- *   ALTER TABLE plants ADD COLUMN plant_note TEXT;
- *
- * plant_condition の想定値: 'seed' | 'seedling' | 'cutting' | 'established'
- */
-const plantConditionLabelMap: Record<string, string> = {
-  seed: "種まき",
+const initialStateLabelMap: Record<string, string> = {
+  seed: "種",
   seedling: "苗",
   cutting: "挿し木",
-  established: "育っている株",
+  established: "既に育っている株",
+  other: "その他",
 };
+
+function getInitialStateLabel(stateType: string | null | undefined): string | null {
+  if (!stateType) return null;
+  return initialStateLabelMap[stateType] ?? stateType;
+}
 
 function addDays(dateString: string, days: number) {
   const d = new Date(dateString);
@@ -196,16 +195,19 @@ async function addPlant(formData: FormData) {
 
   const plantType = String(formData.get("plant_type") || "");
   const plantedAt = String(formData.get("planted_at") || "");
-
-  // plant_condition と plant_note は DB列追加後に保存実装予定
-  // const plantCondition = String(formData.get("plant_condition") || "");
-  // const plantNote = String(formData.get("plant_note") || "");
+  const initialStateType = String(formData.get("initial_state_type") || "") || null;
+  const initialStateNote = String(formData.get("initial_state_note") || "") || null;
 
   if (!plantType || !plantedAt) return;
 
   const { data: plant, error: plantError } = await supabase
     .from("plants")
-    .insert([{ plant_type: plantType, planted_at: plantedAt }])
+    .insert([{
+      plant_type: plantType,
+      planted_at: plantedAt,
+      initial_state_type: initialStateType,
+      initial_state_note: initialStateNote,
+    }])
     .select()
     .single();
 
@@ -616,11 +618,7 @@ export default async function Home() {
                 {plants.map((plant) => {
                   const hasTodayEvent =
                     plantHasTodayEvent.get(plant.id) ?? false;
-                  const conditionLabel =
-                    plant.plant_condition
-                      ? (plantConditionLabelMap[plant.plant_condition] ??
-                        plant.plant_condition)
-                      : null;
+                  const stateLabel = getInitialStateLabel(plant.initial_state_type);
                   return (
                     <div key={plant.id} className="plant-card">
                       {/* Photo area — replaced with <img> when photo upload is ready */}
@@ -648,19 +646,32 @@ export default async function Home() {
                         >
                           {plant.planted_at}
                         </div>
-                        {/* Condition / note — shown once plants table columns are added */}
-                        {(conditionLabel || plant.plant_note) && (
+                        {/* 植えたときの状態 + メモ */}
+                        {stateLabel ? (
                           <div
                             style={{
                               fontSize: 10,
-                              color: "#9ca3af",
+                              color: "#7a9a7a",
                               marginBottom: 6,
-                              lineHeight: 1.4,
+                              lineHeight: 1.5,
                             }}
                           >
-                            {conditionLabel}
-                            {conditionLabel && plant.plant_note ? " · " : ""}
-                            {plant.plant_note ?? ""}
+                            <span>植えたとき：{stateLabel}</span>
+                            {plant.initial_state_note && (
+                              <div style={{ color: "#a0a8a2", marginTop: 1 }}>
+                                {plant.initial_state_note}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              fontSize: 10,
+                              color: "#d1d5db",
+                              marginBottom: 6,
+                            }}
+                          >
+                            未設定
                           </div>
                         )}
                         <div
@@ -735,22 +746,22 @@ export default async function Home() {
                   />
                 </div>
 
-                {/* 植えたときの状態 — UI only. DB保存は次ステップで実装 */}
                 <div style={{ marginBottom: 10 }}>
                   <label className="form-label">植えたときの状態</label>
-                  <select name="plant_condition" className="form-input">
+                  <select name="initial_state_type" className="form-input">
                     <option value="">— 選択してください —</option>
                     <option value="seed">種</option>
                     <option value="seedling">苗</option>
                     <option value="cutting">挿し木</option>
-                    <option value="established">育っている株</option>
+                    <option value="established">既に育っている株</option>
+                    <option value="other">その他</option>
                   </select>
                 </div>
 
                 <div style={{ marginBottom: 14 }}>
                   <label className="form-label">メモ</label>
                   <textarea
-                    name="plant_note"
+                    name="initial_state_note"
                     placeholder="例：10cmくらいの苗、種まきから2週間"
                     className="form-textarea"
                   />
