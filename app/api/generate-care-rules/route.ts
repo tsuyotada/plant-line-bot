@@ -158,8 +158,6 @@ if (!content) {
 
 const parsed = JSON.parse(content);
 
-    const parsed = JSON.parse(response.output_text) as { rules: CareRule[] };
-
     const plantName =
       plant.name ??
       plant.plant_name ??
