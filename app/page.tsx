@@ -179,6 +179,18 @@ function buildTodayLineMessage(
   return `【${today} の今日やること】\n${lines.join("\n")}\n\n無理のない範囲で進めましょう🌱`;
 }
 
+function getAppBaseUrl() {
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    return process.env.NEXT_PUBLIC_APP_URL;
+  }
+
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+
+  return "http://localhost:3000";
+}
+
 async function addPlant(formData: FormData) {
   "use server";
 
@@ -191,12 +203,14 @@ async function addPlant(formData: FormData) {
 
   const { data: plant, error: plantError } = await supabase
     .from("plants")
-    .insert([{
-      plant_type: plantType,
-      planted_at: plantedAt,
-      initial_state_type: initialStateType,
-      initial_state_note: initialStateNote,
-    }])
+    .insert([
+      {
+        plant_type: plantType,
+        planted_at: plantedAt,
+        initial_state_type: initialStateType,
+        initial_state_note: initialStateNote,
+      },
+    ])
     .select()
     .single();
 
@@ -205,22 +219,28 @@ async function addPlant(formData: FormData) {
     return;
   }
 
-  const careRules = await fetchCareRules();
-  const events = buildCareEventsFromRules(
-    plant.id,
-    plantType,
-    plantedAt,
-    careRules
-  );
+  try {
+    const baseUrl = getAppBaseUrl();
 
-  if (events.length > 0) {
-    const { error: eventError } = await supabase
-      .from("care_events")
-      .insert(events);
-    if (eventError) {
-      console.error("care_events insert error:", eventError);
+    const res = await fetch(`${baseUrl}/api/generate-care-rules`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        plantId: plant.id,
+      }),
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error("generate-care-rules API error:", errorText);
     }
+  } catch (error) {
+    console.error("generate-care-rules fetch error:", error);
   }
+
   revalidatePath("/");
 }
 
