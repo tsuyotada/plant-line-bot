@@ -185,7 +185,7 @@ function buildTodayLineMessage(
   );
 
   const lines = uniqueTaskTypes.map((taskType, index) => {
-    const advice = getAdviceText(adviceMap, taskType);
+const advice = getAdviceText({ task_type: taskType });
     return `${index + 1}. ${advice.title}`;
   });
 
