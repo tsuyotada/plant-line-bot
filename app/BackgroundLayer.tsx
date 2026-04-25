@@ -95,19 +95,7 @@ export function BackgroundLayer() {
                   "linear-gradient(160deg, #c8dfc4 0%, #a3c4a0 45%, #7aaa78 100%)",
               }
         }
-      >
-        {/* Sand-beige overlay for readability */}
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            right: 0,
-            bottom: 0,
-            left: 0,
-            background: "rgba(248, 244, 238, 0.60)",
-          }}
-        />
-      </div>
+      />
 
       {/* Background controls — fixed top-right */}
       <div

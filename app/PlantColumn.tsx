@@ -100,6 +100,10 @@ export function PlantColumn({
   // Per-plant upload loading and error state
   const [uploadingIds, setUploadingIds] = useState<Record<string, boolean>>({});
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
+  // Photo preview lightbox
+  const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
+  // Collapsible add-plant form
+  const [isFormOpen, setIsFormOpen] = useState(false);
 
   const formRef = useRef<HTMLFormElement>(null);
   const photoInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -182,6 +186,7 @@ export function PlantColumn({
     startTransition(async () => {
       await addPlantAction(formData);
       formRef.current?.reset();
+      setIsFormOpen(false);
     });
   }
 
@@ -203,13 +208,12 @@ export function PlantColumn({
           box-shadow: 0 3px 10px rgba(60, 50, 30, 0.13);
         }
         .plant-photo-click {
-          height: 68px;
+          height: 96px;
           background: linear-gradient(135deg, #d4edda 0%, #b8dfbf 55%, #93c9a0 100%);
           border-radius: 10px 10px 0 0;
           display: flex;
           align-items: center;
           justify-content: center;
-          cursor: pointer;
           overflow: hidden;
           position: relative;
         }
@@ -243,6 +247,28 @@ export function PlantColumn({
           font-weight: 600;
           letter-spacing: 0.3px;
           font-family: ${fontFamily};
+        }
+        .photo-camera-btn {
+          position: absolute;
+          bottom: 6px;
+          right: 6px;
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.88);
+          border: none;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #4a5568;
+          box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+          backdrop-filter: blur(4px);
+          transition: background 0.15s;
+          z-index: 2;
+        }
+        .photo-camera-btn:hover {
+          background: rgba(255, 255, 255, 0.98);
         }
         .photo-placeholder-label {
           font-size: 10px;
@@ -319,6 +345,24 @@ export function PlantColumn({
           overflow-y: auto;
           box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
         }
+        .btn-add-plant-toggle {
+          width: 100%;
+          padding: 10px 16px;
+          background: transparent;
+          border: 1.5px dashed #b8d4bc;
+          border-radius: 8px;
+          font-size: 13px;
+          font-weight: 600;
+          color: #6db07b;
+          cursor: pointer;
+          font-family: inherit;
+          letter-spacing: 0.2px;
+          transition: background 0.15s, border-color 0.15s;
+        }
+        .btn-add-plant-toggle:hover {
+          background: #f2faf4;
+          border-color: #6db07b;
+        }
       `}</style>
 
       {/* Transparent backdrop — closes the "···" menu on outside click */}
@@ -362,11 +406,21 @@ export function PlantColumn({
 
               return (
                 <div key={plant.id} className="plant-card-wrap">
-                  {/* Photo area — click to select / take photo */}
+                  {/* Photo area — click to enlarge; camera button triggers upload */}
                   <div
                     className="plant-photo-click"
-                    onClick={() => !uploadingIds[plant.id] && handlePhotoClick(plant.id)}
-                    style={{ cursor: uploadingIds[plant.id] ? "not-allowed" : "pointer" }}
+                    style={{
+                      background: displayPhoto ? "#f0ebe3" : undefined,
+                      cursor: uploadingIds[plant.id]
+                        ? "not-allowed"
+                        : displayPhoto
+                        ? "zoom-in"
+                        : "default",
+                    }}
+                    onClick={() => {
+                      if (uploadingIds[plant.id]) return;
+                      if (displayPhoto) setPreviewPhotoUrl(displayPhoto);
+                    }}
                   >
                     {displayPhoto ? (
                       <img
@@ -375,7 +429,7 @@ export function PlantColumn({
                         style={{
                           width: "100%",
                           height: "100%",
-                          objectFit: "cover",
+                          objectFit: "contain",
                         }}
                       />
                     ) : (
@@ -383,8 +437,33 @@ export function PlantColumn({
                     )}
                     {uploadingIds[plant.id] ? (
                       <div className="photo-upload-loading-hint">アップロード中…</div>
-                    ) : (
-                      <div className="photo-hover-hint">写真を追加</div>
+                    ) : displayPhoto ? (
+                      <div className="photo-hover-hint">クリックして拡大</div>
+                    ) : null}
+                    {!uploadingIds[plant.id] && (
+                      <button
+                        type="button"
+                        className="photo-camera-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePhotoClick(plant.id);
+                        }}
+                        aria-label="写真を追加"
+                      >
+                        <svg
+                          width="13"
+                          height="13"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                          <circle cx="12" cy="13" r="4" />
+                        </svg>
+                      </button>
                     )}
                   </div>
 
@@ -507,81 +586,114 @@ export function PlantColumn({
           </div>
         )}
 
-        {/* Add plant form */}
-        <div className="form-card" style={{ marginBottom: 0 }}>
-          <div
-            style={{
-              fontSize: 12,
-              fontWeight: 700,
-              color: "#2d4a3e",
-              marginBottom: 14,
-              letterSpacing: 0.3,
-            }}
+        {/* Collapsible add plant form */}
+        {!isFormOpen ? (
+          <button
+            type="button"
+            className="btn-add-plant-toggle"
+            onClick={() => setIsFormOpen(true)}
           >
-            植物を追加する
-          </div>
-          <form ref={formRef} action={handleFormAction}>
-            <div style={{ marginBottom: 10 }}>
-              <label className="form-label">植物</label>
-              <select
-                name="plant_type"
-                className="form-input"
-                defaultValue={
-                  enabledPlantOptions[0]?.plant_code ?? "tomato"
-                }
-              >
-                {enabledPlantOptions.map((p) => (
-                  <option key={p.plant_code} value={p.plant_code}>
-                    {p.plant_name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div style={{ marginBottom: 10 }}>
-              <label className="form-label">植えた日</label>
-              <input
-                type="date"
-                name="planted_at"
-                defaultValue={today}
-                className="form-input"
-              />
-            </div>
-            <div style={{ marginBottom: 10 }}>
-              <label className="form-label">植えたときの状態</label>
-              <select name="initial_state_type" className="form-input">
-                <option value="">— 選択してください —</option>
-                <option value="seed">種</option>
-                <option value="seedling">苗</option>
-                <option value="cutting">挿し木</option>
-                <option value="established">既に育っている株</option>
-                <option value="other">その他</option>
-              </select>
-            </div>
-            <div style={{ marginBottom: 14 }}>
-              <label className="form-label">メモ</label>
-              <textarea
-                name="initial_state_note"
-                placeholder="例：10cmくらいの苗、種まきから2週間"
-                className="form-textarea"
-              />
-            </div>
-            <button
-              type="submit"
-              className="btn-primary"
-              disabled={isPending}
+            ＋ 植物を追加する
+          </button>
+        ) : (
+          <div className="form-card" style={{ marginBottom: 0 }}>
+            <div
               style={{
-                width: "100%",
-                padding: "10px 16px",
-                fontSize: 14,
-                opacity: isPending ? 0.7 : 1,
-                cursor: isPending ? "not-allowed" : "pointer",
-                fontFamily,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 14,
               }}
             >
-              {isPending ? "追加中…" : "追加する"}
-            </button>
-          </form>
-        </div>
+              <div
+                style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: "#2d4a3e",
+                  letterSpacing: 0.3,
+                }}
+              >
+                植物を追加する
+              </div>
+              <button
+                type="button"
+                onClick={() => { setIsFormOpen(false); formRef.current?.reset(); }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: 12,
+                  color: "#9ca3af",
+                  cursor: "pointer",
+                  fontFamily,
+                  padding: "2px 6px",
+                }}
+              >
+                キャンセル
+              </button>
+            </div>
+            <form ref={formRef} action={handleFormAction}>
+              <div style={{ marginBottom: 10 }}>
+                <label className="form-label">植物</label>
+                <select
+                  name="plant_type"
+                  className="form-input"
+                  defaultValue={
+                    enabledPlantOptions[0]?.plant_code ?? "tomato"
+                  }
+                >
+                  {enabledPlantOptions.map((p) => (
+                    <option key={p.plant_code} value={p.plant_code}>
+                      {p.plant_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ marginBottom: 10 }}>
+                <label className="form-label">植えた日</label>
+                <input
+                  type="date"
+                  name="planted_at"
+                  defaultValue={today}
+                  className="form-input"
+                />
+              </div>
+              <div style={{ marginBottom: 10 }}>
+                <label className="form-label">植えたときの状態</label>
+                <select name="initial_state_type" className="form-input">
+                  <option value="">— 選択してください —</option>
+                  <option value="seed">種</option>
+                  <option value="seedling">苗</option>
+                  <option value="cutting">挿し木</option>
+                  <option value="established">既に育っている株</option>
+                  <option value="other">その他</option>
+                </select>
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <label className="form-label">メモ</label>
+                <textarea
+                  name="initial_state_note"
+                  placeholder="例：10cmくらいの苗、種まきから2週間"
+                  className="form-textarea"
+                />
+              </div>
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={isPending}
+                style={{
+                  width: "100%",
+                  padding: "10px 16px",
+                  fontSize: 14,
+                  opacity: isPending ? 0.7 : 1,
+                  cursor: isPending ? "not-allowed" : "pointer",
+                  fontFamily,
+                }}
+              >
+                {isPending ? "追加中…" : "追加する"}
+              </button>
+            </form>
+          </div>
+        )}
       </div>
 
       {/* Photo history modal */}
@@ -674,7 +786,9 @@ export function PlantColumn({
                           objectFit: "cover",
                           borderRadius: 8,
                           display: "block",
+                          cursor: "pointer",
                         }}
+                        onClick={() => setPreviewPhotoUrl(photo.url)}
                       />
                       <div
                         style={{
@@ -703,6 +817,64 @@ export function PlantColumn({
               }}
             >
               閉じる
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Photo preview lightbox */}
+      {previewPhotoUrl && (
+        <div
+          className="modal-overlay"
+          style={{ zIndex: 300, background: "rgba(0, 0, 0, 0.88)" }}
+          onClick={() => setPreviewPhotoUrl(null)}
+        >
+          <div
+            style={{
+              position: "relative",
+              maxWidth: "92vw",
+              maxHeight: "88vh",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={previewPhotoUrl}
+              alt="写真プレビュー"
+              style={{
+                maxWidth: "92vw",
+                maxHeight: "88vh",
+                objectFit: "contain",
+                borderRadius: 8,
+                display: "block",
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setPreviewPhotoUrl(null)}
+              style={{
+                position: "absolute",
+                top: -14,
+                right: -14,
+                width: 32,
+                height: 32,
+                borderRadius: "50%",
+                background: "rgba(0, 0, 0, 0.55)",
+                border: "2px solid rgba(255, 255, 255, 0.3)",
+                color: "#fff",
+                fontSize: 18,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                lineHeight: 1,
+                fontFamily,
+              }}
+              aria-label="閉じる"
+            >
+              ×
             </button>
           </div>
         </div>

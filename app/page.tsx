@@ -408,13 +408,13 @@ export default async function Home() {
 
         /* ─── Column panel — warm cream frosted glass ─── */
         .col-board {
-          background: rgba(253, 250, 244, 0.84);
+          background: rgba(253, 250, 244, 0.96);
           backdrop-filter: blur(12px);
           -webkit-backdrop-filter: blur(12px);
-          border: 1px solid rgba(255, 255, 255, 0.90);
+          border: 1px solid rgba(255, 255, 255, 0.95);
           border-radius: 14px;
           padding: 18px;
-          box-shadow: 0 2px 12px rgba(60, 50, 30, 0.07);
+          box-shadow: 0 2px 16px rgba(60, 50, 30, 0.10);
         }
 
         /* ─── Column heading ─── */
