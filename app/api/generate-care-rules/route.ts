@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 
-
 type CareRule = {
   task_type:
     | "watering"
@@ -28,20 +27,13 @@ export async function POST(req: Request) {
   );
 
   try {
-    const body = await req.json();
-    const { plantId } = body;
+    const { plantId } = await req.json();
 
     if (!plantId) {
       return NextResponse.json(
         { error: "plantId is required" },
         { status: 400 }
       );
-    }
-  try {
-    const { plantId } = await req.json();
-
-    if (!plantId) {
-      return NextResponse.json({ error: "plantId is required" }, { status: 400 });
     }
 
     const { data: plant, error: plantError } = await supabase
@@ -52,7 +44,10 @@ export async function POST(req: Request) {
 
     if (plantError || !plant) {
       return NextResponse.json(
-        { error: "Plant not found", detail: plantError?.message ?? null },
+        {
+          error: "Plant not found",
+          detail: plantError?.message ?? null,
+        },
         { status: 404 }
       );
     }
@@ -162,41 +157,39 @@ ${JSON.stringify(plant, null, 2)}
       is_active: true,
     }));
 
-    // ① care_rules に保存
-const { error: insertError } = await supabase
-  .from("care_rules")
-  .insert(rows);
+    const { error: insertError } = await supabase
+      .from("care_rules")
+      .insert(rows);
 
-console.log("INSERT ERROR:", insertError);
-console.log("ROWS:", rows);
+    console.log("INSERT ERROR:", insertError);
+    console.log("ROWS:", rows);
 
-if (insertError) {
-  return NextResponse.json(
-    {
-      error: "Failed to insert care_rules",
-      detail: insertError.message,
-    },
-    { status: 500 }
-  );
-}
+    if (insertError) {
+      return NextResponse.json(
+        {
+          error: "Failed to insert care_rules",
+          detail: insertError.message,
+        },
+        { status: 500 }
+      );
+    }
 
-// ② 直後に取得
-const { data: insertedRules, error: selectRulesError } = await supabase
-  .from("care_rules")
-  .select("id, plant_id, task_type, interval_days")
-  .eq("plant_id", plant.id)
-  .order("created_at", { ascending: false })
-  .limit(rows.length);
+    const { data: insertedRules, error: selectRulesError } = await supabase
+      .from("care_rules")
+      .select("id, plant_id, task_type, interval_days")
+      .eq("plant_id", plant.id)
+      .order("created_at", { ascending: false })
+      .limit(rows.length);
 
-if (selectRulesError || !insertedRules) {
-  return NextResponse.json(
-    {
-      error: "Failed to select inserted care_rules",
-      detail: selectRulesError?.message ?? "insertedRules is null",
-    },
-    { status: 500 }
-  );
-}
+    if (selectRulesError || !insertedRules) {
+      return NextResponse.json(
+        {
+          error: "Failed to select inserted care_rules",
+          detail: selectRulesError?.message ?? "insertedRules is null",
+        },
+        { status: 500 }
+      );
+    }
 
     const eventsToInsert: {
       plant_id: string;
