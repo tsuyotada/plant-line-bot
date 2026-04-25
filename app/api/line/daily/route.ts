@@ -1,3 +1,4 @@
+import { generateCareMessage } from "@/lib/aiCareMessage";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
@@ -88,12 +89,35 @@ export async function GET() {
         })
       : [];
 
-  const message =
-    lines.length > 0
-      ? `【${today} の今日やること🌱】\n\n${lines.join(
-          "\n\n"
-        )}\n\n無理ない範囲で進めましょう🌿`
-      : `【${today} のお世話メモ🌱】\n今日はお世話の予定はありません🌿`;
+      const aiMessage =
+  events && events.length > 0
+    ? await generateCareMessage({
+        today,
+        events: events.map((event: any) => ({
+          task_type: event.task_type,
+        })),
+        plants: events.map((event: any) => {
+          const plantType = event.plants?.plant_type ?? "";
+          const plantName = plantLabelMap.get(plantType) ?? "植物";
+
+          return {
+            id: event.id,
+            name: plantName,
+          };
+        }),
+      })
+    : null;
+
+const fallbackMessage =
+  lines.length > 0
+    ? `【${today} の今日やること🌱】\n\n${lines.join(
+        "\n\n"
+      )}\n\n無理ない範囲で進めましょう🌿`
+    : `【${today} のお世話メモ🌱】\n今日はお世話の予定はありません🌿`;
+
+const message = aiMessage ?? fallbackMessage;
+  
+
 
   const lineRes = await fetch("https://api.line.me/v2/bot/message/push", {
     method: "POST",
