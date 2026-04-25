@@ -1,5 +1,7 @@
 import { supabase } from "../src/lib/supabase";
+import { revalidatePath } from "next/cache";
 import { BackgroundLayer } from "./BackgroundLayer";
+import { PlantColumn } from "./PlantColumn";
 
 const PLANTS_MASTER_URL =
   "https://opensheet.elk.sh/1XmNK_IFrsQfZ7D65ECBKLDHEHJ7VK9TTFCdwa7_mjrk/plants_master";
@@ -30,19 +32,6 @@ type AdviceMessageRow = {
   title: string;
   message: string;
 };
-
-const initialStateLabelMap: Record<string, string> = {
-  seed: "種",
-  seedling: "苗",
-  cutting: "挿し木",
-  established: "既に育っている株",
-  other: "その他",
-};
-
-function getInitialStateLabel(stateType: string | null | undefined): string | null {
-  if (!stateType) return null;
-  return initialStateLabelMap[stateType] ?? stateType;
-}
 
 function addDays(dateString: string, days: number) {
   const d = new Date(dateString);
@@ -232,6 +221,7 @@ async function addPlant(formData: FormData) {
       console.error("care_events insert error:", eventError);
     }
   }
+  revalidatePath("/");
 }
 
 async function completeCareEvent(formData: FormData) {
@@ -248,6 +238,7 @@ async function completeCareEvent(formData: FormData) {
   if (error) {
     console.error("complete care event error:", error);
   }
+  revalidatePath("/");
 }
 
 async function snoozeCareEvent(formData: FormData) {
@@ -268,6 +259,47 @@ async function snoozeCareEvent(formData: FormData) {
   if (error) {
     console.error("snooze care event error:", error);
   }
+  revalidatePath("/");
+}
+
+async function uploadPlantPhoto(formData: FormData) {
+  "use server";
+
+  const plantId = String(formData.get("plant_id") || "");
+  const file = formData.get("photo") as File | null;
+
+  if (!plantId || !file || file.size === 0) return;
+
+  const storagePath = `plants/${plantId}/${Date.now()}-${file.name}`;
+
+  const bytes = await file.arrayBuffer();
+  const { error: uploadError } = await supabase.storage
+    .from("plant-photos")
+    .upload(storagePath, bytes, { contentType: file.type || "image/jpeg" });
+
+  if (uploadError) {
+    console.error("storage upload error:", uploadError);
+    return;
+  }
+
+  const { data: urlData } = supabase.storage
+    .from("plant-photos")
+    .getPublicUrl(storagePath);
+
+  const { error: dbError } = await supabase
+    .from("plant_photos")
+    .insert([{
+      plant_id: plantId,
+      image_url: urlData.publicUrl,
+      storage_path: storagePath,
+      taken_at: new Date().toISOString(),
+    }]);
+
+  if (dbError) {
+    console.error("plant_photos insert error:", dbError);
+  }
+
+  revalidatePath("/");
 }
 
 export default async function Home() {
@@ -311,6 +343,35 @@ export default async function Home() {
       todayEvents.some((e) => e.plant_id === plant.id),
     ])
   );
+
+  const plantHasTodayEventRecord = Object.fromEntries(plantHasTodayEvent);
+
+  const { data: photosRaw } = await supabase
+    .from("plant_photos")
+    .select("id, plant_id, image_url, taken_at")
+    .order("taken_at", { ascending: false });
+
+  const photos = photosRaw ?? [];
+
+  const latestPhotos: Record<string, string> = {};
+  const photoHistories: Record<string, { id: string; url: string; takenAt: string }[]> = {};
+
+  for (const photo of photos) {
+    const url: string = photo.image_url ?? "";
+    if (!url) continue;
+
+    if (!latestPhotos[photo.plant_id]) {
+      latestPhotos[photo.plant_id] = url;
+    }
+    if (!photoHistories[photo.plant_id]) {
+      photoHistories[photo.plant_id] = [];
+    }
+    photoHistories[photo.plant_id].push({
+      id: photo.id,
+      url,
+      takenAt: String(photo.taken_at ?? "").slice(0, 10),
+    });
+  }
 
   const todayLineMessage = buildTodayLineMessage(today, todayEvents, adviceMap);
   const lineShareUrl = `https://line.me/R/msg/text/?${encodeURIComponent(
@@ -597,186 +658,17 @@ export default async function Home() {
           {/* ════════════════════════════════
               Column 1 — 育てている植物
           ════════════════════════════════ */}
-          <div className="col-board">
-            <h2 className="col-heading">育てている植物</h2>
-
-            {/* Plant card grid */}
-            {plantsError ? (
-              <div className="todo-card">
-                <p style={{ color: "#b91c1c", margin: 0, fontSize: 13 }}>
-                  植物データの取得でエラーが出ました
-                </p>
-              </div>
-            ) : plants.length === 0 ? (
-              <div className="todo-card">
-                <p style={{ color: "#9ca3af", margin: 0, fontSize: 13 }}>
-                  まだ植物は登録されていません
-                </p>
-              </div>
-            ) : (
-              <div className="plants-grid">
-                {plants.map((plant) => {
-                  const hasTodayEvent =
-                    plantHasTodayEvent.get(plant.id) ?? false;
-                  const stateLabel = getInitialStateLabel(plant.initial_state_type);
-                  return (
-                    <div key={plant.id} className="plant-card">
-                      {/* Photo area — replaced with <img> when photo upload is ready */}
-                      <div className="plant-photo-area">
-                        <span className="plant-photo-label">photo</span>
-                      </div>
-                      <div className="plant-info">
-                        <div
-                          style={{
-                            fontWeight: 700,
-                            fontSize: 14,
-                            color: "#2d4a3e",
-                            marginBottom: 2,
-                            lineHeight: 1.3,
-                          }}
-                        >
-                          {getPlantLabel(plant.plant_type)}
-                        </div>
-                        <div
-                          style={{
-                            color: "#b0b8b0",
-                            fontSize: 11,
-                            marginBottom: 4,
-                          }}
-                        >
-                          {plant.planted_at}
-                        </div>
-                        {/* 植えたときの状態 + メモ */}
-                        {stateLabel ? (
-                          <div
-                            style={{
-                              fontSize: 10,
-                              color: "#7a9a7a",
-                              marginBottom: 6,
-                              lineHeight: 1.5,
-                            }}
-                          >
-                            <span>植えたとき：{stateLabel}</span>
-                            {plant.initial_state_note && (
-                              <div style={{ color: "#a0a8a2", marginTop: 1 }}>
-                                {plant.initial_state_note}
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <div
-                            style={{
-                              fontSize: 10,
-                              color: "#d1d5db",
-                              marginBottom: 6,
-                            }}
-                          >
-                            未設定
-                          </div>
-                        )}
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            marginTop: 4,
-                          }}
-                        >
-                          <span
-                            className={
-                              hasTodayEvent ? "badge-alert" : "badge-ok"
-                            }
-                          >
-                            {hasTodayEvent ? "要対応" : "良好"}
-                          </span>
-                          {/* Operations area — reserved for edit / delete / photo upload */}
-                          <span
-                            style={{
-                              fontSize: 14,
-                              color: "#ddd8cf",
-                              cursor: "default",
-                              letterSpacing: 1,
-                              userSelect: "none",
-                            }}
-                          >
-                            ···
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Add plant form */}
-            <div className="form-card" style={{ marginBottom: 0 }}>
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: "#2d4a3e",
-                  marginBottom: 14,
-                  letterSpacing: 0.3,
-                }}
-              >
-                植物を追加する
-              </div>
-              <form action={addPlant}>
-                <div style={{ marginBottom: 10 }}>
-                  <label className="form-label">植物</label>
-                  <select name="plant_type" className="form-input"
-                    defaultValue={enabledPlantOptions[0]?.plant_code ?? "tomato"}
-                  >
-                    {enabledPlantOptions.map((plant) => (
-                      <option key={plant.plant_code} value={plant.plant_code}>
-                        {plant.plant_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div style={{ marginBottom: 10 }}>
-                  <label className="form-label">植えた日</label>
-                  <input
-                    type="date"
-                    name="planted_at"
-                    defaultValue={today}
-                    className="form-input"
-                  />
-                </div>
-
-                <div style={{ marginBottom: 10 }}>
-                  <label className="form-label">植えたときの状態</label>
-                  <select name="initial_state_type" className="form-input">
-                    <option value="">— 選択してください —</option>
-                    <option value="seed">種</option>
-                    <option value="seedling">苗</option>
-                    <option value="cutting">挿し木</option>
-                    <option value="established">既に育っている株</option>
-                    <option value="other">その他</option>
-                  </select>
-                </div>
-
-                <div style={{ marginBottom: 14 }}>
-                  <label className="form-label">メモ</label>
-                  <textarea
-                    name="initial_state_note"
-                    placeholder="例：10cmくらいの苗、種まきから2週間"
-                    className="form-textarea"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="btn-primary"
-                  style={{ width: "100%", padding: "10px 16px", fontSize: 14 }}
-                >
-                  追加する
-                </button>
-              </form>
-            </div>
-          </div>
+          <PlantColumn
+            plants={plants}
+            enabledPlantOptions={enabledPlantOptions}
+            today={today}
+            plantHasTodayEventRecord={plantHasTodayEventRecord}
+            hasError={!!plantsError}
+            addPlantAction={addPlant}
+            uploadPhotoAction={uploadPlantPhoto}
+            latestPhotos={latestPhotos}
+            photoHistories={photoHistories}
+          />
 
           {/* ════════════════════════════════
               Column 2 — 今日やること

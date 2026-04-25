@@ -8,15 +8,14 @@ const fontFamily =
   'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 
 const controlBtnStyle: React.CSSProperties = {
-  padding: "6px 13px",
-  background: "rgba(255, 255, 255, 0.90)",
-  border: "1px solid rgba(0, 0, 0, 0.10)",
+  padding: "4px 10px",
+  background: "transparent",
+  border: "none",
   borderRadius: 6,
-  fontSize: 12,
-  fontWeight: 600,
+  fontSize: 11,
+  fontWeight: 500,
   cursor: "pointer",
-  backdropFilter: "blur(8px)",
-  color: "#374151",
+  color: "rgba(80, 100, 80, 0.50)",
   fontFamily,
   lineHeight: 1,
 };
@@ -62,8 +61,16 @@ export function BackgroundLayer() {
 
   return (
     <>
+      <style>{`
+        @media (max-width: 768px) {
+          .app-bg-photo { background-image: none !important; }
+          .app-bg-controls { display: none !important; }
+        }
+      `}</style>
+
       {/* Fixed background */}
       <div
+        className="app-bg-photo"
         style={
           bgImage
             ? {
@@ -97,13 +104,14 @@ export function BackgroundLayer() {
             right: 0,
             bottom: 0,
             left: 0,
-            background: "rgba(248, 244, 238, 0.88)",
+            background: "rgba(248, 244, 238, 0.60)",
           }}
         />
       </div>
 
       {/* Background controls — fixed top-right */}
       <div
+        className="app-bg-controls"
         style={{
           position: "fixed",
           top: 14,
