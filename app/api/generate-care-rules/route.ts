@@ -142,6 +142,22 @@ enum: [
 
     console.log("AI text:", response.output_text);
 
+const content = response.choices?.[0]?.message?.content;
+
+console.log("AI raw content:", content);
+
+if (!content) {
+  return NextResponse.json(
+    {
+      error: "Failed to generate care rules",
+      detail: "AI response was empty",
+    },
+    { status: 500 }
+  );
+}
+
+const parsed = JSON.parse(content);
+
     const parsed = JSON.parse(response.output_text) as { rules: CareRule[] };
 
     const plantName =
