@@ -838,7 +838,7 @@ const advice = getAdviceText(event);
               <>
                 <div className="upcoming-grid">
                   {upcomingEvents.slice(0, 5).map((event) => {
-                    const advice = getAdviceText(adviceMap, event.task_type);
+const advice = getAdviceText(event);
                     const plant = plantMap.get(event.plant_id);
                     const plantName = getPlantLabel(plant?.plant_type);
                     return (
