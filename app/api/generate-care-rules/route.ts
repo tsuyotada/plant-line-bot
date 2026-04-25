@@ -9,7 +9,11 @@ type CareRule = {
     | "fertilizing"
     | "pruning"
     | "harvesting"
+    | "environment"
+    | "soil"
+    | "support"
     | "other";
+  task_detail: string;
   interval_days: number;
   title: string;
   message: string;
@@ -66,8 +70,14 @@ ${JSON.stringify(plant, null, 2)}
 - 日本の一般家庭・ベランダ栽培を想定
 - 初心者向け
 - 通知アプリで使うため、短く実行しやすい内容にする
-- 水やり、観察、追肥、剪定、収穫確認などから必要なものだけ作る
-- task_type は watering / observation / fertilizing / pruning / harvesting / other のいずれか
+- task_type は watering / observation / fertilizing / pruning / harvesting / environment / soil / support / other のいずれか
+- task_type は大分類として使う
+- task_detail には具体的な作業名を書く
+- environment は 日照調整・風対策・温度対策・鉢の向き変更
+- soil は 用土の表面ほぐし・増し土・植え替え・排水チェック
+- support は 摘芯・人工授粉・間引き・支柱・誘引
+- title は短く、画面の見出しに使える日本語
+- message はLINE通知にそのまま使える自然な日本語
 - interval_days は 1以上の整数
 - title は短く
 - message はLINE通知にそのまま使える自然な日本語
@@ -89,15 +99,19 @@ ${JSON.stringify(plant, null, 2)}
                   properties: {
                     task_type: {
                       type: "string",
-                      enum: [
-                        "watering",
-                        "observation",
-                        "fertilizing",
-                        "pruning",
-                        "harvesting",
-                        "other",
-                      ],
+enum: [
+  "watering",
+  "observation",
+  "fertilizing",
+  "pruning",
+  "harvesting",
+  "environment",
+  "soil",
+  "support",
+  "other",
+],
                     },
+                    task_detail: { type: "string" },
                     interval_days: {
                       type: "integer",
                       minimum: 1,
@@ -111,6 +125,7 @@ ${JSON.stringify(plant, null, 2)}
                   },
                   required: [
                     "task_type",
+                    "task_detail",
                     "interval_days",
                     "title",
                     "message",
@@ -143,19 +158,20 @@ ${JSON.stringify(plant, null, 2)}
       plant.name ??
       null;
 
-    const rows = parsed.rules.map((rule) => ({
-      plant_id: plant.id,
-      user_id: plant.user_id ?? null,
-      plant_name: plantName,
-      plant_type: plantType,
-      task_type: rule.task_type,
-      interval_days: rule.interval_days,
-      title: rule.title,
-      message: rule.message,
-      source: "ai",
-      confidence: rule.confidence,
-      is_active: true,
-    }));
+const rows = parsed.rules.map((rule) => ({
+  plant_id: plant.id,
+  user_id: plant.user_id ?? null,
+  plant_name: plantName,
+  plant_type: plantType,
+  task_type: rule.task_type,
+  task_detail: rule.task_detail,
+  interval_days: rule.interval_days,
+  title: rule.title,
+  message: rule.message,
+  source: "ai",
+  confidence: rule.confidence,
+  is_active: true,
+}));
 
     const { error: insertError } = await supabase
       .from("care_rules")
