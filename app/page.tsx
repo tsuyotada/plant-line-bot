@@ -262,44 +262,55 @@ async function snoozeCareEvent(formData: FormData) {
   revalidatePath("/");
 }
 
-async function uploadPlantPhoto(formData: FormData) {
+async function uploadPlantPhoto(
+  formData: FormData
+): Promise<{ success: boolean; error?: string }> {
   "use server";
 
-  const plantId = String(formData.get("plant_id") || "");
-  const file = formData.get("photo") as File | null;
+  try {
+    const plantId = String(formData.get("plant_id") || "");
+    const file = formData.get("photo") as File | null;
 
-  if (!plantId || !file || file.size === 0) return;
+    if (!plantId || !file || file.size === 0) {
+      return { success: false, error: "必要なデータが不足しています" };
+    }
 
-  const storagePath = `plants/${plantId}/${Date.now()}-${file.name}`;
+    const storagePath = `plants/${plantId}/${Date.now()}-${file.name}`;
 
-  const bytes = await file.arrayBuffer();
-  const { error: uploadError } = await supabase.storage
-    .from("plant-photos")
-    .upload(storagePath, bytes, { contentType: file.type || "image/jpeg" });
+    const bytes = await file.arrayBuffer();
+    const { error: uploadError } = await supabase.storage
+      .from("plant-photos")
+      .upload(storagePath, bytes, { contentType: file.type || "image/jpeg" });
 
-  if (uploadError) {
-    console.error("storage upload error:", uploadError);
-    return;
+    if (uploadError) {
+      console.error("storage upload error:", uploadError);
+      return { success: false, error: "アップロードに失敗しました。通信状態を確認してください。" };
+    }
+
+    const { data: urlData } = supabase.storage
+      .from("plant-photos")
+      .getPublicUrl(storagePath);
+
+    const { error: dbError } = await supabase
+      .from("plant_photos")
+      .insert([{
+        plant_id: plantId,
+        image_url: urlData.publicUrl,
+        storage_path: storagePath,
+        taken_at: new Date().toISOString(),
+      }]);
+
+    if (dbError) {
+      console.error("plant_photos insert error:", dbError);
+      return { success: false, error: "データの保存に失敗しました。" };
+    }
+
+    revalidatePath("/");
+    return { success: true };
+  } catch (err) {
+    console.error("uploadPlantPhoto unexpected error:", err);
+    return { success: false, error: "予期しないエラーが発生しました。" };
   }
-
-  const { data: urlData } = supabase.storage
-    .from("plant-photos")
-    .getPublicUrl(storagePath);
-
-  const { error: dbError } = await supabase
-    .from("plant_photos")
-    .insert([{
-      plant_id: plantId,
-      image_url: urlData.publicUrl,
-      storage_path: storagePath,
-      taken_at: new Date().toISOString(),
-    }]);
-
-  if (dbError) {
-    console.error("plant_photos insert error:", dbError);
-  }
-
-  revalidatePath("/");
 }
 
 export default async function Home() {

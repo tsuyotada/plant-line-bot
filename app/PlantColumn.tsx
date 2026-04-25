@@ -13,7 +13,7 @@ type Props = {
   plantHasTodayEventRecord: Record<string, boolean>;
   hasError: boolean;
   addPlantAction: (formData: FormData) => Promise<void>;
-  uploadPhotoAction: (formData: FormData) => Promise<void>;
+  uploadPhotoAction: (formData: FormData) => Promise<{ success: boolean; error?: string }>;
   latestPhotos: Record<string, string>;
   photoHistories: Record<string, PhotoHistoryItem[]>;
 };
@@ -46,6 +46,35 @@ function getInitialStateLabel(stateType: string | null | undefined): string | nu
   return initialStateLabelMap[stateType] ?? stateType;
 }
 
+async function compressImage(file: File): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const MAX_WIDTH = 1200;
+      let { width, height } = img;
+      if (width > MAX_WIDTH) {
+        height = Math.round(height * (MAX_WIDTH / width));
+        width = MAX_WIDTH;
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { reject(new Error("canvas unavailable")); return; }
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => { if (blob) resolve(blob); else reject(new Error("toBlob failed")); },
+        "image/jpeg",
+        0.7
+      );
+    };
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error("image load failed")); };
+    img.src = objectUrl;
+  });
+}
+
 const fontFamily =
   'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 
@@ -68,8 +97,9 @@ export function PlantColumn({
   const [historyModalId, setHistoryModalId] = useState<string | null>(null);
   // Form submission pending state
   const [isPending, startTransition] = useTransition();
-  // Photo upload pending state
-  const [, startUploadTransition] = useTransition();
+  // Per-plant upload loading and error state
+  const [uploadingIds, setUploadingIds] = useState<Record<string, boolean>>({});
+  const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
 
   const formRef = useRef<HTMLFormElement>(null);
   const photoInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -78,12 +108,24 @@ export function PlantColumn({
     photoInputRefs.current[plantId]?.click();
   }
 
-  function handlePhotoChange(
+  async function handlePhotoChange(
     plantId: string,
     e: React.ChangeEvent<HTMLInputElement>
   ) {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Clear previous error
+    setUploadErrors((prev) => { const next = { ...prev }; delete next[plantId]; return next; });
+
+    // File size check: 5 MB
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadErrors((prev) => ({
+        ...prev,
+        [plantId]: "画像サイズが大きすぎます（5MB以内にしてください）",
+      }));
+      return;
+    }
 
     // Immediate session preview
     const reader = new FileReader();
@@ -95,14 +137,35 @@ export function PlantColumn({
     };
     reader.readAsDataURL(file);
 
-    // Upload to Supabase Storage
-    const fd = new FormData();
-    fd.set("plant_id", plantId);
-    fd.set("taken_at", today);
-    fd.set("photo", file);
-    startUploadTransition(async () => {
-      await uploadPhotoAction(fd);
-    });
+    setUploadingIds((prev) => ({ ...prev, [plantId]: true }));
+
+    try {
+      const compressed = await compressImage(file);
+      const compressedFile = new File(
+        [compressed],
+        file.name.replace(/\.[^/.]+$/, "") + ".jpg",
+        { type: "image/jpeg" }
+      );
+
+      const fd = new FormData();
+      fd.set("plant_id", plantId);
+      fd.set("photo", compressedFile);
+
+      const result = await uploadPhotoAction(fd);
+      if (!result.success) {
+        setUploadErrors((prev) => ({
+          ...prev,
+          [plantId]: result.error ?? "アップロードに失敗しました。通信状態を確認してください。",
+        }));
+      }
+    } catch {
+      setUploadErrors((prev) => ({
+        ...prev,
+        [plantId]: "アップロードに失敗しました。通信状態を確認してください。",
+      }));
+    } finally {
+      setUploadingIds((prev) => { const next = { ...prev }; delete next[plantId]; return next; });
+    }
   }
 
   function handleMenuToggle(plantId: string, e: React.MouseEvent) {
@@ -162,6 +225,19 @@ export function PlantColumn({
           justify-content: center;
           opacity: 0;
           transition: opacity 0.15s;
+          font-size: 11px;
+          color: #fff;
+          font-weight: 600;
+          letter-spacing: 0.3px;
+          font-family: ${fontFamily};
+        }
+        .photo-upload-loading-hint {
+          position: absolute;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.40);
+          display: flex;
+          align-items: center;
+          justify-content: center;
           font-size: 11px;
           color: #fff;
           font-weight: 600;
@@ -289,7 +365,8 @@ export function PlantColumn({
                   {/* Photo area — click to select / take photo */}
                   <div
                     className="plant-photo-click"
-                    onClick={() => handlePhotoClick(plant.id)}
+                    onClick={() => !uploadingIds[plant.id] && handlePhotoClick(plant.id)}
+                    style={{ cursor: uploadingIds[plant.id] ? "not-allowed" : "pointer" }}
                   >
                     {displayPhoto ? (
                       <img
@@ -304,7 +381,11 @@ export function PlantColumn({
                     ) : (
                       <span className="photo-placeholder-label">photo</span>
                     )}
-                    <div className="photo-hover-hint">写真を追加</div>
+                    {uploadingIds[plant.id] ? (
+                      <div className="photo-upload-loading-hint">アップロード中…</div>
+                    ) : (
+                      <div className="photo-hover-hint">写真を追加</div>
+                    )}
                   </div>
 
                   {/* Hidden file input (future: upload to Supabase Storage) */}
@@ -406,6 +487,19 @@ export function PlantColumn({
                         )}
                       </div>
                     </div>
+
+                    {uploadErrors[plant.id] && (
+                      <div
+                        style={{
+                          fontSize: 10,
+                          color: "#b91c1c",
+                          marginTop: 6,
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        {uploadErrors[plant.id]}
+                      </div>
+                    )}
                   </div>
                 </div>
               );
