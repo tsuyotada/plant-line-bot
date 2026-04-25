@@ -150,10 +150,13 @@ ${JSON.stringify(plant, null, 2)}
       confidence: rule.confidence,
       is_active: true,
     }));
-// ① insertだけする
+
+    // ① care_rules に保存
 const { error: insertError } = await supabase
   .from("care_rules")
   .insert(rows);
+
+console.log("INSERT ERROR:", insertError);
 
 if (insertError) {
   return NextResponse.json(
