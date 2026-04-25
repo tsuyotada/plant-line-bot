@@ -157,6 +157,7 @@ const { error: insertError } = await supabase
   .insert(rows);
 
 console.log("INSERT ERROR:", insertError);
+console.log("ROWS:", rows);
 
 if (insertError) {
   return NextResponse.json(
