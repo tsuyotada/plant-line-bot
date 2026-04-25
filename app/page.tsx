@@ -18,6 +18,18 @@ type PlantMasterRow = {
   enabled: string;
 };
 
+const TASK_LABEL_MAP: Record<string, string> = {
+  watering: "水やり",
+  observation: "観察",
+  fertilizing: "追肥",
+  pruning: "剪定",
+  harvesting: "収穫",
+  environment: "環境調整",
+  soil: "土の管理",
+  support: "成長サポート",
+  other: "お世話",
+};
+
 type CareRuleRow = {
   plant_code: string;
   event_code: string;
@@ -85,15 +97,16 @@ function buildAdviceMap(adviceMessages: AdviceMessageRow[]) {
   );
 }
 
-function getAdviceText(
-  adviceMap: Map<string, { title: string; message: string }>,
-  taskType: string | null | undefined
-) {
-  const advice = adviceMap.get(taskType ?? "");
-  if (!advice) {
-    return { title: "植物のお世話", message: "植物のお世話をしましょう" };
-  }
-  return advice;
+function getAdviceText(item: any) {
+  const taskType = item.task_type;
+
+  return {
+    title: item.title ?? TASK_LABEL_MAP[taskType] ?? "お世話",
+    message:
+      item.task_detail ??
+      item.message ??
+      "植物の状態を確認しましょう",
+  };
 }
 
 function isTrueLike(value: string | null | undefined) {
@@ -723,7 +736,7 @@ export default async function Home() {
               </div>
             ) : (
               todayEvents.map((event) => {
-                const advice = getAdviceText(adviceMap, event.task_type);
+const advice = getAdviceText(event);
                 const plant = plantMap.get(event.plant_id);
                 const plantName = getPlantLabel(plant?.plant_type);
                 return (
