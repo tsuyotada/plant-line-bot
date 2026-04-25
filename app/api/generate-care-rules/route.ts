@@ -72,7 +72,12 @@ ${JSON.stringify(plant, null, 2)}
 - 通知アプリで使うため、短く実行しやすい内容にする
 - task_type は watering / observation / fertilizing / pruning / harvesting / environment / soil / support / other のいずれか
 - task_type は大分類として使う
-- task_detail には具体的な作業名を書く
+- task_detail は必ず空文字にしない
+- task_detail は title と同じでもよいが、できれば具体的な作業内容にする
+- 例：
+  task_type: watering
+  task_detail: 土が乾いていたら水やり
+  title: 水やり
 - environment は 日照調整・風対策・温度対策・鉢の向き変更
 - soil は 用土の表面ほぐし・増し土・植え替え・排水チェック
 - support は 摘芯・人工授粉・間引き・支柱・誘引
@@ -177,7 +182,10 @@ const rows = parsed.rules.map((rule: CareRule) => ({
   plant_name: plantName,
   plant_type: plantType,
   task_type: rule.task_type,
-  task_detail: rule.task_detail,
+  task_detail:
+  rule.task_detail?.trim() ||
+  rule.title?.trim() ||
+  "植物の状態を確認",
   interval_days: rule.interval_days,
   title: rule.title,
   message: rule.message,
