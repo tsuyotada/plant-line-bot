@@ -17,8 +17,13 @@ export async function generateCareMessage(params: {
   today: string;
   events: CareEvent[];
   plants: Plant[];
+  weather?: {
+    temperature: number | null;
+    precipitation: number | null;
+    description: string;
+  } | null;
 }): Promise<string | null> {
-  const { today, events, plants } = params;
+  const { today, events, plants, weather } = params;
 
   if (!events || events.length === 0) {
     return null;
@@ -44,6 +49,9 @@ LINEで送る短い通知メッセージを作ってください。
 日付: ${today}
 植物: ${plantNames}
 作業: ${tasks}
+天気: ${weather?.description ?? "不明"}
+気温: ${weather?.temperature ?? "不明"}℃
+降水確率: ${weather?.precipitation ?? "不明"}%
 
 【出力】
 そのままLINEで送れる文章のみ

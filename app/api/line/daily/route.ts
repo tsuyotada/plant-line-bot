@@ -1,6 +1,7 @@
 import { generateCareMessage } from "@/lib/aiCareMessage";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { getTodayWeather } from "@/lib/weather";
 
 function getTodayJst() {
   return new Intl.DateTimeFormat("en-CA", {
@@ -75,6 +76,8 @@ export async function GET() {
     );
   }
 
+  const weather = await getTodayWeather(35.6938, 139.7034);
+
   const lines =
     events && events.length > 0
       ? events.map((event: any, index: number) => {
@@ -95,6 +98,7 @@ export async function GET() {
         today,
         events: events.map((event: any) => ({
           task_type: event.task_type,
+          weather,
         })),
         plants: events.map((event: any) => {
           const plantType = event.plants?.plant_type ?? "";
