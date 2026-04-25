@@ -171,7 +171,7 @@ const parsed = JSON.parse(content);
       plant.name ??
       null;
 
-const rows = parsed.rules.map((rule) => ({
+const rows = parsed.rules.map((rule: CareRule) => ({
   plant_id: plant.id,
   user_id: plant.user_id ?? null,
   plant_name: plantName,
