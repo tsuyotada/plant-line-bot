@@ -142,8 +142,7 @@ enum: [
 
     console.log("AI text:", response.output_text);
 
-const content = response.choices?.[0]?.message?.content;
-
+const content = response.output_text;
 console.log("AI raw content:", content);
 
 if (!content) {
