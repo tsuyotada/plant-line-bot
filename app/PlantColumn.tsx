@@ -429,7 +429,7 @@ export function PlantColumn({
                         style={{
                           width: "100%",
                           height: "100%",
-                          objectFit: "contain",
+                          objectFit: "cover",
                         }}
                       />
                     ) : (
@@ -560,12 +560,34 @@ export function PlantColumn({
                               className="plant-menu-item"
                               onClick={() => handleHistoryOpen(plant.id)}
                             >
-                              過去写真
+                              写真履歴を見る
                             </button>
                           </div>
                         )}
                       </div>
                     </div>
+
+                    {(photoHistories[plant.id]?.length ?? 0) > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => handleHistoryOpen(plant.id)}
+                        style={{
+                          display: "block",
+                          marginTop: 6,
+                          background: "none",
+                          border: "none",
+                          padding: 0,
+                          fontSize: 10,
+                          color: "#6db07b",
+                          cursor: "pointer",
+                          fontFamily,
+                          fontWeight: 600,
+                          letterSpacing: 0.2,
+                        }}
+                      >
+                        写真履歴（{photoHistories[plant.id].length}枚）
+                      </button>
+                    )}
 
                     {uploadErrors[plant.id] && (
                       <div
@@ -714,15 +736,22 @@ export function PlantColumn({
                 marginBottom: 18,
               }}
             >
-              <div
-                style={{
-                  fontWeight: 700,
-                  fontSize: 16,
-                  color: "#2d4a3e",
-                  fontFamily,
-                }}
-              >
-                {getPlantLabel(historyPlant?.plant_type)} の写真履歴
+              <div>
+                <div
+                  style={{
+                    fontWeight: 700,
+                    fontSize: 16,
+                    color: "#2d4a3e",
+                    fontFamily,
+                  }}
+                >
+                  {getPlantLabel(historyPlant?.plant_type)} の写真履歴
+                </div>
+                {(photoHistories[historyModalId!] ?? []).length > 0 && (
+                  <div style={{ fontSize: 11, color: "#a0a8a2", fontFamily, marginTop: 2 }}>
+                    {(photoHistories[historyModalId!] ?? []).length}枚・古い順に表示
+                  </div>
+                )}
               </div>
               <button
                 type="button"
@@ -744,7 +773,8 @@ export function PlantColumn({
             </div>
 
             {(() => {
-              const history = photoHistories[historyModalId!] ?? [];
+              const rawHistory = photoHistories[historyModalId!] ?? [];
+              const history = [...rawHistory].reverse();
               if (history.length === 0) {
                 return (
                   <div
@@ -761,7 +791,7 @@ export function PlantColumn({
                       写真履歴はまだありません
                     </div>
                     <div style={{ fontSize: 12, color: "#c8c0b4", fontFamily }}>
-                      写真エリアをクリックして記録を始めましょう
+                      カメラアイコンをタップして記録を始めましょう
                     </div>
                   </div>
                 );
@@ -770,7 +800,7 @@ export function PlantColumn({
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "1fr 1fr 1fr",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(90px, 1fr))",
                     gap: 8,
                     marginBottom: 20,
                   }}
@@ -786,7 +816,7 @@ export function PlantColumn({
                           objectFit: "cover",
                           borderRadius: 8,
                           display: "block",
-                          cursor: "pointer",
+                          cursor: "zoom-in",
                         }}
                         onClick={() => setPreviewPhotoUrl(photo.url)}
                       />
@@ -796,6 +826,7 @@ export function PlantColumn({
                           color: "#a0a8a2",
                           textAlign: "center",
                           marginTop: 4,
+                          fontFamily,
                         }}
                       >
                         {photo.takenAt}
