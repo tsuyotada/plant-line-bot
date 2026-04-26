@@ -33,3 +33,21 @@ export async function replyToLine(
     console.error("LINE reply error:", await res.text());
   }
 }
+
+export async function pushToLine(
+  token: string,
+  lineUserId: string,
+  messages: object[]
+): Promise<void> {
+  const res = await fetch("https://api.line.me/v2/bot/message/push", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ to: lineUserId, messages }),
+  });
+  if (!res.ok) {
+    console.error("LINE push error:", await res.text());
+  }
+}

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { generatePlantChatReply } from "@/lib/aiPlantChat";
-import { fetchLineImage, replyToLine } from "@/lib/linePhotoUtils";
+import { fetchLineImage, replyToLine, pushToLine } from "@/lib/linePhotoUtils";
+import { generatePhotoAdvice } from "@/lib/aiPhotoAdvice";
 import { createClient } from "@supabase/supabase-js";
 
 const PLANT_LABEL_MAP: Record<string, string> = {
@@ -183,8 +184,10 @@ async function handlePostback(event: any, lineToken: string) {
     return;
   }
 
-  // ── 植物が選ばれた → plant_photos に登録 ──
+  // ── 植物が選ばれた → plant_photos に登録 → AI アドバイス送信 ──
   if (action === "select_plant" && pendingId && plantId) {
+    const lineUserId: string = event.source?.userId ?? "";
+
     const { data: pending, error } = await supabase
       .from("pending_line_photos")
       .select()
@@ -203,11 +206,13 @@ async function handlePostback(event: any, lineToken: string) {
       .from("plant-photos")
       .getPublicUrl(pending.storage_path);
 
+    const imageUrl: string = urlData.publicUrl;
+
     const { error: photoError } = await supabase
       .from("plant_photos")
       .insert({
         plant_id: plantId,
-        image_url: urlData.publicUrl,
+        image_url: imageUrl,
         storage_path: pending.storage_path,
         taken_at: new Date().toISOString(),
       });
@@ -227,15 +232,30 @@ async function handlePostback(event: any, lineToken: string) {
 
     const { data: plant } = await supabase
       .from("plants")
-      .select("plant_type")
+      .select("plant_type, initial_state_type, initial_state_note")
       .eq("id", plantId)
       .single();
 
     const plantName = plant ? getPlantLabel(plant.plant_type) : "植物";
 
+    // 登録完了を reply token で即返信
     await replyToLine(lineToken, replyToken, [
-      { type: "text", text: `${plantName}の写真として追加しました🌱` },
+      { type: "text", text: `${plantName}の写真として追加しました🌱\n少しお待ちください…` },
     ]);
+
+    // AI アドバイスを生成して push で送信
+    const advice = await generatePhotoAdvice({
+      imageUrl,
+      plantName,
+      initialStateType: plant?.initial_state_type ?? null,
+      initialStateNote: plant?.initial_state_note ?? null,
+    });
+
+    if (advice && lineUserId) {
+      await pushToLine(lineToken, lineUserId, [
+        { type: "text", text: advice },
+      ]);
+    }
   }
 }
 
