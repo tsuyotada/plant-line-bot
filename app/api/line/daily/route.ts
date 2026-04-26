@@ -41,30 +41,9 @@ export async function GET() {
     (plantMasters ?? []).map((plant) => [plant.plant_code, plant.plant_name])
   );
 
-  const { data: adviceMessages, error: adviceError } = await supabase
-    .from("advice_messages")
-    .select("event_code, title, message");
-
-  if (adviceError) {
-    return NextResponse.json(
-      { ok: false, error: adviceError.message },
-      { status: 500 }
-    );
-  }
-
-  const adviceMap = new Map(
-    (adviceMessages ?? []).map((advice) => [
-      advice.event_code,
-      {
-        title: advice.title,
-        message: advice.message,
-      },
-    ])
-  );
-
   const { data: events, error: eventsError } = await supabase
     .from("care_events")
-    .select("id, scheduled_for, status, task_type, plants(plant_type)")
+    .select("id, scheduled_for, status, task_type, rule_id, plants(plant_type), care_rules!rule_id(task_detail, title, message)")
     .eq("scheduled_for", today)
     .eq("status", "pending")
     .order("created_at", { ascending: true });
@@ -78,17 +57,29 @@ export async function GET() {
 
   const weather = await getTodayWeather(35.6938, 139.7034);
 
+  const TASK_LABEL_MAP: Record<string, string> = {
+    watering: "水やり",
+    observation: "観察",
+    fertilizing: "追肥",
+    pruning: "剪定",
+    harvesting: "収穫",
+    environment: "環境調整",
+    soil: "土の管理",
+    support: "成長サポート",
+    other: "お世話",
+  };
+
   const lines =
     events && events.length > 0
       ? events.map((event: any, index: number) => {
           const plantType = event.plants?.plant_type ?? "";
           const plantName = plantLabelMap.get(plantType) ?? "植物";
-          const advice = adviceMap.get(event.task_type) ?? {
-            title: "お世話",
-            message: "植物の様子を確認しましょう",
-          };
+          const rule = event.care_rules;
+          const title = rule?.title ?? TASK_LABEL_MAP[event.task_type] ?? "お世話";
+          const message =
+            rule?.task_detail ?? rule?.message ?? "植物の状態を確認しましょう";
 
-          return `${index + 1}. ${plantName}：${advice.title}\n${advice.message}`;
+          return `${index + 1}. ${plantName}：${title}\n${message}`;
         })
       : [];
 

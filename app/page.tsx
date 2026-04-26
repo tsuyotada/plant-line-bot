@@ -9,9 +9,6 @@ const PLANTS_MASTER_URL =
 const CARE_RULES_URL =
   "https://opensheet.elk.sh/1XmNK_IFrsQfZ7D65ECBKLDHEHJ7VK9TTFCdwa7_mjrk/care_rules";
 
-const ADVICE_MESSAGES_URL =
-  "https://opensheet.elk.sh/1XmNK_IFrsQfZ7D65ECBKLDHEHJ7VK9TTFCdwa7_mjrk/advice_messages";
-
 type PlantMasterRow = {
   plant_code: string;
   plant_name: string;
@@ -39,11 +36,6 @@ type CareRuleRow = {
   enabled: string;
 };
 
-type AdviceMessageRow = {
-  event_code: string;
-  title: string;
-  message: string;
-};
 
 function addDays(dateString: string, days: number) {
   const d = new Date(dateString);
@@ -82,29 +74,18 @@ async function fetchCareRules(): Promise<CareRuleRow[]> {
   return res.json();
 }
 
-async function fetchAdviceMessages(): Promise<AdviceMessageRow[]> {
-  const res = await fetch(ADVICE_MESSAGES_URL, { cache: "no-store" });
-  if (!res.ok) throw new Error("advice_messages の取得に失敗しました");
-  return res.json();
-}
-
-function buildAdviceMap(adviceMessages: AdviceMessageRow[]) {
-  return new Map(
-    adviceMessages.map((row) => [
-      row.event_code,
-      { title: row.title, message: row.message },
-    ])
-  );
-}
 
 function getAdviceText(item: any) {
   const taskType = item.task_type;
+  const rule = item.care_rules;
 
   return {
-    title: item.title ?? TASK_LABEL_MAP[taskType] ?? "お世話",
+    title: item.title ?? rule?.title ?? TASK_LABEL_MAP[taskType] ?? "お世話",
     message:
       item.task_detail ??
+      rule?.task_detail ??
       item.message ??
+      rule?.message ??
       "植物の状態を確認しましょう",
   };
 }
@@ -174,22 +155,20 @@ function buildCareEventsFromRules(
 function buildTodayLineMessage(
   today: string,
   todayEvents: any[],
-  adviceMap: Map<string, { title: string; message: string }>
+  plantMap: Map<string, any>
 ) {
   if (todayEvents.length === 0) {
     return `【${today} のお世話メモ】\n今日はお世話の予定はありません🌱`;
   }
 
-  const uniqueTaskTypes = Array.from(
-    new Set(todayEvents.map((e) => e.task_type))
-  );
-
-  const lines = uniqueTaskTypes.map((taskType, index) => {
-const advice = getAdviceText({ task_type: taskType });
-    return `${index + 1}. ${advice.title}`;
+  const lines = todayEvents.map((event, index) => {
+    const advice = getAdviceText(event);
+    const plant = plantMap.get(event.plant_id);
+    const plantName = getPlantLabel(plant?.plant_type);
+    return `${index + 1}. ${plantName}：${advice.title}\n${advice.message}`;
   });
 
-  return `【${today} の今日やること】\n${lines.join("\n")}\n\n無理のない範囲で進めましょう🌱`;
+  return `【${today} の今日やること】\n\n${lines.join("\n\n")}\n\n無理のない範囲で進めましょう🌱`;
 }
 
 function getAppBaseUrl() {
@@ -353,9 +332,6 @@ export default async function Home() {
     (plant) => String(plant.enabled).toLowerCase() === "true"
   );
 
-  const adviceMessages = await fetchAdviceMessages();
-  const adviceMap = buildAdviceMap(adviceMessages);
-
   const today = todayString();
 
   const { data: plantsRaw, error: plantsError } = await supabase
@@ -365,7 +341,7 @@ export default async function Home() {
 
   const { data: careEventsRaw, error: careEventsError } = await supabase
     .from("care_events")
-    .select("*")
+    .select("*, care_rules!rule_id(task_detail, title, message)")
     .order("scheduled_for", { ascending: true });
 
   const plants = plantsRaw ?? [];
@@ -417,7 +393,7 @@ export default async function Home() {
     });
   }
 
-  const todayLineMessage = buildTodayLineMessage(today, todayEvents, adviceMap);
+  const todayLineMessage = buildTodayLineMessage(today, todayEvents, plantMap);
   const lineShareUrl = `https://line.me/R/msg/text/?${encodeURIComponent(
     todayLineMessage
   )}`;
