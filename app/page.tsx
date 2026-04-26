@@ -59,7 +59,8 @@ const plantLabelMap: Record<string, string> = {
 };
 
 function getPlantLabel(plantType: string | null | undefined) {
-  return plantType ? (plantLabelMap[plantType] ?? "植物") : "植物";
+  if (!plantType) return "植物";
+  return plantLabelMap[plantType] ?? plantType;
 }
 
 async function fetchPlantsMaster(): Promise<PlantMasterRow[]> {
@@ -186,23 +187,25 @@ function getAppBaseUrl() {
 async function addPlant(formData: FormData) {
   "use server";
 
-  const plantType = String(formData.get("plant_type") || "");
-  const plantedAt = String(formData.get("planted_at") || "");
-  const initialStateType = String(formData.get("initial_state_type") || "") || null;
-  const initialStateNote = String(formData.get("initial_state_note") || "") || null;
+  const name = String(formData.get("name") || "").trim();
+  const species = String(formData.get("species") || "").trim() || null;
+  const location = String(formData.get("location") || "").trim() || null;
+  const startedAt = String(formData.get("started_at") || "").trim() || null;
+  const memo = String(formData.get("memo") || "").trim() || null;
+  const photo = formData.get("photo") as File | null;
 
-  if (!plantType || !plantedAt) return;
+  if (!name) return;
 
   const { data: plant, error: plantError } = await supabase
     .from("plants")
-    .insert([
-      {
-        plant_type: plantType,
-        planted_at: plantedAt,
-        initial_state_type: initialStateType,
-        initial_state_note: initialStateNote,
-      },
-    ])
+    .insert({
+      plant_type: name,
+      planted_at: startedAt ?? todayString(),
+      started_at: startedAt || null,
+      species,
+      location,
+      memo,
+    })
     .select()
     .single();
 
@@ -211,20 +214,38 @@ async function addPlant(formData: FormData) {
     return;
   }
 
+  if (photo && photo.size > 0) {
+    try {
+      const storagePath = `plants/${plant.id}/${Date.now()}-${photo.name}`;
+      const bytes = await photo.arrayBuffer();
+      const { error: uploadError } = await supabase.storage
+        .from("plant-photos")
+        .upload(storagePath, bytes, { contentType: photo.type || "image/jpeg" });
+
+      if (!uploadError) {
+        const { data: urlData } = supabase.storage
+          .from("plant-photos")
+          .getPublicUrl(storagePath);
+        await supabase.from("plant_photos").insert({
+          plant_id: plant.id,
+          image_url: urlData.publicUrl,
+          storage_path: storagePath,
+          taken_at: new Date().toISOString(),
+        });
+      }
+    } catch (err) {
+      console.error("photo upload error in addPlant:", err);
+    }
+  }
+
   try {
     const baseUrl = getAppBaseUrl();
-
     const res = await fetch(`${baseUrl}/api/generate-care-rules`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        plantId: plant.id,
-      }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ plantId: plant.id }),
       cache: "no-store",
     });
-
     if (!res.ok) {
       const errorText = await res.text();
       console.error("generate-care-rules API error:", errorText);
@@ -233,6 +254,28 @@ async function addPlant(formData: FormData) {
     console.error("generate-care-rules fetch error:", error);
   }
 
+  revalidatePath("/");
+}
+
+async function archivePlant(formData: FormData) {
+  "use server";
+  const plantId = String(formData.get("plant_id") || "");
+  if (!plantId) return;
+  await supabase
+    .from("plants")
+    .update({ archived_at: new Date().toISOString() })
+    .eq("id", plantId);
+  revalidatePath("/");
+}
+
+async function restorePlant(formData: FormData) {
+  "use server";
+  const plantId = String(formData.get("plant_id") || "");
+  if (!plantId) return;
+  await supabase
+    .from("plants")
+    .update({ archived_at: null })
+    .eq("id", plantId);
   revalidatePath("/");
 }
 
@@ -334,7 +377,7 @@ export default async function Home() {
 
   const today = todayString();
 
-  const { data: plantsRaw, error: plantsError } = await supabase
+  const { data: allPlantsRaw, error: plantsError } = await supabase
     .from("plants")
     .select("*")
     .order("created_at", { ascending: false });
@@ -344,10 +387,12 @@ export default async function Home() {
     .select("*, care_rules!rule_id(task_detail, title, message)")
     .order("scheduled_for", { ascending: true });
 
-  const plants = plantsRaw ?? [];
+  const allPlants = allPlantsRaw ?? [];
+  const plants = allPlants.filter((p) => !p.archived_at);
+  const archivedPlants = allPlants.filter((p) => !!p.archived_at);
   const careEvents = careEventsRaw ?? [];
 
-  const plantMap = new Map(plants.map((plant) => [plant.id, plant]));
+  const plantMap = new Map(allPlants.map((plant) => [plant.id, plant]));
 
   const todayEvents = careEvents.filter(
     (event) => event.scheduled_for === today && event.status === "pending"
@@ -680,11 +725,13 @@ export default async function Home() {
           ════════════════════════════════ */}
           <PlantColumn
             plants={plants}
-            enabledPlantOptions={enabledPlantOptions}
+            archivedPlants={archivedPlants}
             today={today}
             plantHasTodayEventRecord={plantHasTodayEventRecord}
             hasError={!!plantsError}
             addPlantAction={addPlant}
+            archivePlantAction={archivePlant}
+            restorePlantAction={restorePlant}
             uploadPhotoAction={uploadPlantPhoto}
             latestPhotos={latestPhotos}
             photoHistories={photoHistories}

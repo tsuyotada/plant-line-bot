@@ -2,17 +2,17 @@
 
 import { useRef, useState, useTransition } from "react";
 
-type PlantMasterOption = { plant_code: string; plant_name: string };
-
 type PhotoHistoryItem = { id: string; url: string; takenAt: string };
 
 type Props = {
   plants: any[];
-  enabledPlantOptions: PlantMasterOption[];
+  archivedPlants: any[];
   today: string;
   plantHasTodayEventRecord: Record<string, boolean>;
   hasError: boolean;
   addPlantAction: (formData: FormData) => Promise<void>;
+  archivePlantAction: (formData: FormData) => Promise<void>;
+  restorePlantAction: (formData: FormData) => Promise<void>;
   uploadPhotoAction: (formData: FormData) => Promise<{ success: boolean; error?: string }>;
   latestPhotos: Record<string, string>;
   photoHistories: Record<string, PhotoHistoryItem[]>;
@@ -30,7 +30,8 @@ const plantLabelMap: Record<string, string> = {
 };
 
 function getPlantLabel(plantType: string | null | undefined): string {
-  return plantType ? (plantLabelMap[plantType] ?? "植物") : "植物";
+  if (!plantType) return "植物";
+  return plantLabelMap[plantType] ?? plantType;
 }
 
 const initialStateLabelMap: Record<string, string> = {
@@ -80,33 +81,32 @@ const fontFamily =
 
 export function PlantColumn({
   plants,
-  enabledPlantOptions,
+  archivedPlants,
   today,
   plantHasTodayEventRecord,
   hasError,
   addPlantAction,
+  archivePlantAction,
+  restorePlantAction,
   uploadPhotoAction,
   latestPhotos,
   photoHistories,
 }: Props) {
-  // Photo preview: plant_id → data URL (session-only; cleared on reload)
   const [photoPreviews, setPhotoPreviews] = useState<Record<string, string>>({});
-  // Which plant's "···" menu is open
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  // Which plant's history modal is open
   const [historyModalId, setHistoryModalId] = useState<string | null>(null);
-  // Form submission pending state
   const [isPending, startTransition] = useTransition();
-  // Per-plant upload loading and error state
   const [uploadingIds, setUploadingIds] = useState<Record<string, boolean>>({});
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
-  // Photo preview lightbox
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
-  // Collapsible add-plant form
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [formPhotoPreview, setFormPhotoPreview] = useState<string | null>(null);
+  const [isArchivedOpen, setIsArchivedOpen] = useState(false);
 
   const formRef = useRef<HTMLFormElement>(null);
   const photoInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const formPhotoInputRef = useRef<HTMLInputElement | null>(null);
 
   function handlePhotoClick(plantId: string) {
     photoInputRefs.current[plantId]?.click();
@@ -119,10 +119,8 @@ export function PlantColumn({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Clear previous error
     setUploadErrors((prev) => { const next = { ...prev }; delete next[plantId]; return next; });
 
-    // File size check: 5 MB
     if (file.size > 5 * 1024 * 1024) {
       setUploadErrors((prev) => ({
         ...prev,
@@ -131,7 +129,6 @@ export function PlantColumn({
       return;
     }
 
-    // Immediate session preview
     const reader = new FileReader();
     reader.onload = (ev) => {
       const result = ev.target?.result;
@@ -172,6 +169,17 @@ export function PlantColumn({
     }
   }
 
+  function handleFormPhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) { setFormPhotoPreview(null); return; }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = ev.target?.result;
+      if (typeof result === "string") setFormPhotoPreview(result);
+    };
+    reader.readAsDataURL(file);
+  }
+
   function handleMenuToggle(plantId: string, e: React.MouseEvent) {
     e.stopPropagation();
     setOpenMenuId((prev) => (prev === plantId ? null : plantId));
@@ -184,14 +192,30 @@ export function PlantColumn({
 
   function handleFormAction(formData: FormData) {
     startTransition(async () => {
+      const rawFile = formData.get("photo") as File | null;
+      if (rawFile && rawFile.size > 0) {
+        try {
+          const compressed = await compressImage(rawFile);
+          const compressedFile = new File(
+            [compressed],
+            rawFile.name.replace(/\.[^/.]+$/, "") + ".jpg",
+            { type: "image/jpeg" }
+          );
+          formData.set("photo", compressedFile);
+        } catch {
+          // use original on compression failure
+        }
+      }
       await addPlantAction(formData);
       formRef.current?.reset();
       setIsFormOpen(false);
+      setIsDetailsOpen(false);
+      setFormPhotoPreview(null);
     });
   }
 
   const historyPlant = historyModalId
-    ? plants.find((p) => p.id === historyModalId)
+    ? [...plants, ...archivedPlants].find((p) => p.id === historyModalId)
     : null;
 
   return (
@@ -270,14 +294,6 @@ export function PlantColumn({
         .photo-camera-btn:hover {
           background: rgba(255, 255, 255, 0.98);
         }
-        .photo-placeholder-label {
-          font-size: 10px;
-          font-weight: 600;
-          color: rgba(147, 201, 160, 0.9);
-          letter-spacing: 1.2px;
-          text-transform: uppercase;
-          user-select: none;
-        }
         .plant-info-wrap {
           padding: 10px 11px 12px;
         }
@@ -307,7 +323,7 @@ export function PlantColumn({
           padding: 4px 0;
           box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14);
           z-index: 50;
-          min-width: 120px;
+          min-width: 130px;
           border: 1px solid #f0ebe2;
         }
         .plant-menu-item {
@@ -325,6 +341,21 @@ export function PlantColumn({
         .plant-menu-item:hover {
           background: #f9f7f3;
           color: #2d4a3e;
+        }
+        .plant-menu-item-danger {
+          display: block;
+          width: 100%;
+          padding: 8px 14px;
+          background: transparent;
+          border: none;
+          text-align: left;
+          font-size: 13px;
+          color: #b91c1c;
+          cursor: pointer;
+          font-family: inherit;
+        }
+        .plant-menu-item-danger:hover {
+          background: #fff5f5;
         }
         .modal-overlay {
           position: fixed;
@@ -363,9 +394,100 @@ export function PlantColumn({
           background: #f2faf4;
           border-color: #6db07b;
         }
+        .details-toggle-btn {
+          width: 100%;
+          padding: 7px 10px;
+          background: #f9f7f3;
+          border: 1px solid #e8e4dc;
+          border-radius: 7px;
+          font-size: 12px;
+          font-weight: 600;
+          color: #7a8a7a;
+          cursor: pointer;
+          font-family: inherit;
+          text-align: left;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          transition: background 0.12s;
+        }
+        .details-toggle-btn:hover {
+          background: #f2ede6;
+        }
+        .form-photo-preview {
+          width: 100%;
+          height: 90px;
+          object-fit: cover;
+          border-radius: 7px;
+          display: block;
+          margin-bottom: 6px;
+        }
+        .form-photo-pick-btn {
+          width: 100%;
+          padding: 7px 10px;
+          background: #f2faf4;
+          border: 1.5px dashed #93c9a0;
+          border-radius: 7px;
+          font-size: 12px;
+          font-weight: 600;
+          color: #6db07b;
+          cursor: pointer;
+          font-family: inherit;
+          text-align: center;
+          transition: background 0.12s;
+        }
+        .form-photo-pick-btn:hover {
+          background: #e4f5e9;
+        }
+        .archived-section-toggle {
+          width: 100%;
+          padding: 8px 10px;
+          background: transparent;
+          border: 1px solid #e8e4dc;
+          border-radius: 8px;
+          font-size: 12px;
+          font-weight: 600;
+          color: #a0a8a2;
+          cursor: pointer;
+          font-family: inherit;
+          text-align: left;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          transition: background 0.12s;
+          margin-top: 10px;
+        }
+        .archived-section-toggle:hover {
+          background: #f5f2ed;
+        }
+        .archived-plant-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 8px 10px;
+          background: #ffffff;
+          border-radius: 8px;
+          margin-bottom: 6px;
+          box-shadow: 0 1px 2px rgba(60, 50, 30, 0.06);
+        }
+        .btn-restore {
+          padding: 4px 10px;
+          background: transparent;
+          border: 1px solid #b8d4bc;
+          border-radius: 6px;
+          font-size: 11px;
+          font-weight: 600;
+          color: #6db07b;
+          cursor: pointer;
+          font-family: inherit;
+          white-space: nowrap;
+          flex-shrink: 0;
+        }
+        .btn-restore:hover {
+          background: #f2faf4;
+        }
       `}</style>
 
-      {/* Transparent backdrop — closes the "···" menu on outside click */}
       {openMenuId !== null && (
         <div
           onClick={() => setOpenMenuId(null)}
@@ -377,11 +499,9 @@ export function PlantColumn({
         />
       )}
 
-      {/* ── Column board ── */}
       <div className="col-board">
         <h2 className="col-heading">育てている植物</h2>
 
-        {/* Plant cards */}
         {hasError ? (
           <div className="todo-card">
             <p style={{ color: "#b91c1c", margin: 0, fontSize: 13 }}>
@@ -397,8 +517,7 @@ export function PlantColumn({
         ) : (
           <div className="plants-grid">
             {plants.map((plant) => {
-              const hasTodayEvent =
-                plantHasTodayEventRecord[plant.id] ?? false;
+              const hasTodayEvent = plantHasTodayEventRecord[plant.id] ?? false;
               const stateLabel = getInitialStateLabel(plant.initial_state_type);
               const preview = photoPreviews[plant.id];
               const displayPhoto = preview ?? latestPhotos[plant.id] ?? null;
@@ -490,7 +609,6 @@ export function PlantColumn({
                     )}
                   </div>
 
-                  {/* Hidden file input (future: upload to Supabase Storage) */}
                   <input
                     ref={(el: HTMLInputElement | null) => {
                       photoInputRefs.current[plant.id] = el;
@@ -508,23 +626,48 @@ export function PlantColumn({
                         fontWeight: 700,
                         fontSize: 14,
                         color: "#2d4a3e",
-                        marginBottom: 2,
+                        marginBottom: 1,
                         lineHeight: 1.3,
                       }}
                     >
                       {getPlantLabel(plant.plant_type)}
                     </div>
-                    <div
-                      style={{
-                        color: "#b0b8b0",
-                        fontSize: 11,
-                        marginBottom: 4,
-                      }}
-                    >
-                      {plant.planted_at}
+
+                    {plant.species && (
+                      <div style={{ fontSize: 11, color: "#7a8a7a", marginBottom: 2, lineHeight: 1.3 }}>
+                        {plant.species}
+                      </div>
+                    )}
+
+                    <div style={{ color: "#b0b8b0", fontSize: 11, marginBottom: 4 }}>
+                      {plant.location
+                        ? `📍 ${plant.location}`
+                        : (plant.started_at ?? plant.planted_at ?? "")}
                     </div>
 
-                    {stateLabel ? (
+                    {plant.location && (
+                      <div style={{ color: "#b0b8b0", fontSize: 11, marginBottom: 4 }}>
+                        {plant.started_at ?? plant.planted_at ?? ""}
+                      </div>
+                    )}
+
+                    {plant.memo && (
+                      <div
+                        style={{
+                          fontSize: 10,
+                          color: "#a0a8a2",
+                          marginBottom: 4,
+                          lineHeight: 1.5,
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        {plant.memo}
+                      </div>
+                    )}
+
+                    {stateLabel && !plant.species && !plant.location && (
                       <div
                         style={{
                           fontSize: 10,
@@ -540,16 +683,6 @@ export function PlantColumn({
                           </div>
                         )}
                       </div>
-                    ) : (
-                      <div
-                        style={{
-                          fontSize: 10,
-                          color: "#d1d5db",
-                          marginBottom: 6,
-                        }}
-                      >
-                        未設定
-                      </div>
                     )}
 
                     <div
@@ -560,13 +693,10 @@ export function PlantColumn({
                         marginTop: 4,
                       }}
                     >
-                      <span
-                        className={hasTodayEvent ? "badge-alert" : "badge-ok"}
-                      >
+                      <span className={hasTodayEvent ? "badge-alert" : "badge-ok"}>
                         {hasTodayEvent ? "要対応" : "良好"}
                       </span>
 
-                      {/* ··· operations menu */}
                       <div style={{ position: "relative" }}>
                         <button
                           type="button"
@@ -585,6 +715,16 @@ export function PlantColumn({
                             >
                               写真履歴を見る
                             </button>
+                            <form action={archivePlantAction} style={{ display: "contents" }}>
+                              <input type="hidden" name="plant_id" value={plant.id} />
+                              <button
+                                type="submit"
+                                className="plant-menu-item-danger"
+                                onClick={() => setOpenMenuId(null)}
+                              >
+                                アーカイブ
+                              </button>
+                            </form>
                           </div>
                         )}
                       </div>
@@ -631,7 +771,7 @@ export function PlantColumn({
           </div>
         )}
 
-        {/* Collapsible add plant form */}
+        {/* Add plant form */}
         {!isFormOpen ? (
           <button
             type="button"
@@ -650,19 +790,17 @@ export function PlantColumn({
                 marginBottom: 14,
               }}
             >
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: "#2d4a3e",
-                  letterSpacing: 0.3,
-                }}
-              >
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#2d4a3e", letterSpacing: 0.3 }}>
                 植物を追加する
               </div>
               <button
                 type="button"
-                onClick={() => { setIsFormOpen(false); formRef.current?.reset(); }}
+                onClick={() => {
+                  setIsFormOpen(false);
+                  setIsDetailsOpen(false);
+                  setFormPhotoPreview(null);
+                  formRef.current?.reset();
+                }}
                 style={{
                   background: "none",
                   border: "none",
@@ -676,51 +814,120 @@ export function PlantColumn({
                 キャンセル
               </button>
             </div>
+
             <form ref={formRef} action={handleFormAction}>
-              <div style={{ marginBottom: 10 }}>
-                <label className="form-label">植物</label>
-                <select
-                  name="plant_type"
-                  className="form-input"
-                  defaultValue={
-                    enabledPlantOptions[0]?.plant_code ?? "tomato"
-                  }
-                >
-                  {enabledPlantOptions.map((p) => (
-                    <option key={p.plant_code} value={p.plant_code}>
-                      {p.plant_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div style={{ marginBottom: 10 }}>
-                <label className="form-label">植えた日</label>
+              {/* Required: plant name */}
+              <div style={{ marginBottom: 12 }}>
+                <label className="form-label">
+                  植物名 <span style={{ color: "#b91c1c" }}>*</span>
+                </label>
                 <input
-                  type="date"
-                  name="planted_at"
-                  defaultValue={today}
+                  type="text"
+                  name="name"
+                  required
+                  placeholder="例：ミニトマト、バジル、パキラ"
                   className="form-input"
                 />
               </div>
-              <div style={{ marginBottom: 10 }}>
-                <label className="form-label">植えたときの状態</label>
-                <select name="initial_state_type" className="form-input">
-                  <option value="">— 選択してください —</option>
-                  <option value="seed">種</option>
-                  <option value="seedling">苗</option>
-                  <option value="cutting">挿し木</option>
-                  <option value="established">既に育っている株</option>
-                  <option value="other">その他</option>
-                </select>
-              </div>
-              <div style={{ marginBottom: 14 }}>
-                <label className="form-label">メモ</label>
-                <textarea
-                  name="initial_state_note"
-                  placeholder="例：10cmくらいの苗、種まきから2週間"
-                  className="form-textarea"
-                />
-              </div>
+
+              {/* Collapsible optional details */}
+              <button
+                type="button"
+                className="details-toggle-btn"
+                onClick={() => setIsDetailsOpen((v) => !v)}
+                style={{ marginBottom: isDetailsOpen ? 12 : 14 }}
+              >
+                <span style={{ fontSize: 11 }}>{isDetailsOpen ? "▼" : "▶"}</span>
+                詳細を入力する
+                <span style={{ fontSize: 10, color: "#b0b8b0", fontWeight: 400 }}>（任意）</span>
+              </button>
+
+              {isDetailsOpen && (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ marginBottom: 10 }}>
+                    <label className="form-label">
+                      種類 / 品種
+                      <span style={{ fontSize: 9, color: "#b0b8b0", fontWeight: 400, marginLeft: 5 }}>わかれば</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="species"
+                      placeholder="例：中玉トマト、スイートバジル"
+                      className="form-input"
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: 10 }}>
+                    <label className="form-label">
+                      置き場所
+                      <span style={{ fontSize: 9, color: "#b0b8b0", fontWeight: 400, marginLeft: 5 }}>任意</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="location"
+                      placeholder="例：南向きベランダ、窓際"
+                      className="form-input"
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: 10 }}>
+                    <label className="form-label">
+                      育成開始日
+                      <span style={{ fontSize: 9, color: "#b0b8b0", fontWeight: 400, marginLeft: 5 }}>任意</span>
+                    </label>
+                    <input
+                      type="date"
+                      name="started_at"
+                      defaultValue={today}
+                      className="form-input"
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: 10 }}>
+                    <label className="form-label">
+                      メモ
+                      <span style={{ fontSize: 9, color: "#b0b8b0", fontWeight: 400, marginLeft: 5 }}>任意</span>
+                    </label>
+                    <textarea
+                      name="memo"
+                      placeholder="例：種から育てた苗、購入先：〇〇ホームセンター"
+                      className="form-textarea"
+                    />
+                  </div>
+
+                  {/* Optional initial photo */}
+                  <div style={{ marginBottom: 2 }}>
+                    <label className="form-label">
+                      写真
+                      <span style={{ fontSize: 9, color: "#b0b8b0", fontWeight: 400, marginLeft: 5 }}>任意</span>
+                    </label>
+                    {formPhotoPreview && (
+                      <img
+                        src={formPhotoPreview}
+                        alt="プレビュー"
+                        className="form-photo-preview"
+                      />
+                    )}
+                    <button
+                      type="button"
+                      className="form-photo-pick-btn"
+                      onClick={() => formPhotoInputRef.current?.click()}
+                    >
+                      {formPhotoPreview ? "写真を変更する" : "📷 写真を選ぶ"}
+                    </button>
+                    <input
+                      ref={formPhotoInputRef}
+                      type="file"
+                      name="photo"
+                      accept="image/*"
+                      capture="environment"
+                      style={{ display: "none" }}
+                      onChange={handleFormPhotoChange}
+                    />
+                  </div>
+                </div>
+              )}
+
               <button
                 type="submit"
                 className="btn-primary"
@@ -738,6 +945,48 @@ export function PlantColumn({
               </button>
             </form>
           </div>
+        )}
+
+        {/* Archived plants section */}
+        {archivedPlants.length > 0 && (
+          <>
+            <button
+              type="button"
+              className="archived-section-toggle"
+              onClick={() => setIsArchivedOpen((v) => !v)}
+            >
+              <span style={{ fontSize: 11 }}>{isArchivedOpen ? "▼" : "▶"}</span>
+              アーカイブ済み（{archivedPlants.length}件）
+            </button>
+
+            {isArchivedOpen && (
+              <div style={{ marginTop: 8 }}>
+                {archivedPlants.map((plant) => (
+                  <div key={plant.id} className="archived-plant-row">
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#6b7280", lineHeight: 1.3 }}>
+                        {getPlantLabel(plant.plant_type)}
+                      </div>
+                      {plant.species && (
+                        <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 1 }}>
+                          {plant.species}
+                        </div>
+                      )}
+                      <div style={{ fontSize: 10, color: "#c8c0b4", marginTop: 1 }}>
+                        {plant.started_at ?? plant.planted_at ?? ""}
+                      </div>
+                    </div>
+                    <form action={restorePlantAction}>
+                      <input type="hidden" name="plant_id" value={plant.id} />
+                      <button type="submit" className="btn-restore">
+                        復元
+                      </button>
+                    </form>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -760,14 +1009,7 @@ export function PlantColumn({
               }}
             >
               <div>
-                <div
-                  style={{
-                    fontWeight: 700,
-                    fontSize: 16,
-                    color: "#2d4a3e",
-                    fontFamily,
-                  }}
-                >
+                <div style={{ fontWeight: 700, fontSize: 16, color: "#2d4a3e", fontFamily }}>
                   {getPlantLabel(historyPlant?.plant_type)} の写真履歴
                 </div>
                 {(photoHistories[historyModalId!] ?? []).length > 0 && (
@@ -864,11 +1106,7 @@ export function PlantColumn({
               type="button"
               className="btn-primary"
               onClick={() => setHistoryModalId(null)}
-              style={{
-                padding: "8px 20px",
-                fontSize: 13,
-                fontFamily,
-              }}
+              style={{ padding: "8px 20px", fontSize: 13, fontFamily }}
             >
               閉じる
             </button>
