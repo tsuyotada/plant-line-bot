@@ -191,11 +191,18 @@ export default async function Home() {
   const { data: allPlantsRaw, error: plantsError } = await supabase
     .from("plants")
     .select("*")
-    // sort_order NULLs go to end (for existing rows), then newest first
-    .order("sort_order", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: false });
 
-  const allPlants = allPlantsRaw ?? [];
+  // Sort in JS so the query never fails when sort_order column doesn't exist yet.
+  // Plants with sort_order set appear first (ascending), NULLs fall back to created_at order.
+  const allPlants = (allPlantsRaw ?? []).sort((a, b) => {
+    const aOrd: number | null = a.sort_order ?? null;
+    const bOrd: number | null = b.sort_order ?? null;
+    if (aOrd !== null && bOrd !== null) return aOrd - bOrd;
+    if (aOrd !== null) return -1;
+    if (bOrd !== null) return 1;
+    return 0; // both null → preserve created_at desc order from query
+  });
   const plants = allPlants.filter((p) => !p.archived_at);
   const archivedPlants = allPlants.filter((p) => !!p.archived_at);
 
