@@ -206,20 +206,13 @@ export default async function Home() {
   const plants = allPlants.filter((p) => !p.archived_at);
   const archivedPlants = allPlants.filter((p) => !!p.archived_at);
 
-  // care_events: kept for 要対応/良好 badge only
-  const { data: careEventsRaw } = await supabase
+  // care_events kept as internal data (not used for badge display)
+  await supabase
     .from("care_events")
-    .select("id, plant_id, scheduled_for, status")
+    .select("id")
     .eq("scheduled_for", today)
-    .eq("status", "pending");
-
-  const todayEvents = careEventsRaw ?? [];
-  const plantHasTodayEventRecord = Object.fromEntries(
-    plants.map((plant) => [
-      plant.id,
-      todayEvents.some((e) => e.plant_id === plant.id),
-    ])
-  );
+    .eq("status", "pending")
+    .limit(1);
 
   // Photos
   const { data: photosRaw } = await supabase
@@ -263,6 +256,14 @@ export default async function Home() {
   } catch (err) {
     console.error("AI task generation error:", err);
   }
+
+  // Badge record: derived from AI tasks (not care_events)
+  const plantHasTodayEventRecord = Object.fromEntries(
+    plants.map((plant) => [
+      plant.id,
+      todayTasks.some((t) => t.plant_id === plant.id),
+    ])
+  );
 
   const todayLineMessage = buildTodayLineMessage(today, todayTasks);
   const lineShareUrl = `https://line.me/R/msg/text/?${encodeURIComponent(todayLineMessage)}`;

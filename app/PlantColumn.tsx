@@ -652,7 +652,7 @@ export function PlantColumn({
 
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
                           <span className={hasTodayEvent ? "badge-alert" : "badge-ok"}>
-                            {hasTodayEvent ? "要対応" : "良好"}
+                            {hasTodayEvent ? "要対応" : "見守り"}
                           </span>
                           <div style={{ position: "relative" }}>
                             <button type="button" className="plant-menu-trigger" onClick={(e) => handleMenuToggle(plant.id, e)} aria-label="操作メニューを開く">
