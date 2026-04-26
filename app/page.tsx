@@ -2,46 +2,16 @@ import { supabase } from "../src/lib/supabase";
 import { revalidatePath } from "next/cache";
 import { BackgroundLayer } from "./BackgroundLayer";
 import { PlantColumn } from "./PlantColumn";
+import {
+  buildTodayTasksForPlants,
+  buildTodayLineMessage,
+} from "@/lib/plantGrowthAdvisor";
 
-const PLANTS_MASTER_URL =
-  "https://opensheet.elk.sh/1XmNK_IFrsQfZ7D65ECBKLDHEHJ7VK9TTFCdwa7_mjrk/plants_master";
-
-const CARE_RULES_URL =
-  "https://opensheet.elk.sh/1XmNK_IFrsQfZ7D65ECBKLDHEHJ7VK9TTFCdwa7_mjrk/care_rules";
-
-type PlantMasterRow = {
-  plant_code: string;
-  plant_name: string;
-  enabled: string;
-};
-
-const TASK_LABEL_MAP: Record<string, string> = {
-  watering: "水やり",
-  observation: "観察",
-  fertilizing: "追肥",
-  pruning: "剪定",
-  harvesting: "収穫",
-  environment: "環境調整",
-  soil: "土の管理",
-  support: "成長サポート",
-  other: "お世話",
-};
-
-type CareRuleRow = {
-  plant_code: string;
-  event_code: string;
-  days_after_planting: string;
-  repeat_every_days: string;
-  is_repeat: string;
-  enabled: string;
-};
-
-
-function addDays(dateString: string, days: number) {
-  const d = new Date(dateString);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-}
+// DB migration required (run once):
+// alter table plants add column if not exists sort_order integer;
+// update plants set sort_order = sub.rn - 1
+//   from (select id, row_number() over (order by created_at) as rn from plants) sub
+//   where plants.id = sub.id;
 
 function todayString() {
   return new Date().toISOString().slice(0, 10);
@@ -63,126 +33,13 @@ function getPlantLabel(plantType: string | null | undefined) {
   return plantLabelMap[plantType] ?? plantType;
 }
 
-async function fetchPlantsMaster(): Promise<PlantMasterRow[]> {
-  const res = await fetch(PLANTS_MASTER_URL, { cache: "no-store" });
-  if (!res.ok) throw new Error("plants_master の取得に失敗しました");
-  return res.json();
-}
-
-async function fetchCareRules(): Promise<CareRuleRow[]> {
-  const res = await fetch(CARE_RULES_URL, { cache: "no-store" });
-  if (!res.ok) throw new Error("care_rules の取得に失敗しました");
-  return res.json();
-}
-
-
-function getAdviceText(item: any) {
-  const taskType = item.task_type;
-  const rule = item.care_rules;
-
-  return {
-    title: item.title ?? rule?.title ?? TASK_LABEL_MAP[taskType] ?? "お世話",
-    message:
-      item.task_detail ??
-      rule?.task_detail ??
-      item.message ??
-      rule?.message ??
-      "植物の状態を確認しましょう",
-  };
-}
-
-function isTrueLike(value: string | null | undefined) {
-  return String(value).toLowerCase() === "true";
-}
-
-function toNumberOrNull(value: string | null | undefined) {
-  if (value == null || value === "") return null;
-  const n = Number(value);
-  return Number.isNaN(n) ? null : n;
-}
-
-function buildCareEventsFromRules(
-  plantId: string,
-  plantType: string,
-  plantedAt: string,
-  rules: CareRuleRow[]
-) {
-  const events: {
-    plant_id: string;
-    scheduled_for: string;
-    status: string;
-    task_type: string;
-    rule_id?: string | null;
-  }[] = [];
-
-  const targetRules = rules.filter(
-    (rule) => rule.plant_code === plantType && isTrueLike(rule.enabled)
-  );
-
-  for (const rule of targetRules) {
-    const daysAfterPlanting = toNumberOrNull(rule.days_after_planting);
-    const repeatEveryDays = toNumberOrNull(rule.repeat_every_days);
-    const isRepeat = isTrueLike(rule.is_repeat);
-
-    if (daysAfterPlanting == null) continue;
-
-    if (!isRepeat) {
-      events.push({
-        plant_id: plantId,
-        scheduled_for: addDays(plantedAt, daysAfterPlanting),
-        status: "pending",
-        task_type: rule.event_code,
-        rule_id: null,
-      });
-      continue;
-    }
-
-    if (repeatEveryDays == null || repeatEveryDays <= 0) continue;
-
-    for (let day = daysAfterPlanting; day <= 30; day += repeatEveryDays) {
-      events.push({
-        plant_id: plantId,
-        scheduled_for: addDays(plantedAt, day),
-        status: "pending",
-        task_type: rule.event_code,
-        rule_id: null,
-      });
-    }
-  }
-
-  return events;
-}
-
-function buildTodayLineMessage(
-  today: string,
-  todayEvents: any[],
-  plantMap: Map<string, any>
-) {
-  if (todayEvents.length === 0) {
-    return `【${today} のお世話メモ】\n今日はお世話の予定はありません🌱`;
-  }
-
-  const lines = todayEvents.map((event, index) => {
-    const advice = getAdviceText(event);
-    const plant = plantMap.get(event.plant_id);
-    const plantName = getPlantLabel(plant?.plant_type);
-    return `${index + 1}. ${plantName}：${advice.title}\n${advice.message}`;
-  });
-
-  return `【${today} の今日やること】\n\n${lines.join("\n\n")}\n\n無理のない範囲で進めましょう🌱`;
-}
-
 function getAppBaseUrl() {
-  if (process.env.NEXT_PUBLIC_APP_URL) {
-    return process.env.NEXT_PUBLIC_APP_URL;
-  }
-
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`;
-  }
-
+  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
   return "http://localhost:3000";
 }
+
+// ── Server actions ────────────────────────────────────────────────────────────
 
 async function addPlant(formData: FormData) {
   "use server";
@@ -246,10 +103,7 @@ async function addPlant(formData: FormData) {
       body: JSON.stringify({ plantId: plant.id }),
       cache: "no-store",
     });
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error("generate-care-rules API error:", errorText);
-    }
+    if (!res.ok) console.error("generate-care-rules API error:", await res.text());
   } catch (error) {
     console.error("generate-care-rules fetch error:", error);
   }
@@ -272,48 +126,7 @@ async function restorePlant(formData: FormData) {
   "use server";
   const plantId = String(formData.get("plant_id") || "");
   if (!plantId) return;
-  await supabase
-    .from("plants")
-    .update({ archived_at: null })
-    .eq("id", plantId);
-  revalidatePath("/");
-}
-
-async function completeCareEvent(formData: FormData) {
-  "use server";
-
-  const eventId = String(formData.get("event_id") || "");
-  if (!eventId) return;
-
-  const { error } = await supabase
-    .from("care_events")
-    .update({ status: "done" })
-    .eq("id", eventId);
-
-  if (error) {
-    console.error("complete care event error:", error);
-  }
-  revalidatePath("/");
-}
-
-async function snoozeCareEvent(formData: FormData) {
-  "use server";
-
-  const eventId = String(formData.get("event_id") || "");
-  const scheduledFor = String(formData.get("scheduled_for") || "");
-
-  if (!eventId || !scheduledFor) return;
-
-  const nextDate = addDays(scheduledFor, 1);
-
-  const { error } = await supabase
-    .from("care_events")
-    .update({ scheduled_for: nextDate })
-    .eq("id", eventId);
-
-  if (error) {
-    console.error("snooze care event error:", error);
-  }
+  await supabase.from("plants").update({ archived_at: null }).eq("id", plantId);
   revalidatePath("/");
 }
 
@@ -326,111 +139,99 @@ async function uploadPlantPhoto(
     const plantId = String(formData.get("plant_id") || "");
     const file = formData.get("photo") as File | null;
 
-    if (!plantId || !file || file.size === 0) {
+    if (!plantId || !file || file.size === 0)
       return { success: false, error: "必要なデータが不足しています" };
-    }
 
     const storagePath = `plants/${plantId}/${Date.now()}-${file.name}`;
-
     const bytes = await file.arrayBuffer();
     const { error: uploadError } = await supabase.storage
       .from("plant-photos")
       .upload(storagePath, bytes, { contentType: file.type || "image/jpeg" });
 
-    if (uploadError) {
-      console.error("storage upload error:", uploadError);
+    if (uploadError)
       return { success: false, error: "アップロードに失敗しました。通信状態を確認してください。" };
-    }
 
     const { data: urlData } = supabase.storage
       .from("plant-photos")
       .getPublicUrl(storagePath);
 
-    const { error: dbError } = await supabase
-      .from("plant_photos")
-      .insert([{
+    const { error: dbError } = await supabase.from("plant_photos").insert([
+      {
         plant_id: plantId,
         image_url: urlData.publicUrl,
         storage_path: storagePath,
         taken_at: new Date().toISOString(),
-      }]);
+      },
+    ]);
 
-    if (dbError) {
-      console.error("plant_photos insert error:", dbError);
-      return { success: false, error: "データの保存に失敗しました。" };
-    }
+    if (dbError) return { success: false, error: "データの保存に失敗しました。" };
 
     revalidatePath("/");
     return { success: true };
-  } catch (err) {
-    console.error("uploadPlantPhoto unexpected error:", err);
+  } catch {
     return { success: false, error: "予期しないエラーが発生しました。" };
   }
 }
 
-export default async function Home() {
-  const plantsMaster = await fetchPlantsMaster();
-
-  const enabledPlantOptions = plantsMaster.filter(
-    (plant) => String(plant.enabled).toLowerCase() === "true"
+async function reorderPlants(orderedIds: string[]) {
+  "use server";
+  await Promise.all(
+    orderedIds.map((id, index) =>
+      supabase.from("plants").update({ sort_order: index }).eq("id", id)
+    )
   );
+  revalidatePath("/");
+}
 
+// ── Page ──────────────────────────────────────────────────────────────────────
+
+export default async function Home() {
   const today = todayString();
 
   const { data: allPlantsRaw, error: plantsError } = await supabase
     .from("plants")
     .select("*")
+    // sort_order NULLs go to end (for existing rows), then newest first
+    .order("sort_order", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: false });
-
-  const { data: careEventsRaw, error: careEventsError } = await supabase
-    .from("care_events")
-    .select("*, care_rules!rule_id(task_detail, title, message)")
-    .order("scheduled_for", { ascending: true });
 
   const allPlants = allPlantsRaw ?? [];
   const plants = allPlants.filter((p) => !p.archived_at);
   const archivedPlants = allPlants.filter((p) => !!p.archived_at);
-  const careEvents = careEventsRaw ?? [];
 
-  const plantMap = new Map(allPlants.map((plant) => [plant.id, plant]));
+  // care_events: kept for 要対応/良好 badge only
+  const { data: careEventsRaw } = await supabase
+    .from("care_events")
+    .select("id, plant_id, scheduled_for, status")
+    .eq("scheduled_for", today)
+    .eq("status", "pending");
 
-  const todayEvents = careEvents.filter(
-    (event) => event.scheduled_for === today && event.status === "pending"
-  );
-
-  const upcomingEvents = careEvents.filter(
-    (event) => event.scheduled_for > today && event.status === "pending"
-  );
-
-  const plantHasTodayEvent = new Map<string, boolean>(
+  const todayEvents = careEventsRaw ?? [];
+  const plantHasTodayEventRecord = Object.fromEntries(
     plants.map((plant) => [
       plant.id,
       todayEvents.some((e) => e.plant_id === plant.id),
     ])
   );
 
-  const plantHasTodayEventRecord = Object.fromEntries(plantHasTodayEvent);
-
+  // Photos
   const { data: photosRaw } = await supabase
     .from("plant_photos")
     .select("id, plant_id, image_url, taken_at")
     .order("taken_at", { ascending: false });
 
   const photos = photosRaw ?? [];
-
   const latestPhotos: Record<string, string> = {};
-  const photoHistories: Record<string, { id: string; url: string; takenAt: string }[]> = {};
+  const photoHistories: Record<
+    string,
+    { id: string; url: string; takenAt: string }[]
+  > = {};
 
   for (const photo of photos) {
     const url: string = photo.image_url ?? "";
     if (!url) continue;
-
-    if (!latestPhotos[photo.plant_id]) {
-      latestPhotos[photo.plant_id] = url;
-    }
-    if (!photoHistories[photo.plant_id]) {
-      photoHistories[photo.plant_id] = [];
-    }
+    if (!latestPhotos[photo.plant_id]) latestPhotos[photo.plant_id] = url;
+    if (!photoHistories[photo.plant_id]) photoHistories[photo.plant_id] = [];
     photoHistories[photo.plant_id].push({
       id: photo.id,
       url,
@@ -438,10 +239,26 @@ export default async function Home() {
     });
   }
 
-  const todayLineMessage = buildTodayLineMessage(today, todayEvents, plantMap);
-  const lineShareUrl = `https://line.me/R/msg/text/?${encodeURIComponent(
-    todayLineMessage
-  )}`;
+  // AI-generated today tasks (growth-stage based)
+  const plantsForAdvisor = plants.map((p) => ({
+    id: p.id,
+    display_name: getPlantLabel(p.plant_type),
+    species: p.species ?? null,
+    started_at: p.started_at ?? null,
+    planted_at: p.planted_at ?? null,
+    memo: p.memo ?? null,
+    location: p.location ?? null,
+  }));
+
+  let todayTasks: Awaited<ReturnType<typeof buildTodayTasksForPlants>> = [];
+  try {
+    todayTasks = await buildTodayTasksForPlants(plantsForAdvisor, today);
+  } catch (err) {
+    console.error("AI task generation error:", err);
+  }
+
+  const todayLineMessage = buildTodayLineMessage(today, todayTasks);
+  const lineShareUrl = `https://line.me/R/msg/text/?${encodeURIComponent(todayLineMessage)}`;
 
   const fontFamily =
     'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
@@ -460,7 +277,7 @@ export default async function Home() {
           .board-grid { grid-template-columns: 1fr; }
         }
 
-        /* ─── Column panel — warm cream frosted glass ─── */
+        /* ─── Column panel ─── */
         .col-board {
           background: rgba(253, 250, 244, 0.96);
           backdrop-filter: blur(12px);
@@ -484,10 +301,10 @@ export default async function Home() {
           line-height: 1.4;
         }
 
-        /* ─── Plants 2-col grid ─── */
+        /* ─── Plants 2-col grid (equal columns) ─── */
         .plants-grid {
           display: grid;
-          grid-template-columns: 1fr 1fr;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 8px;
           margin-bottom: 12px;
         }
@@ -506,24 +323,6 @@ export default async function Home() {
         .plant-card:hover {
           box-shadow: 0 3px 10px rgba(60, 50, 30, 0.13);
         }
-        .plant-photo-area {
-          height: 68px;
-          background: linear-gradient(135deg, #d4edda 0%, #b8dfbf 55%, #93c9a0 100%);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .plant-photo-label {
-          font-size: 10px;
-          font-weight: 600;
-          color: rgba(147, 201, 160, 0.95);
-          letter-spacing: 1.2px;
-          text-transform: uppercase;
-          user-select: none;
-        }
-        .plant-info {
-          padding: 10px 11px 12px;
-        }
 
         /* ─── Generic white cards ─── */
         .todo-card,
@@ -536,7 +335,7 @@ export default async function Home() {
           box-shadow: 0 1px 3px rgba(60, 50, 30, 0.07);
         }
 
-        /* ─── Active todo card (has tasks) — left accent ─── */
+        /* ─── Today task card ─── */
         .todo-card-active {
           background: #ffffff;
           border-radius: 10px;
@@ -554,23 +353,6 @@ export default async function Home() {
           margin-bottom: 8px;
           text-align: center;
           border: 1px dashed #c8e6cc;
-        }
-
-        /* ─── Upcoming 2-col grid ─── */
-        .upcoming-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 8px;
-          margin-bottom: 4px;
-        }
-        @media (max-width: 640px) {
-          .upcoming-grid { grid-template-columns: 1fr; }
-        }
-        .upcoming-card {
-          background: #ffffff;
-          border-radius: 10px;
-          padding: 12px;
-          box-shadow: 0 1px 3px rgba(60, 50, 30, 0.06);
         }
 
         /* ─── Sub-section label ─── */
@@ -685,44 +467,17 @@ export default async function Home() {
         }
       `}</style>
 
-      {/* Client Component: background layer + controls */}
       <BackgroundLayer />
 
-      <main
-        style={{
-          minHeight: "100vh",
-          padding: "14px 20px 48px",
-          fontFamily,
-        }}
-      >
-        {/* ── Minimal header strip ── */}
-        <div
-          style={{
-            maxWidth: 1440,
-            margin: "0 auto 14px",
-            paddingRight: 200, // right space for fixed bg controls
-          }}
-        >
-          <span
-            style={{
-              fontSize: 12,
-              color: "#8a9a8a",
-              fontWeight: 500,
-              letterSpacing: 0.2,
-            }}
-          >
+      <main style={{ minHeight: "100vh", padding: "14px 20px 48px", fontFamily }}>
+        <div style={{ maxWidth: 1440, margin: "0 auto 14px", paddingRight: 200 }}>
+          <span style={{ fontSize: 12, color: "#8a9a8a", fontWeight: 500, letterSpacing: 0.2 }}>
             Keep every balcony plant healthy.
           </span>
         </div>
 
-        {/* ── Board ── */}
-        <div
-          className="board-grid"
-          style={{ maxWidth: 1440, margin: "0 auto" }}
-        >
-          {/* ════════════════════════════════
-              Column 1 — 育てている植物
-          ════════════════════════════════ */}
+        <div className="board-grid" style={{ maxWidth: 1440, margin: "0 auto" }}>
+          {/* ── Column 1: 育てている植物 ── */}
           <PlantColumn
             plants={plants}
             archivedPlants={archivedPlants}
@@ -732,195 +487,73 @@ export default async function Home() {
             addPlantAction={addPlant}
             archivePlantAction={archivePlant}
             restorePlantAction={restorePlant}
+            reorderPlantAction={reorderPlants}
             uploadPhotoAction={uploadPlantPhoto}
             latestPhotos={latestPhotos}
             photoHistories={photoHistories}
           />
 
-          {/* ════════════════════════════════
-              Column 2 — 今日やること
-          ════════════════════════════════ */}
+          {/* ── Column 2: 今日やること ── */}
           <div className="col-board">
             <h2 className="col-heading">今日やること</h2>
 
-            {/* Today event cards */}
-            {todayEvents.length === 0 ? (
+            {todayTasks.length === 0 ? (
               <div className="empty-today-card">
-                <p
-                  style={{
-                    color: "#7a9a7a",
-                    margin: 0,
-                    fontSize: 14,
-                    lineHeight: 1.6,
-                  }}
-                >
+                <p style={{ color: "#7a9a7a", margin: 0, fontSize: 14, lineHeight: 1.6 }}>
                   今日はゆっくり見守る日です 🌿
                 </p>
               </div>
             ) : (
-              todayEvents.map((event) => {
-const advice = getAdviceText(event);
-                const plant = plantMap.get(event.plant_id);
-                const plantName = getPlantLabel(plant?.plant_type);
-                return (
-                  <div key={event.id} className="todo-card-active">
-                    <div
-                      style={{
-                        fontWeight: 700,
-                        fontSize: 14,
-                        color: "#2d4a3e",
-                        marginBottom: 5,
-                      }}
-                    >
-                      {advice.title}
-                    </div>
-                    <div
-                      style={{
-                        color: "#4a5568",
-                        fontSize: 13,
-                        lineHeight: 1.65,
-                        marginBottom: 7,
-                      }}
-                    >
-                      {advice.message}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 11,
-                        color: "#a0a8a2",
-                        marginBottom: 12,
-                      }}
-                    >
-                      対象: {plantName}
-                    </div>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <form action={completeCareEvent}>
-                        <input
-                          type="hidden"
-                          name="event_id"
-                          value={event.id}
-                        />
-                        <button
-                          type="submit"
-                          className="btn-primary"
-                          style={{ padding: "6px 14px", fontSize: 13 }}
-                        >
-                          やった
-                        </button>
-                      </form>
-                      <form action={snoozeCareEvent}>
-                        <input
-                          type="hidden"
-                          name="event_id"
-                          value={event.id}
-                        />
-                        <input
-                          type="hidden"
-                          name="scheduled_for"
-                          value={event.scheduled_for}
-                        />
-                        <button
-                          type="submit"
-                          className="btn"
-                          style={{
-                            padding: "6px 14px",
-                            background: "#e8a838",
-                            color: "#fff",
-                            fontSize: 13,
-                          }}
-                        >
-                          あとで
-                        </button>
-                      </form>
-                    </div>
+              todayTasks.map((pt) => (
+                <div key={pt.plant_id} className="todo-card-active">
+                  <div style={{ fontWeight: 700, fontSize: 14, color: "#2d4a3e", marginBottom: 3 }}>
+                    {pt.plant_name}
                   </div>
-                );
-              })
-            )}
-
-            {/* Upcoming events */}
-            <div className="sub-heading">これからの予定</div>
-
-            {careEventsError ? (
-              <div
-                style={{
-                  background: "#fff",
-                  borderRadius: 10,
-                  padding: 14,
-                  fontSize: 13,
-                  color: "#b91c1c",
-                }}
-              >
-                予定データの取得でエラーが出ました
-              </div>
-            ) : upcomingEvents.length === 0 ? (
-              <p style={{ color: "#a0a8a2", fontSize: 13, margin: 0 }}>
-                今後の予定はありません
-              </p>
-            ) : (
-              <>
-                <div className="upcoming-grid">
-                  {upcomingEvents.slice(0, 5).map((event) => {
-const advice = getAdviceText(event);
-                    const plant = plantMap.get(event.plant_id);
-                    const plantName = getPlantLabel(plant?.plant_type);
-                    return (
-                      <div key={event.id} className="upcoming-card">
-                        <div
-                          style={{
-                            fontWeight: 600,
-                            fontSize: 12,
-                            color: "#4a5568",
-                            marginBottom: 3,
-                            lineHeight: 1.3,
-                          }}
-                        >
-                          {advice.title}
-                        </div>
-                        <div
-                          style={{
-                            color: "#a0a8a2",
-                            fontSize: 11,
-                            marginBottom: 2,
-                          }}
-                        >
-                          {plantName}
-                        </div>
-                        <div style={{ color: "#c8c0b4", fontSize: 11 }}>
-                          {event.scheduled_for}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                {upcomingEvents.length > 5 && (
-                  <button
-                    type="button"
-                    className="btn"
+                  <div
                     style={{
-                      width: "100%",
-                      padding: "8px",
-                      background: "transparent",
-                      border: "1px solid #e8e4dc",
-                      fontSize: 12,
+                      fontSize: 10,
                       color: "#a0a8a2",
-                      fontWeight: 500,
+                      marginBottom: 8,
+                      letterSpacing: 0.3,
                     }}
                   >
-                    View More ({upcomingEvents.length - 5} 件)
-                  </button>
-                )}
-              </>
+                    {pt.growth_stage}
+                  </div>
+                  {pt.tasks.map((task, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        fontSize: 13,
+                        color: "#374151",
+                        lineHeight: 1.65,
+                        marginBottom: i < pt.tasks.length - 1 ? 6 : 0,
+                        paddingLeft: 12,
+                        position: "relative",
+                      }}
+                    >
+                      <span
+                        style={{
+                          position: "absolute",
+                          left: 0,
+                          top: "0.15em",
+                          color: "#6db07b",
+                          fontSize: 11,
+                        }}
+                      >
+                        ✓
+                      </span>
+                      {task}
+                    </div>
+                  ))}
+                </div>
+              ))
             )}
           </div>
 
-          {/* ════════════════════════════════
-              Column 3 — LINE通知
-          ════════════════════════════════ */}
+          {/* ── Column 3: LINE通知 ── */}
           <div className="col-board">
             <h2 className="col-heading">LINE通知</h2>
 
-            {/* Message preview */}
             <div className="line-card">
               <div
                 style={{
@@ -966,20 +599,11 @@ const advice = getAdviceText(event);
               >
                 LINEで開く
               </a>
-              {/* Last sent timestamp — populated when sending history is implemented */}
-              <div
-                style={{
-                  marginTop: 12,
-                  fontSize: 11,
-                  color: "#c8c0b4",
-                  letterSpacing: 0.2,
-                }}
-              >
+              <div style={{ marginTop: 12, fontSize: 11, color: "#c8c0b4", letterSpacing: 0.2 }}>
                 最終送信日時: —
               </div>
             </div>
 
-            {/* QR / notification join section */}
             <div className="line-card" style={{ marginBottom: 0 }}>
               <div
                 style={{
@@ -993,55 +617,20 @@ const advice = getAdviceText(event);
               >
                 通知を受け取る
               </div>
-              <div
-                style={{
-                  display: "flex",
-                  gap: 14,
-                  alignItems: "flex-start",
-                }}
-              >
-                {/* QR placeholder — swap with <QRCode> component when ready */}
+              <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
                 <div className="qr-placeholder">
-                  <span
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: "#93c9a0",
-                      letterSpacing: 0.5,
-                    }}
-                  >
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "#93c9a0", letterSpacing: 0.5 }}>
                     QR
                   </span>
                 </div>
                 <div style={{ paddingTop: 2 }}>
-                  <div
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 700,
-                      color: "#2d4a3e",
-                      marginBottom: 5,
-                    }}
-                  >
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#2d4a3e", marginBottom: 5 }}>
                     通知を受け取る
                   </div>
-                  <p
-                    style={{
-                      fontSize: 12,
-                      color: "#7a8a7a",
-                      margin: "0 0 10px",
-                      lineHeight: 1.65,
-                    }}
-                  >
+                  <p style={{ fontSize: 12, color: "#7a8a7a", margin: "0 0 10px", lineHeight: 1.65 }}>
                     Receive plant care notifications.
                   </p>
-                  {/* Placeholder for LINE account registration link */}
-                  <div
-                    style={{
-                      fontSize: 11,
-                      color: "#c8c0b4",
-                      lineHeight: 1.5,
-                    }}
-                  >
+                  <div style={{ fontSize: 11, color: "#c8c0b4", lineHeight: 1.5 }}>
                     — LINE登録はこちら（準備中）
                   </div>
                 </div>

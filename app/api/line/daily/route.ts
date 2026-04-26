@@ -1,12 +1,27 @@
-import { generateCareMessage } from "@/lib/aiCareMessage";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { getTodayWeather } from "@/lib/weather";
+import { buildTodayTasksForPlants, buildTodayLineMessage } from "@/lib/plantGrowthAdvisor";
 
 function getTodayJst() {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Tokyo",
   }).format(new Date());
+}
+
+const plantLabelMap: Record<string, string> = {
+  tomato: "トマト",
+  coriander: "コリアンダー",
+  makrut_lime: "コブミカン",
+  mint: "ミント",
+  everbearing_strawberry: "四季成りイチゴ",
+  italian_parsley: "イタリアンパセリ",
+  shiso: "大葉",
+  perilla: "えごま",
+};
+
+function getPlantLabel(plantType: string | null | undefined) {
+  if (!plantType) return "植物";
+  return plantLabelMap[plantType] ?? plantType;
 }
 
 export async function GET() {
@@ -25,123 +40,69 @@ export async function GET() {
   const supabase = createClient(supabaseUrl, supabaseKey);
   const today = getTodayJst();
 
-  const { data: plantMasters, error: plantMasterError } = await supabase
-    .from("plants_master")
-    .select("plant_code, plant_name")
-    .eq("enabled", true);
+  // Active plants only
+  const { data: plantsRaw, error: plantsError } = await supabase
+    .from("plants")
+    .select("*")
+    .is("archived_at", null)
+    .order("sort_order", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: false });
 
-  if (plantMasterError) {
-    return NextResponse.json(
-      { ok: false, error: plantMasterError.message },
-      { status: 500 }
-    );
+  if (plantsError) {
+    return NextResponse.json({ ok: false, error: plantsError.message }, { status: 500 });
   }
 
-  const plantLabelMap = new Map(
-    (plantMasters ?? []).map((plant) => [plant.plant_code, plant.plant_name])
-  );
+  const plants = plantsRaw ?? [];
 
-  const { data: events, error: eventsError } = await supabase
-    .from("care_events")
-    .select("id, scheduled_for, status, task_type, rule_id, plants(plant_type), care_rules!rule_id(task_detail, title, message)")
-    .eq("scheduled_for", today)
-    .eq("status", "pending")
-    .order("created_at", { ascending: true });
-
-  if (eventsError) {
-    return NextResponse.json(
-      { ok: false, error: eventsError.message },
-      { status: 500 }
-    );
+  if (plants.length === 0) {
+    const message = `【${today} のお世話メモ🌱】\n登録されている植物がありません🌿`;
+    await sendLine(lineToken, lineUserId, message);
+    return NextResponse.json({ ok: true, today, count: 0 });
   }
 
-  const weather = await getTodayWeather(35.6938, 139.7034);
+  // Build advisor input with display names
+  const plantsForAdvisor = plants.map((p) => ({
+    id: p.id,
+    display_name: getPlantLabel(p.plant_type),
+    species: p.species ?? null,
+    started_at: p.started_at ?? null,
+    planted_at: p.planted_at ?? null,
+    memo: p.memo ?? null,
+    location: p.location ?? null,
+  }));
 
-  const TASK_LABEL_MAP: Record<string, string> = {
-    watering: "水やり",
-    observation: "観察",
-    fertilizing: "追肥",
-    pruning: "剪定",
-    harvesting: "収穫",
-    environment: "環境調整",
-    soil: "土の管理",
-    support: "成長サポート",
-    other: "お世話",
-  };
+  let todayTasks: Awaited<ReturnType<typeof buildTodayTasksForPlants>> = [];
+  try {
+    todayTasks = await buildTodayTasksForPlants(plantsForAdvisor, today);
+  } catch (err) {
+    console.error("LINE daily: AI task generation failed:", err);
+  }
 
-  const lines =
-    events && events.length > 0
-      ? events.map((event: any, index: number) => {
-          const plantType = event.plants?.plant_type ?? "";
-          const plantName = plantLabelMap.get(plantType) ?? "植物";
-          const rule = event.care_rules;
-          const title = rule?.title ?? TASK_LABEL_MAP[event.task_type] ?? "お世話";
-          const message =
-            rule?.task_detail ?? rule?.message ?? "植物の状態を確認しましょう";
+  const message = buildTodayLineMessage(today, todayTasks);
 
-          return `${index + 1}. ${plantName}：${title}\n${message}`;
-        })
-      : [];
-
-      const aiMessage =
-  events && events.length > 0
-    ? await generateCareMessage({
-        today,
-        events: events.map((event: any) => ({
-          task_type: event.task_type,
-          weather,
-        })),
-        plants: events.map((event: any) => {
-          const plantType = event.plants?.plant_type ?? "";
-          const plantName = plantLabelMap.get(plantType) ?? "植物";
-
-          return {
-            id: event.id,
-            name: plantName,
-          };
-        }),
-      })
-    : null;
-
-const fallbackMessage =
-  lines.length > 0
-    ? `【${today} の今日やること🌱】\n\n${lines.join(
-        "\n\n"
-      )}\n\n無理ない範囲で進めましょう🌿`
-    : `【${today} のお世話メモ🌱】\n今日はお世話の予定はありません🌿`;
-
-const message = aiMessage ?? fallbackMessage;
-  
-
-
-  const lineRes = await fetch("https://api.line.me/v2/bot/message/push", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${lineToken}`,
-    },
-    body: JSON.stringify({
-      to: lineUserId,
-      messages: [
-        {
-          type: "text",
-          text: message,
-        },
-      ],
-    }),
-  });
-
-  if (!lineRes.ok) {
-    const errorText = await lineRes.text();
-    return NextResponse.json(
-      { ok: false, error: errorText },
-      { status: lineRes.status }
-    );
+  const res = await sendLine(lineToken, lineUserId, message);
+  if (!res.ok) {
+    const errorText = await res.text();
+    return NextResponse.json({ ok: false, error: errorText }, { status: res.status });
   }
 
   return NextResponse.json({
     ok: true,
     today,
-    count: events?.length ?? 0,
+    count: todayTasks.length,
+  });
+}
+
+async function sendLine(token: string, userId: string, message: string) {
+  return fetch("https://api.line.me/v2/bot/message/push", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      to: userId,
+      messages: [{ type: "text", text: message }],
+    }),
   });
 }
