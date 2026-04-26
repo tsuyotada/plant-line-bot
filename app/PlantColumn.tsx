@@ -408,8 +408,13 @@ export function PlantColumn({
                 <div key={plant.id} className="plant-card-wrap">
                   {/* Photo area */}
                   <div
-                    className="plant-photo-click"
                     style={{
+                      position: "relative",
+                      width: "100%",
+                      height: 96,
+                      overflow: "hidden",
+                      borderRadius: "10px 10px 0 0",
+                      background: "linear-gradient(135deg, #d4edda 0%, #b8dfbf 55%, #93c9a0 100%)",
                       cursor: uploadingIds[plant.id]
                         ? "not-allowed"
                         : displayPhoto
@@ -435,7 +440,23 @@ export function PlantColumn({
                         }}
                       />
                     ) : (
-                      <span className="photo-placeholder-label">photo</span>
+                      <span
+                        style={{
+                          position: "absolute",
+                          top: "50%",
+                          left: "50%",
+                          transform: "translate(-50%, -50%)",
+                          fontSize: 10,
+                          fontWeight: 600,
+                          color: "rgba(147, 201, 160, 0.9)",
+                          letterSpacing: "1.2px",
+                          textTransform: "uppercase",
+                          userSelect: "none",
+                          pointerEvents: "none",
+                        }}
+                      >
+                        photo
+                      </span>
                     )}
                     {uploadingIds[plant.id] ? (
                       <div className="photo-upload-loading-hint">アップロード中…</div>
