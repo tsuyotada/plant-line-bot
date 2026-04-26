@@ -84,22 +84,22 @@ async function handleImageMessage(event: any, lineToken: string) {
   await replyToLine(lineToken, replyToken, [
     {
       type: "template",
-      altText: "この写真を植物に追加しますか？",
+      altText: "この写真を植物の記録として保存し、状態のアドバイスを受け取りますか？🌱",
       template: {
         type: "buttons",
-        text: "この写真を育てている植物の写真として追加しますか？",
+        text: "この写真を植物の記録として保存し、状態のアドバイスを受け取りますか？🌱",
         actions: [
           {
             type: "postback",
-            label: "追加する",
+            label: "保存してアドバイスを見る",
             data: `action=confirm_photo&id=${pending.id}`,
-            displayText: "追加する",
+            displayText: "保存してアドバイスを見る",
           },
           {
             type: "postback",
-            label: "追加しない",
+            label: "今回はやめる",
             data: `action=cancel_photo&id=${pending.id}`,
-            displayText: "追加しない",
+            displayText: "今回はやめる",
           },
         ],
       },
@@ -179,7 +179,10 @@ async function handlePostback(event: any, lineToken: string) {
       .eq("id", pendingId);
 
     await replyToLine(lineToken, replyToken, [
-      { type: "text", text: "写真の追加をキャンセルしました🌱" },
+      {
+        type: "text",
+        text: "今回はアドバイスを行いませんでした。\n必要なときは、また写真を送ってください🌱",
+      },
     ]);
     return;
   }
