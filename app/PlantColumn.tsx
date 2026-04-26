@@ -406,11 +406,10 @@ export function PlantColumn({
 
               return (
                 <div key={plant.id} className="plant-card-wrap">
-                  {/* Photo area — click to enlarge; camera button triggers upload */}
+                  {/* Photo area */}
                   <div
                     className="plant-photo-click"
                     style={{
-                      background: displayPhoto ? "#f0ebe3" : undefined,
                       cursor: uploadingIds[plant.id]
                         ? "not-allowed"
                         : displayPhoto
@@ -427,6 +426,9 @@ export function PlantColumn({
                         src={displayPhoto}
                         alt={getPlantLabel(plant.plant_type)}
                         style={{
+                          position: "absolute",
+                          top: 0,
+                          left: 0,
                           width: "100%",
                           height: "100%",
                           objectFit: "cover",
@@ -567,27 +569,27 @@ export function PlantColumn({
                       </div>
                     </div>
 
-                    {(photoHistories[plant.id]?.length ?? 0) > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => handleHistoryOpen(plant.id)}
-                        style={{
-                          display: "block",
-                          marginTop: 6,
-                          background: "none",
-                          border: "none",
-                          padding: 0,
-                          fontSize: 10,
-                          color: "#6db07b",
-                          cursor: "pointer",
-                          fontFamily,
-                          fontWeight: 600,
-                          letterSpacing: 0.2,
-                        }}
-                      >
-                        写真履歴（{photoHistories[plant.id].length}枚）
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleHistoryOpen(plant.id)}
+                      style={{
+                        display: "block",
+                        marginTop: 6,
+                        background: "none",
+                        border: "none",
+                        padding: 0,
+                        fontSize: 10,
+                        color: "#6db07b",
+                        cursor: "pointer",
+                        fontFamily,
+                        fontWeight: 600,
+                        letterSpacing: 0.2,
+                      }}
+                    >
+                      {(photoHistories[plant.id]?.length ?? 0) > 0
+                        ? `過去写真を見る（${photoHistories[plant.id].length}枚）`
+                        : "過去写真を見る"}
+                    </button>
 
                     {uploadErrors[plant.id] && (
                       <div
