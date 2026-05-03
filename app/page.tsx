@@ -215,10 +215,13 @@ export default async function Home() {
     .limit(1);
 
   // Photos
-  const { data: photosRaw } = await supabase
+  const { data: photosRaw, error: photosError } = await supabase
     .from("plant_photos")
     .select("id, plant_id, image_url, taken_at")
     .order("taken_at", { ascending: false });
+
+  console.log(`[Page] plants取得件数=${allPlants.length} photosError=${photosError?.message ?? "なし"}`);
+  console.log(`[Page] plant_photos取得件数=${photosRaw?.length ?? 0}`);
 
   const photos = photosRaw ?? [];
   const latestPhotos: Record<string, string> = {};
@@ -230,13 +233,22 @@ export default async function Home() {
   for (const photo of photos) {
     const url: string = photo.image_url ?? "";
     if (!url) continue;
-    if (!latestPhotos[photo.plant_id]) latestPhotos[photo.plant_id] = url;
+    if (!latestPhotos[photo.plant_id]) {
+      latestPhotos[photo.plant_id] = url;
+      console.log(`[Page] plant_id=${photo.plant_id} 最新写真あり url=${url}`);
+    }
     if (!photoHistories[photo.plant_id]) photoHistories[photo.plant_id] = [];
     photoHistories[photo.plant_id].push({
       id: photo.id,
       url,
       takenAt: String(photo.taken_at ?? "").slice(0, 10),
     });
+  }
+
+  for (const plant of plants) {
+    if (!latestPhotos[plant.id]) {
+      console.log(`[Page] plant_id=${plant.id} (${plant.plant_type}) 写真なし`);
+    }
   }
 
   // AI-generated today tasks (growth-stage based)

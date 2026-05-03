@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { generatePlantChatReply } from "@/lib/aiPlantChat";
 import { fetchLineImage, replyToLine, pushToLine } from "@/lib/linePhotoUtils";
 import { generatePhotoAdvice } from "@/lib/aiPhotoAdvice";
@@ -241,6 +242,9 @@ async function handlePostback(event: any, lineToken: string) {
     }
 
     console.log(`[DB] plant_photos insert成功 plant_id=${plantId} imageUrl=${imageUrl}`);
+
+    revalidatePath("/");
+    console.log("[Cache] revalidatePath('/') 実行");
 
     await supabase
       .from("pending_line_photos")
