@@ -32,9 +32,13 @@ async function handleImageMessage(event: any, lineToken: string) {
   const messageId: string = event.message.id;
   const replyToken: string = event.replyToken;
 
+  console.log(`[LINE] 画像受信 userId=${lineUserId}`);
+  console.log(`[LINE] messageId=${messageId}`);
+
   // 1. LINE から画像バイナリを取得
   const image = await fetchLineImage(messageId, lineToken);
   if (!image) {
+    // fetchLineImage 内で詳細ログ済み
     await replyToLine(lineToken, replyToken, [
       { type: "text", text: "画像の取得に失敗しました。もう一度お試しください🌱" },
     ]);
@@ -53,12 +57,14 @@ async function handleImageMessage(event: any, lineToken: string) {
     });
 
   if (uploadError) {
-    console.error("storage upload error:", uploadError);
+    console.error(`[Storage] upload失敗 path=${storagePath}`, uploadError);
     await replyToLine(lineToken, replyToken, [
       { type: "text", text: "画像の保存に失敗しました。もう一度お試しください🌱" },
     ]);
     return;
   }
+
+  console.log(`[Storage] upload成功 path=${storagePath}`);
 
   // 3. pending_line_photos に記録
   const { data: pending, error: insertError } = await supabase
@@ -73,12 +79,14 @@ async function handleImageMessage(event: any, lineToken: string) {
     .single();
 
   if (insertError || !pending) {
-    console.error("pending insert error:", insertError);
+    console.error(`[DB] pending_line_photos insert失敗 messageId=${messageId}`, insertError);
     await replyToLine(lineToken, replyToken, [
       { type: "text", text: "エラーが発生しました。もう一度お試しください🌱" },
     ]);
     return;
   }
+
+  console.log(`[DB] pending_line_photos insert成功 id=${pending.id} storagePath=${storagePath}`);
 
   // 4. 確認メッセージを送信（Buttons template）
   await replyToLine(lineToken, replyToken, [
@@ -191,6 +199,8 @@ async function handlePostback(event: any, lineToken: string) {
   if (action === "select_plant" && pendingId && plantId) {
     const lineUserId: string = event.source?.userId ?? "";
 
+    console.log(`[DB] plant_id=${plantId} pendingId=${pendingId}`);
+
     const { data: pending, error } = await supabase
       .from("pending_line_photos")
       .select()
@@ -199,6 +209,7 @@ async function handlePostback(event: any, lineToken: string) {
       .single();
 
     if (error || !pending) {
+      console.error(`[DB] pending_line_photos 取得失敗 pendingId=${pendingId}`, error);
       await replyToLine(lineToken, replyToken, [
         { type: "text", text: "写真が見つかりませんでした。もう一度画像を送ってください🌱" },
       ]);
@@ -210,6 +221,7 @@ async function handlePostback(event: any, lineToken: string) {
       .getPublicUrl(pending.storage_path);
 
     const imageUrl: string = urlData.publicUrl;
+    console.log(`[DB] 画像URL生成 imageUrl=${imageUrl}`);
 
     const { error: photoError } = await supabase
       .from("plant_photos")
@@ -221,12 +233,14 @@ async function handlePostback(event: any, lineToken: string) {
       });
 
     if (photoError) {
-      console.error("plant_photos insert error:", photoError);
+      console.error(`[DB] plant_photos insert失敗 plant_id=${plantId} imageUrl=${imageUrl}`, photoError);
       await replyToLine(lineToken, replyToken, [
         { type: "text", text: "写真の登録に失敗しました。もう一度お試しください🌱" },
       ]);
       return;
     }
+
+    console.log(`[DB] plant_photos insert成功 plant_id=${plantId} imageUrl=${imageUrl}`);
 
     await supabase
       .from("pending_line_photos")

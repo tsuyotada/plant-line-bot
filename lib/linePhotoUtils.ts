@@ -7,11 +7,17 @@ export async function fetchLineImage(
       `https://api-data.line.me/v2/bot/message/${messageId}/content`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => "(body読み取り失敗)");
+      console.error(`[LINE] 画像取得失敗 messageId=${messageId} status=${res.status} body=${errBody}`);
+      return null;
+    }
     const binary = await res.arrayBuffer();
     const contentType = res.headers.get("content-type") ?? "image/jpeg";
+    console.log(`[LINE] 画像取得成功 messageId=${messageId} contentType=${contentType} size=${binary.byteLength}bytes`);
     return { binary, contentType };
-  } catch {
+  } catch (err) {
+    console.error(`[LINE] 画像取得例外 messageId=${messageId}`, err);
     return null;
   }
 }
