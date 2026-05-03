@@ -297,6 +297,18 @@ export default async function Home() {
           .board-grid { grid-template-columns: 1fr; }
         }
 
+        /* ─── Grid span helpers ─── */
+        .col-plants { grid-column: span 2; }
+        .col-right {
+          grid-column: span 1;
+          display: flex;
+          flex-direction: column;
+          gap: 18px;
+        }
+        @media (max-width: 960px) {
+          .col-plants, .col-right { grid-column: span 1; }
+        }
+
         /* ─── Column panel ─── */
         .col-board {
           background: rgba(253, 250, 244, 0.96);
@@ -497,23 +509,27 @@ export default async function Home() {
         </div>
 
         <div className="board-grid" style={{ maxWidth: 1440, margin: "0 auto" }}>
-          {/* ── Column 1: 育てている植物 ── */}
-          <PlantColumn
-            plants={plants}
-            archivedPlants={archivedPlants}
-            today={today}
-            plantHasTodayEventRecord={plantHasTodayEventRecord}
-            hasError={!!plantsError}
-            addPlantAction={addPlant}
-            archivePlantAction={archivePlant}
-            restorePlantAction={restorePlant}
-            reorderPlantAction={reorderPlants}
-            uploadPhotoAction={uploadPlantPhoto}
-            latestPhotos={latestPhotos}
-            photoHistories={photoHistories}
-          />
+          {/* ── Column 1: 育てている植物 (2/3幅) ── */}
+          <div className="col-plants">
+            <PlantColumn
+              plants={plants}
+              archivedPlants={archivedPlants}
+              today={today}
+              plantHasTodayEventRecord={plantHasTodayEventRecord}
+              hasError={!!plantsError}
+              addPlantAction={addPlant}
+              archivePlantAction={archivePlant}
+              restorePlantAction={restorePlant}
+              reorderPlantAction={reorderPlants}
+              uploadPhotoAction={uploadPlantPhoto}
+              latestPhotos={latestPhotos}
+              photoHistories={photoHistories}
+            />
+          </div>
 
-          {/* ── Column 2: 今日やること ── */}
+          {/* ── Right column (1/3幅): 今日やること + LINE通知 縦積み ── */}
+          <div className="col-right">
+          {/* ── 今日やること ── */}
           <div className="col-board">
             <h2 className="col-heading">今日やること</h2>
 
@@ -570,7 +586,7 @@ export default async function Home() {
             )}
           </div>
 
-          {/* ── Column 3: LINE通知 ── */}
+          {/* ── LINE通知 ── */}
           <div className="col-board">
             <h2 className="col-heading">LINE通知</h2>
 
@@ -657,6 +673,7 @@ export default async function Home() {
               </div>
             </div>
           </div>
+          </div>{/* /col-right */}
         </div>
       </main>
     </>
