@@ -164,7 +164,7 @@ export function PlantColumn({
   const [isPending, startTransition] = useTransition();
   const [uploadingIds, setUploadingIds] = useState<Record<string, boolean>>({});
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
-  const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<{ urls: string[]; index: number } | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [formPhotoPreview, setFormPhotoPreview] = useState<string | null>(null);
@@ -180,6 +180,7 @@ export function PlantColumn({
   const photoInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const photoLibraryInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const batchInputRef = useRef<HTMLInputElement | null>(null);
+  const touchStartX = useRef<number>(0);
   const formPhotoInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -192,6 +193,22 @@ export function PlantColumn({
   useEffect(() => {
     setLocalPlants(plants);
   }, [plants]);
+
+  const lightboxOpen = lightbox !== null;
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    function handleKey(e: KeyboardEvent) {
+      setLightbox((prev) => {
+        if (!prev) return prev;
+        if (e.key === "ArrowLeft" && prev.index > 0) return { ...prev, index: prev.index - 1 };
+        if (e.key === "ArrowRight" && prev.index < prev.urls.length - 1) return { ...prev, index: prev.index + 1 };
+        if (e.key === "Escape") return null;
+        return prev;
+      });
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [lightboxOpen]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -813,7 +830,7 @@ export function PlantColumn({
                         }}
                         onClick={() => {
                           if (uploadingIds[plant.id]) return;
-                          if (displayPhoto) setPreviewPhotoUrl(displayPhoto);
+                          if (displayPhoto) setLightbox({ urls: [displayPhoto], index: 0 });
                         }}
                       >
                         {displayPhoto ? (
@@ -1111,7 +1128,7 @@ export function PlantColumn({
                 </div>
                 {(photoHistories[historyModalId!] ?? []).length > 0 && (
                   <div style={{ fontSize: 11, color: "#a0a8a2", fontFamily, marginTop: 2 }}>
-                    {(photoHistories[historyModalId!] ?? []).length}枚・古い順に表示
+                    {(photoHistories[historyModalId!] ?? []).length}枚・新しい順に表示
                   </div>
                 )}
               </div>
@@ -1119,7 +1136,7 @@ export function PlantColumn({
             </div>
 
             {(() => {
-              const history = [...(photoHistories[historyModalId!] ?? [])].reverse();
+              const history = photoHistories[historyModalId!] ?? [];
               if (history.length === 0) {
                 return (
                   <div style={{ padding: "40px 16px", textAlign: "center", border: "1px dashed #c8e6cc", borderRadius: 10, background: "#f9fcf9", marginBottom: 20 }}>
@@ -1128,11 +1145,17 @@ export function PlantColumn({
                   </div>
                 );
               }
+              const urls = history.map((p) => p.url);
               return (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(90px, 1fr))", gap: 8, marginBottom: 20 }}>
-                  {history.map((photo) => (
+                  {history.map((photo, photoIdx) => (
                     <div key={photo.id}>
-                      <img src={photo.url} alt={photo.takenAt} style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 8, display: "block", cursor: "zoom-in" }} onClick={() => setPreviewPhotoUrl(photo.url)} />
+                      <img
+                        src={photo.url}
+                        alt={photo.takenAt}
+                        style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 8, display: "block", cursor: "zoom-in" }}
+                        onClick={() => setLightbox({ urls, index: photoIdx })}
+                      />
                       <div style={{ fontSize: 10, color: "#a0a8a2", textAlign: "center", marginTop: 4, fontFamily }}>{photo.takenAt}</div>
                     </div>
                   ))}
@@ -1195,7 +1218,7 @@ export function PlantColumn({
                     src={item.preview}
                     alt={`写真${idx + 1}`}
                     className="batch-thumb"
-                    onClick={() => setPreviewPhotoUrl(item.preview)}
+                    onClick={() => setLightbox({ urls: [item.preview], index: 0 })}
                   />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <select
@@ -1278,18 +1301,64 @@ export function PlantColumn({
       )}
 
       {/* Photo lightbox */}
-      {previewPhotoUrl && (
-        <div className="modal-overlay" style={{ zIndex: 300, background: "rgba(0, 0, 0, 0.88)" }} onClick={() => setPreviewPhotoUrl(null)}>
-          <div style={{ position: "relative", maxWidth: "92vw", maxHeight: "88vh", display: "flex", alignItems: "center", justifyContent: "center" }} onClick={(e) => e.stopPropagation()}>
-            <img src={previewPhotoUrl} alt="写真プレビュー" style={{ maxWidth: "92vw", maxHeight: "88vh", objectFit: "contain", borderRadius: 8, display: "block" }} />
-            <button
-              type="button"
-              onClick={() => setPreviewPhotoUrl(null)}
-              style={{ position: "absolute", top: -14, right: -14, width: 32, height: 32, borderRadius: "50%", background: "rgba(0, 0, 0, 0.55)", border: "2px solid rgba(255, 255, 255, 0.3)", color: "#fff", fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, fontFamily }}
-            >×</button>
+      {lightbox && (() => {
+        const { urls, index } = lightbox;
+        const canPrev = index > 0;
+        const canNext = index < urls.length - 1;
+        return (
+          <div
+            className="modal-overlay"
+            style={{ zIndex: 300, background: "rgba(0,0,0,0.88)" }}
+            onClick={() => setLightbox(null)}
+            onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; }}
+            onTouchEnd={(e) => {
+              const dx = e.changedTouches[0].clientX - touchStartX.current;
+              if (dx > 50 && canPrev) setLightbox((p) => p ? { ...p, index: p.index - 1 } : null);
+              if (dx < -50 && canNext) setLightbox((p) => p ? { ...p, index: p.index + 1 } : null);
+            }}
+          >
+            {/* Counter */}
+            {urls.length > 1 && (
+              <div style={{ position: "absolute", top: 18, left: "50%", transform: "translateX(-50%)", color: "rgba(255,255,255,0.88)", fontSize: 13, fontWeight: 600, fontFamily, background: "rgba(0,0,0,0.38)", padding: "4px 14px", borderRadius: 20, pointerEvents: "none", whiteSpace: "nowrap" }}>
+                {index + 1} / {urls.length}
+              </div>
+            )}
+
+            {/* Prev button (新しい写真) */}
+            {canPrev && (
+              <button
+                type="button"
+                aria-label="新しい写真"
+                onClick={(e) => { e.stopPropagation(); setLightbox((p) => p ? { ...p, index: p.index - 1 } : null); }}
+                style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 40, height: 40, borderRadius: "50%", background: "rgba(0,0,0,0.45)", border: "2px solid rgba(255,255,255,0.25)", color: "#fff", fontSize: 24, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily, lineHeight: 1 }}
+              >‹</button>
+            )}
+
+            {/* Image */}
+            <div
+              style={{ position: "relative", maxWidth: "80vw", maxHeight: "88vh", display: "flex", alignItems: "center", justifyContent: "center" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img src={urls[index]} alt="写真プレビュー" style={{ maxWidth: "80vw", maxHeight: "88vh", objectFit: "contain", borderRadius: 8, display: "block" }} />
+              <button
+                type="button"
+                onClick={() => setLightbox(null)}
+                style={{ position: "absolute", top: -14, right: -14, width: 32, height: 32, borderRadius: "50%", background: "rgba(0,0,0,0.55)", border: "2px solid rgba(255,255,255,0.3)", color: "#fff", fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, fontFamily }}
+              >×</button>
+            </div>
+
+            {/* Next button (古い写真) */}
+            {canNext && (
+              <button
+                type="button"
+                aria-label="古い写真"
+                onClick={(e) => { e.stopPropagation(); setLightbox((p) => p ? { ...p, index: p.index + 1 } : null); }}
+                style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", width: 40, height: 40, borderRadius: "50%", background: "rgba(0,0,0,0.45)", border: "2px solid rgba(255,255,255,0.25)", color: "#fff", fontSize: 24, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily, lineHeight: 1 }}
+              >›</button>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
     </>
   );
 }
