@@ -618,23 +618,28 @@ export default async function Home() {
               >
                 {todayLineMessage}
               </div>
-              <a
-                href={lineShareUrl}
-                target="_blank"
-                rel="noreferrer"
-                style={{
-                  display: "inline-block",
-                  padding: "9px 18px",
-                  background: "#06c755",
-                  color: "#ffffff",
-                  textDecoration: "none",
-                  borderRadius: 8,
-                  fontWeight: 700,
-                  fontSize: 14,
-                }}
-              >
-                LINEで開く
-              </a>
+              <div style={{ display: "flex", justifyContent: "center" }}>
+                <a
+                  href={lineShareUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    maxWidth: 240,
+                    padding: "9px 18px",
+                    background: "#06c755",
+                    color: "#ffffff",
+                    textDecoration: "none",
+                    borderRadius: 8,
+                    fontWeight: 700,
+                    fontSize: 14,
+                    textAlign: "center",
+                  }}
+                >
+                  LINEで開く
+                </a>
+              </div>
               <div style={{ marginTop: 12, fontSize: 11, color: "#c8c0b4", letterSpacing: 0.2 }}>
                 最終送信日時: —
               </div>
@@ -669,7 +674,9 @@ export default async function Home() {
                   target="_blank"
                   rel="noreferrer"
                   style={{
-                    display: "inline-block",
+                    display: "block",
+                    width: "100%",
+                    maxWidth: 240,
                     padding: "8px 20px",
                     background: "#06c755",
                     color: "#ffffff",
@@ -677,6 +684,7 @@ export default async function Home() {
                     borderRadius: 8,
                     fontWeight: 700,
                     fontSize: 13,
+                    textAlign: "center",
                   }}
                 >
                   LINEで友だち追加
