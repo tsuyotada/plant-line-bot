@@ -2,10 +2,7 @@ import { supabase } from "../src/lib/supabase";
 import { revalidatePath } from "next/cache";
 import { BackgroundLayer } from "./BackgroundLayer";
 import { PlantColumn } from "./PlantColumn";
-import {
-  buildTodayTasksForPlants,
-  buildTodayLineMessage,
-} from "@/lib/plantGrowthAdvisor";
+import { buildTodayTasksForPlants } from "@/lib/plantGrowthAdvisor";
 
 // DB migration required (run once):
 // alter table plants add column if not exists sort_order integer;
@@ -276,9 +273,6 @@ export default async function Home() {
       todayTasks.some((t) => t.plant_id === plant.id),
     ])
   );
-
-  const todayLineMessage = buildTodayLineMessage(today, todayTasks);
-  const lineShareUrl = `https://line.me/R/msg/text/?${encodeURIComponent(todayLineMessage)}`;
 
   const fontFamily =
     'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
@@ -586,79 +580,11 @@ export default async function Home() {
             )}
           </div>
 
-          {/* ── LINE通知 ── */}
+          {/* ── LINE通知を受け取る ── */}
           <div className="col-board">
-            <h2 className="col-heading">LINE通知</h2>
-
-            <div className="line-card">
-              <div
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: "#a0a8a2",
-                  textTransform: "uppercase",
-                  letterSpacing: 1,
-                  marginBottom: 10,
-                }}
-              >
-                最新メッセージのプレビュー
-              </div>
-              <div
-                style={{
-                  whiteSpace: "pre-wrap",
-                  fontSize: 13,
-                  color: "#2d4a3e",
-                  lineHeight: 1.75,
-                  padding: "12px 14px",
-                  background: "#f2faf4",
-                  borderRadius: 8,
-                  border: "1px solid #c8e6cc",
-                  marginBottom: 14,
-                }}
-              >
-                {todayLineMessage}
-              </div>
-              <div style={{ display: "flex", justifyContent: "center" }}>
-                <a
-                  href={lineShareUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{
-                    display: "block",
-                    width: "100%",
-                    maxWidth: 240,
-                    padding: "9px 18px",
-                    background: "#06c755",
-                    color: "#ffffff",
-                    textDecoration: "none",
-                    borderRadius: 8,
-                    fontWeight: 700,
-                    fontSize: 14,
-                    textAlign: "center",
-                  }}
-                >
-                  LINEで開く
-                </a>
-              </div>
-              <div style={{ marginTop: 12, fontSize: 11, color: "#c8c0b4", letterSpacing: 0.2 }}>
-                最終送信日時: —
-              </div>
-            </div>
+            <h2 className="col-heading">LINE通知を受け取る</h2>
 
             <div className="line-card" style={{ marginBottom: 0 }}>
-              <div
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: "#a0a8a2",
-                  textTransform: "uppercase",
-                  letterSpacing: 1,
-                  marginBottom: 14,
-                }}
-              >
-                LINEで通知を受け取る
-              </div>
-
               {/* QR + ボタン */}
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, marginBottom: 14 }}>
                 <img
