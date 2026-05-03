@@ -4,6 +4,7 @@ import { generatePlantChatReply } from "@/lib/aiPlantChat";
 import { fetchLineImage, replyToLine, pushToLine } from "@/lib/linePhotoUtils";
 import { generatePhotoAdvice } from "@/lib/aiPhotoAdvice";
 import { identifyPlantFromPhoto } from "@/lib/aiPlantIdentify";
+import { buildDailyNotificationMessage } from "@/lib/buildDailyNotification";
 import { createClient } from "@supabase/supabase-js";
 
 const PLANT_LABEL_MAP: Record<string, string> = {
@@ -502,14 +503,64 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    // テキスト（既存 AI チャット）
+    // テキスト
     if (event.type !== "message" || event.message?.type !== "text") {
       return NextResponse.json({ ok: true });
     }
 
-    const userMessage: string = event.message.text;
+    const userMessage: string = event.message.text.trim();
     const replyToken: string = event.replyToken;
+    const lineUserId: string = event.source?.userId ?? "";
+    const supabase = getSupabase();
 
+    // ── コマンド：登録 ──────────────────────────────────────────────
+    if (userMessage === "登録") {
+      const { data: existing } = await supabase
+        .from("line_notification_users")
+        .select("id, is_active")
+        .eq("line_user_id", lineUserId)
+        .maybeSingle();
+
+      if (existing) {
+        await supabase
+          .from("line_notification_users")
+          .update({ is_active: true, updated_at: new Date().toISOString() })
+          .eq("line_user_id", lineUserId);
+      } else {
+        await supabase
+          .from("line_notification_users")
+          .insert({ line_user_id: lineUserId, is_active: true });
+      }
+      console.log(`[通知登録] userId=${lineUserId} 登録完了`);
+      await replyToLine(lineToken, replyToken, [
+        { type: "text", text: "毎朝の植物通知を登録しました🌱\n毎朝お知らせします！" },
+      ]);
+      return NextResponse.json({ ok: true });
+    }
+
+    // ── コマンド：解除 ──────────────────────────────────────────────
+    if (userMessage === "解除") {
+      await supabase
+        .from("line_notification_users")
+        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .eq("line_user_id", lineUserId);
+      console.log(`[通知登録] userId=${lineUserId} 解除完了`);
+      await replyToLine(lineToken, replyToken, [
+        { type: "text", text: "毎朝の植物通知を停止しました🌿\n再開したい場合は「登録」と送ってください。" },
+      ]);
+      return NextResponse.json({ ok: true });
+    }
+
+    // ── コマンド：通知テスト ────────────────────────────────────────
+    if (userMessage === "通知テスト") {
+      const { message } = await buildDailyNotificationMessage();
+      await replyToLine(lineToken, replyToken, [
+        { type: "text", text: `📋 通知テスト：\n\n${message}` },
+      ]);
+      return NextResponse.json({ ok: true });
+    }
+
+    // ── AI チャット（既存） ─────────────────────────────────────────
     const aiReply = await generatePlantChatReply({ userMessage });
     const replyText =
       aiReply ?? "うまく答えられませんでした。もう一度試してください🌱";
