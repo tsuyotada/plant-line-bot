@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { generatePlantChatReply } from "@/lib/aiPlantChat";
 import { fetchLineImage, replyToLine, pushToLine } from "@/lib/linePhotoUtils";
 import { generatePhotoAdvice } from "@/lib/aiPhotoAdvice";
+import { identifyPlantFromPhoto } from "@/lib/aiPlantIdentify";
 import { createClient } from "@supabase/supabase-js";
 
 const PLANT_LABEL_MAP: Record<string, string> = {
@@ -27,7 +28,7 @@ const PLANT_PAGE_SIZE = 11;
 async function fetchActivePlants(supabase: ReturnType<typeof getSupabase>) {
   const { data: raw } = await supabase
     .from("plants")
-    .select("id, plant_type, sort_order")
+    .select("id, plant_type, sort_order, species, memo")
     .is("archived_at", null)
     .order("created_at", { ascending: true });
 
@@ -99,6 +100,85 @@ function getSupabase() {
   );
 }
 
+// 植物写真を plant_photos に保存し、AIアドバイスを push 送信する共通処理
+async function savePlantPhotoAndAdvise(
+  supabase: ReturnType<typeof getSupabase>,
+  lineToken: string,
+  replyToken: string,
+  lineUserId: string,
+  pendingId: string,
+  plantId: string
+): Promise<void> {
+  const { data: pending, error } = await supabase
+    .from("pending_line_photos")
+    .select()
+    .eq("id", pendingId)
+    .in("status", ["pending", "selecting_plant"])
+    .single();
+
+  if (error || !pending) {
+    console.error(`[DB] pending_line_photos 取得失敗 pendingId=${pendingId}`, error);
+    await replyToLine(lineToken, replyToken, [
+      { type: "text", text: "写真が見つかりませんでした。もう一度画像を送ってください🌱" },
+    ]);
+    return;
+  }
+
+  const { data: urlData } = supabase.storage
+    .from("plant-photos")
+    .getPublicUrl(pending.storage_path);
+  const imageUrl: string = urlData.publicUrl;
+  console.log(`[DB] 画像URL生成 imageUrl=${imageUrl}`);
+
+  const { error: photoError } = await supabase.from("plant_photos").insert({
+    plant_id: plantId,
+    image_url: imageUrl,
+    storage_path: pending.storage_path,
+    taken_at: new Date().toISOString(),
+  });
+
+  if (photoError) {
+    console.error(`[DB] plant_photos insert失敗 plant_id=${plantId} imageUrl=${imageUrl}`, photoError);
+    await replyToLine(lineToken, replyToken, [
+      { type: "text", text: "写真の登録に失敗しました。もう一度お試しください🌱" },
+    ]);
+    return;
+  }
+
+  console.log(`[DB] plant_photos insert成功 plant_id=${plantId} imageUrl=${imageUrl}`);
+  revalidatePath("/");
+  console.log("[Cache] revalidatePath('/') 実行");
+
+  await supabase
+    .from("pending_line_photos")
+    .update({ status: "completed" })
+    .eq("id", pendingId);
+
+  const { data: plant } = await supabase
+    .from("plants")
+    .select("plant_type, initial_state_type, initial_state_note")
+    .eq("id", plantId)
+    .single();
+
+  const plantName = plant ? getPlantLabel(plant.plant_type) : "植物";
+  console.log(`[Plants] ユーザー選択 plant_id=${plantId} plantName=${plantName}`);
+
+  await replyToLine(lineToken, replyToken, [
+    { type: "text", text: `${plantName}の写真として追加しました🌱\n少しお待ちください…` },
+  ]);
+
+  const advice = await generatePhotoAdvice({
+    imageUrl,
+    plantName,
+    initialStateType: plant?.initial_state_type ?? null,
+    initialStateNote: plant?.initial_state_note ?? null,
+  });
+
+  if (advice && lineUserId) {
+    await pushToLine(lineToken, lineUserId, [{ type: "text", text: advice }]);
+  }
+}
+
 async function handleImageMessage(event: any, lineToken: string) {
   const supabase = getSupabase();
   const lineUserId: string = event.source?.userId ?? "unknown";
@@ -161,31 +241,95 @@ async function handleImageMessage(event: any, lineToken: string) {
 
   console.log(`[DB] pending_line_photos insert成功 id=${pending.id} storagePath=${storagePath}`);
 
-  // 4. 確認メッセージを送信（Buttons template）
-  await replyToLine(lineToken, replyToken, [
-    {
-      type: "template",
-      altText: "この写真を植物の記録として保存し、状態のアドバイスを受け取りますか？🌱",
-      template: {
-        type: "buttons",
-        text: "この写真を植物の記録として保存し、状態のアドバイスを受け取りますか？🌱",
-        actions: [
-          {
-            type: "postback",
-            label: "保存してアドバイスを見る",
-            data: `action=confirm_photo&id=${pending.id}`,
-            displayText: "保存してアドバイスを見る",
-          },
-          {
-            type: "postback",
-            label: "今回はやめる",
-            data: `action=cancel_photo&id=${pending.id}`,
-            displayText: "今回はやめる",
-          },
-        ],
+  // 4. AI で植物を推定 → 確認メッセージ送信
+  const plants = await fetchActivePlants(supabase);
+
+  if (plants.length === 0) {
+    await replyToLine(lineToken, replyToken, [
+      { type: "text", text: "登録されている植物がありません。先にWebアプリで植物を追加してください🌱" },
+    ]);
+    return;
+  }
+
+  const { data: imageUrlData } = supabase.storage.from("plant-photos").getPublicUrl(storagePath);
+  const imageUrl = imageUrlData.publicUrl;
+
+  const plantsForAI = plants.map((p: any) => ({
+    id: p.id,
+    name: getPlantLabel(p.plant_type),
+    species: p.species ?? null,
+    memo: p.memo ?? null,
+  }));
+
+  console.log(`[AI] 識別候補植物数=${plantsForAI.length}: ${plantsForAI.map((p: any) => p.name).join(", ")}`);
+
+  const aiResult = await identifyPlantFromPhoto({ imageUrl, plants: plantsForAI });
+
+  console.log(`[AI] 識別結果: matchedPlantId=${aiResult?.matchedPlantId ?? "null"} matchedPlantName=${aiResult?.matchedPlantName ?? "null"} confidence=${aiResult?.confidence ?? "null"} reason=${aiResult?.reason ?? ""}`);
+
+  const CONFIDENCE_THRESHOLD = 0.6;
+
+  if (aiResult && aiResult.confidence >= CONFIDENCE_THRESHOLD) {
+    // AI が信頼度高く推定できた → ユーザーに確認
+    await replyToLine(lineToken, replyToken, [
+      {
+        type: "text",
+        text: `この写真は${aiResult.matchedPlantName}っぽいです🌿\n（${aiResult.reason}）\n\n${aiResult.matchedPlantName}として保存しますか？`,
+        quickReply: {
+          items: [
+            {
+              type: "action",
+              action: {
+                type: "postback",
+                label: `${aiResult.matchedPlantName}で保存`.slice(0, 20),
+                data: `action=confirm_ai_plant&id=${pending.id}&plant_id=${aiResult.matchedPlantId}`,
+                displayText: `${aiResult.matchedPlantName}で保存`,
+              },
+            },
+            {
+              type: "action",
+              action: {
+                type: "postback",
+                label: "別の植物を選ぶ",
+                data: `action=reject_ai_plant&id=${pending.id}`,
+                displayText: "別の植物を選ぶ",
+              },
+            },
+            {
+              type: "action",
+              action: {
+                type: "postback",
+                label: "今回はやめる",
+                data: `action=cancel_photo&id=${pending.id}`,
+                displayText: "今回はやめる",
+              },
+            },
+          ],
+        },
       },
-    },
-  ]);
+    ]);
+  } else {
+    // AI が判断できなかった → 直接植物選択フローへ
+    console.log(`[AI] 推定失敗 or 信頼度低 (${aiResult?.confidence ?? "null"}) → 植物選択フローへ`);
+
+    await supabase
+      .from("pending_line_photos")
+      .update({ status: "selecting_plant" })
+      .eq("id", pending.id);
+
+    const items = buildPlantPageItems(plants, pending.id, 0);
+    const totalPages = Math.ceil(plants.length / PLANT_PAGE_SIZE);
+    const hasMoreFirst = plants.length > PLANT_PAGE_SIZE;
+    console.log(`[Plants] page=1/${totalPages} 表示件数=${items.length} 前へ=なし 次へ=${hasMoreFirst}`);
+
+    await replyToLine(lineToken, replyToken, [
+      {
+        type: "text",
+        text: "どの植物か判断が難しかったので、植物を選んでください🌱",
+        quickReply: { items },
+      },
+    ]);
+  }
 }
 
 async function handlePostback(event: any, lineToken: string) {
@@ -262,6 +406,38 @@ async function handlePostback(event: any, lineToken: string) {
     return;
   }
 
+  // ── AI推定結果を「はい」で確認 → 保存 ──
+  if (action === "confirm_ai_plant" && pendingId && plantId) {
+    const lineUserId: string = event.source?.userId ?? "";
+    console.log(`[AI] ユーザー確認: confirm plant_id=${plantId} pendingId=${pendingId}`);
+    await savePlantPhotoAndAdvise(supabase, lineToken, replyToken, lineUserId, pendingId, plantId);
+    return;
+  }
+
+  // ── 「別の植物を選ぶ」が押された → 植物選択フローへ ──
+  if (action === "reject_ai_plant" && pendingId) {
+    console.log(`[AI] ユーザー拒否: reject → 植物選択フローへ pendingId=${pendingId}`);
+
+    await supabase
+      .from("pending_line_photos")
+      .update({ status: "selecting_plant" })
+      .eq("id", pendingId);
+
+    const plants = await fetchActivePlants(supabase);
+    const items = buildPlantPageItems(plants, pendingId, 0);
+    const totalPages = Math.ceil(plants.length / PLANT_PAGE_SIZE);
+    console.log(`[Plants] reject_ai_plant page=1/${totalPages} 表示件数=${items.length}`);
+
+    await replyToLine(lineToken, replyToken, [
+      {
+        type: "text",
+        text: "どの植物の写真として追加しますか？",
+        quickReply: { items },
+      },
+    ]);
+    return;
+  }
+
   // ── 「次の植物を見る」が押された → 次ページを Quick Reply で表示 ──
   if (action === "more_plants" && pendingId) {
     const page = parseInt(params.get("page") ?? "1", 10);
@@ -289,85 +465,8 @@ async function handlePostback(event: any, lineToken: string) {
   // ── 植物が選ばれた → plant_photos に登録 → AI アドバイス送信 ──
   if (action === "select_plant" && pendingId && plantId) {
     const lineUserId: string = event.source?.userId ?? "";
-
     console.log(`[DB] plant_id=${plantId} pendingId=${pendingId}`);
-
-    const { data: pending, error } = await supabase
-      .from("pending_line_photos")
-      .select()
-      .eq("id", pendingId)
-      .in("status", ["pending", "selecting_plant"])
-      .single();
-
-    if (error || !pending) {
-      console.error(`[DB] pending_line_photos 取得失敗 pendingId=${pendingId}`, error);
-      await replyToLine(lineToken, replyToken, [
-        { type: "text", text: "写真が見つかりませんでした。もう一度画像を送ってください🌱" },
-      ]);
-      return;
-    }
-
-    const { data: urlData } = supabase.storage
-      .from("plant-photos")
-      .getPublicUrl(pending.storage_path);
-
-    const imageUrl: string = urlData.publicUrl;
-    console.log(`[DB] 画像URL生成 imageUrl=${imageUrl}`);
-
-    const { error: photoError } = await supabase
-      .from("plant_photos")
-      .insert({
-        plant_id: plantId,
-        image_url: imageUrl,
-        storage_path: pending.storage_path,
-        taken_at: new Date().toISOString(),
-      });
-
-    if (photoError) {
-      console.error(`[DB] plant_photos insert失敗 plant_id=${plantId} imageUrl=${imageUrl}`, photoError);
-      await replyToLine(lineToken, replyToken, [
-        { type: "text", text: "写真の登録に失敗しました。もう一度お試しください🌱" },
-      ]);
-      return;
-    }
-
-    console.log(`[DB] plant_photos insert成功 plant_id=${plantId} imageUrl=${imageUrl}`);
-
-    revalidatePath("/");
-    console.log("[Cache] revalidatePath('/') 実行");
-
-    await supabase
-      .from("pending_line_photos")
-      .update({ status: "completed" })
-      .eq("id", pendingId);
-
-    const { data: plant } = await supabase
-      .from("plants")
-      .select("plant_type, initial_state_type, initial_state_note")
-      .eq("id", plantId)
-      .single();
-
-    const plantName = plant ? getPlantLabel(plant.plant_type) : "植物";
-    console.log(`[Plants] ユーザー選択 plant_id=${plantId} plantName=${plantName}`);
-
-    // 登録完了を reply token で即返信
-    await replyToLine(lineToken, replyToken, [
-      { type: "text", text: `${plantName}の写真として追加しました🌱\n少しお待ちください…` },
-    ]);
-
-    // AI アドバイスを生成して push で送信
-    const advice = await generatePhotoAdvice({
-      imageUrl,
-      plantName,
-      initialStateType: plant?.initial_state_type ?? null,
-      initialStateNote: plant?.initial_state_note ?? null,
-    });
-
-    if (advice && lineUserId) {
-      await pushToLine(lineToken, lineUserId, [
-        { type: "text", text: advice },
-      ]);
-    }
+    await savePlantPhotoAndAdvise(supabase, lineToken, replyToken, lineUserId, pendingId, plantId);
   }
 }
 
