@@ -337,11 +337,12 @@ export default async function Home() {
         .plants-grid {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
+          max-width: 560px;
           gap: 8px;
           margin-bottom: 12px;
         }
         @media (max-width: 480px) {
-          .plants-grid { grid-template-columns: 1fr; }
+          .plants-grid { grid-template-columns: 1fr; max-width: none; }
         }
 
         /* ─── Plant card ─── */

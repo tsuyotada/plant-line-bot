@@ -552,7 +552,7 @@ export function PlantColumn({
                         style={{
                           position: "relative",
                           width: "100%",
-                          height: 88,
+                          aspectRatio: "5/2",
                           overflow: "hidden",
                           background: "linear-gradient(135deg, #d4edda 0%, #b8dfbf 55%, #93c9a0 100%)",
                           cursor: uploadingIds[plant.id] ? "not-allowed" : displayPhoto ? "zoom-in" : "default",
