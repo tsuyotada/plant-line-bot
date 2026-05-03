@@ -333,16 +333,15 @@ export default async function Home() {
           line-height: 1.4;
         }
 
-        /* ─── Plants 2-col grid (equal columns) ─── */
+        /* ─── Plants grid (auto-fill, responsive columns) ─── */
         .plants-grid {
           display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          max-width: 560px;
+          grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
           gap: 8px;
           margin-bottom: 12px;
         }
         @media (max-width: 480px) {
-          .plants-grid { grid-template-columns: 1fr; max-width: none; }
+          .plants-grid { grid-template-columns: 1fr; }
         }
 
         /* ─── Plant card ─── */
