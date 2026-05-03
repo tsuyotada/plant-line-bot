@@ -373,10 +373,6 @@ async function handleFollowEvent(event: any, lineToken: string) {
             type: "action",
             action: { type: "message", label: "通知テスト", text: "通知テスト" },
           },
-          {
-            type: "action",
-            action: { type: "message", label: "使い方を見る", text: "通知" },
-          },
         ],
       },
     },
@@ -996,9 +992,11 @@ export async function POST(req: Request) {
     if (userMessage === "登録") {
       const { data: existing } = await supabase
         .from("line_notification_users")
-        .select("id, is_active")
+        .select("id, is_active, has_tested_notification")
         .eq("line_user_id", lineUserId)
         .maybeSingle();
+
+      const hasTested = existing?.has_tested_notification === true;
 
       if (existing) {
         await supabase
@@ -1010,22 +1008,30 @@ export async function POST(req: Request) {
           .from("line_notification_users")
           .insert({ line_user_id: lineUserId, is_active: true });
       }
-      console.log(`[通知登録] userId=${lineUserId} 登録完了`);
-      console.log(`[LINE] register quick reply sent userId=${lineUserId}`);
-      await replyToLine(lineToken, replyToken, [
-        {
-          type: "text",
-          text: "登録しました🌱\n明日から毎朝の植物通知が届きます。\n\n今すぐ試したい場合は、下の『通知テスト』を押してください。",
-          quickReply: {
-            items: [
-              {
-                type: "action",
-                action: { type: "message", label: "通知テスト", text: "通知テスト" },
-              },
-            ],
+
+      console.log(`[LINE] register completed userId=${lineUserId}`);
+      console.log(`[LINE] register reply includes notification test=${!hasTested}`);
+
+      if (hasTested) {
+        await replyToLine(lineToken, replyToken, [
+          { type: "text", text: "登録しました🌱\n明日から毎朝の植物通知が届きます。" },
+        ]);
+      } else {
+        await replyToLine(lineToken, replyToken, [
+          {
+            type: "text",
+            text: "登録しました🌱\n明日から毎朝の植物通知が届きます。\n\n今すぐ試したい場合は、下の『通知テスト』を押してください。",
+            quickReply: {
+              items: [
+                {
+                  type: "action",
+                  action: { type: "message", label: "通知テスト", text: "通知テスト" },
+                },
+              ],
+            },
           },
-        },
-      ]);
+        ]);
+      }
       return NextResponse.json({ ok: true });
     }
 
@@ -1069,11 +1075,27 @@ export async function POST(req: Request) {
     if (userMessage === "通知テスト") {
       const { data: regRecord } = await supabase
         .from("line_notification_users")
-        .select("is_active")
+        .select("is_active, has_tested_notification")
         .eq("line_user_id", lineUserId)
         .maybeSingle();
+
       const isRegistered = regRecord?.is_active === true;
-      console.log(`[LINE] notification test requested userId=${lineUserId} registered=${isRegistered}`);
+      const wasTested = regRecord?.has_tested_notification === true;
+      console.log(`[LINE] notification test requested userId=${lineUserId} registered=${isRegistered} has_tested_notification=${wasTested}`);
+
+      // テスト履歴を記録（is_active は変えない）
+      if (regRecord) {
+        if (!wasTested) {
+          await supabase
+            .from("line_notification_users")
+            .update({ has_tested_notification: true, updated_at: new Date().toISOString() })
+            .eq("line_user_id", lineUserId);
+        }
+      } else {
+        await supabase
+          .from("line_notification_users")
+          .insert({ line_user_id: lineUserId, is_active: false, has_tested_notification: true });
+      }
 
       const { message } = await buildDailyNotificationMessage();
 
@@ -1086,7 +1108,7 @@ export async function POST(req: Request) {
           { type: "text", text: `📋 通知テスト：\n\n${message}` },
           {
             type: "text",
-            text: "いかがでしょうか？\nこのようなメッセージが毎朝届くようになります。\n\nよければ登録してみてください👇",
+            text: "いかがでしょうか？\nこのような通知が毎朝届くようになります。\n\nよければ登録してみてください👇",
             quickReply: {
               items: [
                 {
@@ -1097,6 +1119,7 @@ export async function POST(req: Request) {
             },
           },
         ]);
+        console.log(`[LINE] notification test follow-up sent userId=${lineUserId}`);
       }
       return NextResponse.json({ ok: true });
     }
