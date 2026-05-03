@@ -21,6 +21,15 @@ import { CSS } from "@dnd-kit/utilities";
 
 type PhotoHistoryItem = { id: string; url: string; takenAt: string };
 
+type BatchItem = {
+  id: string;
+  file: File;
+  preview: string;
+  plantId: string;
+  status: "pending" | "uploading" | "done" | "error";
+  errorMsg?: string;
+};
+
 type Props = {
   plants: any[];
   archivedPlants: any[];
@@ -162,10 +171,15 @@ export function PlantColumn({
   const [isArchivedOpen, setIsArchivedOpen] = useState(false);
   const [photoMenuOpenId, setPhotoMenuOpenId] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<Record<string, { current: number; total: number }>>({});
+  const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
+  const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
+  const [batchSaving, setBatchSaving] = useState(false);
+  const [batchWarning, setBatchWarning] = useState<string | null>(null);
 
   const formRef = useRef<HTMLFormElement>(null);
   const photoInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const photoLibraryInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const batchInputRef = useRef<HTMLInputElement | null>(null);
   const formPhotoInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -271,6 +285,78 @@ export function PlantColumn({
       setUploadErrors((prev) => ({ ...prev, [plantId]: "アップロードに失敗しました。通信状態を確認してください。" }));
     } else if (failCount > 0) {
       setUploadErrors((prev) => ({ ...prev, [plantId]: `${failCount}枚のアップロードに失敗しました（${successCount}枚は成功）` }));
+    }
+  }
+
+  async function handleBatchFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const allFiles = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    if (allFiles.length === 0) return;
+
+    const oversized = allFiles.filter((f) => f.size > 5 * 1024 * 1024);
+    const files = allFiles.filter((f) => f.size <= 5 * 1024 * 1024);
+
+    setBatchWarning(oversized.length > 0 ? `${oversized.length}枚は5MBを超えたためスキップします` : null);
+
+    if (files.length === 0) {
+      setBatchWarning("選択した画像がすべて5MBを超えています");
+      return;
+    }
+
+    const items: BatchItem[] = await Promise.all(
+      files.map(
+        (file, i) =>
+          new Promise<BatchItem>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+              resolve({
+                id: `${Date.now()}-${i}`,
+                file,
+                preview: ev.target?.result as string,
+                plantId: "",
+                status: "pending",
+              });
+            };
+            reader.readAsDataURL(file);
+          })
+      )
+    );
+
+    setBatchItems(items);
+    setIsBatchModalOpen(true);
+  }
+
+  async function handleBatchSave() {
+    const items = [...batchItems];
+    setBatchSaving(true);
+    const results = [...items];
+
+    for (let i = 0; i < items.length; i++) {
+      setBatchItems((prev) => prev.map((it, idx) => idx === i ? { ...it, status: "uploading" as const } : it));
+      try {
+        const item = items[i];
+        const compressed = await compressImage(item.file);
+        const fd = new FormData();
+        fd.set("plant_id", item.plantId);
+        fd.set("photo", new File([compressed], item.file.name.replace(/\.[^/.]+$/, "") + ".jpg", { type: "image/jpeg" }));
+        const result = await uploadPhotoAction(fd);
+        if (result.success) {
+          results[i] = { ...results[i], status: "done" };
+          setBatchItems((prev) => prev.map((it, idx) => idx === i ? { ...it, status: "done" as const } : it));
+        } else {
+          results[i] = { ...results[i], status: "error", errorMsg: result.error ?? "保存失敗" };
+          setBatchItems((prev) => prev.map((it, idx) => idx === i ? { ...it, status: "error" as const, errorMsg: result.error ?? "保存失敗" } : it));
+        }
+      } catch {
+        results[i] = { ...results[i], status: "error", errorMsg: "例外が発生しました" };
+        setBatchItems((prev) => prev.map((it, idx) => idx === i ? { ...it, status: "error" as const, errorMsg: "例外が発生しました" } : it));
+      }
+    }
+
+    setBatchSaving(false);
+    if (results.every((it) => it.status === "done")) {
+      setIsBatchModalOpen(false);
+      setBatchItems([]);
     }
   }
 
@@ -597,6 +683,68 @@ export function PlantColumn({
           flex-shrink: 0;
         }
         .btn-restore:hover { background: #f2faf4; }
+        .plants-heading-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 14px;
+        }
+        .btn-batch-upload {
+          padding: 5px 11px;
+          background: #f2faf4;
+          border: 1.5px solid #93c9a0;
+          border-radius: 7px;
+          font-size: 11px;
+          font-weight: 600;
+          color: #5a9a6a;
+          cursor: pointer;
+          font-family: inherit;
+          white-space: nowrap;
+          transition: background 0.12s, border-color 0.12s;
+          flex-shrink: 0;
+        }
+        .btn-batch-upload:hover { background: #e4f5e9; border-color: #6db07b; color: #2d4a3e; }
+        .batch-item-row {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 8px 0;
+          border-bottom: 1px solid #f0ebe2;
+        }
+        .batch-item-row:last-child { border-bottom: none; }
+        .batch-thumb {
+          width: 62px;
+          height: 62px;
+          object-fit: cover;
+          border-radius: 7px;
+          flex-shrink: 0;
+          cursor: zoom-in;
+        }
+        .batch-plant-select {
+          flex: 1;
+          padding: 7px 9px;
+          border: 1px solid #d1d5db;
+          border-radius: 7px;
+          font-size: 12px;
+          color: #374151;
+          background: #ffffff;
+          font-family: inherit;
+          cursor: pointer;
+          outline: none;
+          min-width: 0;
+        }
+        .batch-plant-select:focus { border-color: #6db07b; box-shadow: 0 0 0 2px rgba(109, 176, 123, 0.18); }
+        .batch-status-icon {
+          font-size: 16px;
+          width: 22px;
+          text-align: center;
+          flex-shrink: 0;
+        }
+        .batch-error-msg {
+          font-size: 10px;
+          color: #b91c1c;
+          margin-top: 3px;
+        }
       `}</style>
 
       {openMenuId !== null && (
@@ -607,7 +755,26 @@ export function PlantColumn({
       )}
 
       <div className="col-board">
-        <h2 className="col-heading">育てている植物</h2>
+        <div className="plants-heading-row">
+          <h2 className="col-heading" style={{ margin: 0 }}>育てている植物</h2>
+          {localPlants.length > 0 && (
+            <button
+              type="button"
+              className="btn-batch-upload"
+              onClick={() => batchInputRef.current?.click()}
+            >
+              写真をまとめて追加
+            </button>
+          )}
+        </div>
+        <input
+          ref={batchInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          style={{ display: "none" }}
+          onChange={handleBatchFileSelect}
+        />
 
         {hasError ? (
           <div className="todo-card">
@@ -974,6 +1141,138 @@ export function PlantColumn({
             })()}
 
             <button type="button" className="btn-primary" onClick={() => setHistoryModalId(null)} style={{ padding: "8px 20px", fontSize: 13, fontFamily }}>閉じる</button>
+          </div>
+        </div>
+      )}
+
+      {/* Batch upload modal */}
+      {isBatchModalOpen && (
+        <div className="modal-overlay" onClick={() => { if (!batchSaving) { setIsBatchModalOpen(false); setBatchItems([]); } }}>
+          <div className="modal-panel" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 15, color: "#2d4a3e", fontFamily }}>
+                  写真をまとめて追加
+                </div>
+                <div style={{ fontSize: 11, color: "#a0a8a2", marginTop: 2, fontFamily }}>
+                  各写真の植物を選んでから「保存する」を押してください
+                </div>
+              </div>
+              {!batchSaving && (
+                <button
+                  type="button"
+                  onClick={() => { setIsBatchModalOpen(false); setBatchItems([]); }}
+                  style={{ background: "none", border: "none", fontSize: 22, color: "#9ca3af", cursor: "pointer", lineHeight: 1, padding: "0 4px", fontFamily }}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+
+            {/* Warning banner */}
+            {batchWarning && (
+              <div style={{ fontSize: 11, color: "#92400e", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 6, padding: "6px 10px", marginBottom: 12, fontFamily }}>
+                {batchWarning}
+              </div>
+            )}
+
+            {/* Progress banner */}
+            {batchSaving && (() => {
+              const doneCount = batchItems.filter((it) => it.status === "done" || it.status === "error").length;
+              return (
+                <div style={{ fontSize: 12, color: "#5a9a6a", background: "#f2faf4", border: "1px solid #b8dfc0", borderRadius: 6, padding: "7px 10px", marginBottom: 12, fontFamily, fontWeight: 600 }}>
+                  {doneCount}/{batchItems.length}枚 保存中…
+                </div>
+              );
+            })()}
+
+            {/* Photo list */}
+            <div style={{ maxHeight: "52vh", overflowY: "auto", marginBottom: 16 }}>
+              {batchItems.map((item, idx) => (
+                <div key={item.id} className="batch-item-row">
+                  <img
+                    src={item.preview}
+                    alt={`写真${idx + 1}`}
+                    className="batch-thumb"
+                    onClick={() => setPreviewPhotoUrl(item.preview)}
+                  />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <select
+                      className="batch-plant-select"
+                      value={item.plantId}
+                      disabled={item.status === "uploading" || item.status === "done"}
+                      onChange={(e) =>
+                        setBatchItems((prev) =>
+                          prev.map((it, i) => i === idx ? { ...it, plantId: e.target.value } : it)
+                        )
+                      }
+                    >
+                      <option value="">植物を選択</option>
+                      {localPlants.map((plant) => (
+                        <option key={plant.id} value={plant.id}>
+                          {getPlantLabel(plant.plant_type)}{plant.species ? ` (${plant.species})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                    {item.status === "error" && item.errorMsg && (
+                      <div className="batch-error-msg">{item.errorMsg}</div>
+                    )}
+                  </div>
+                  <div className="batch-status-icon">
+                    {item.status === "uploading" && <span style={{ color: "#6db07b" }}>⏳</span>}
+                    {item.status === "done" && <span style={{ color: "#16a34a" }}>✓</span>}
+                    {item.status === "error" && <span style={{ color: "#b91c1c" }}>✗</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Footer */}
+            {(() => {
+              const errorCount = batchItems.filter((it) => it.status === "error").length;
+              const allFinished = !batchSaving && batchItems.every((it) => it.status === "done" || it.status === "error");
+              const canSave = !batchSaving && batchItems.every((it) => it.plantId !== "") && batchItems.some((it) => it.status === "pending");
+
+              if (allFinished && errorCount > 0) {
+                return (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div style={{ fontSize: 12, color: "#b91c1c", fontFamily }}>
+                      {errorCount}枚の保存に失敗しました。通信状態を確認して再度お試しください。
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      onClick={() => { setIsBatchModalOpen(false); setBatchItems([]); }}
+                      style={{ padding: "9px 20px", fontSize: 13, fontFamily }}
+                    >
+                      閉じる
+                    </button>
+                  </div>
+                );
+              }
+
+              return (
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={!canSave}
+                  onClick={handleBatchSave}
+                  style={{
+                    width: "100%",
+                    padding: "10px 16px",
+                    fontSize: 14,
+                    fontFamily,
+                    opacity: canSave ? 1 : 0.45,
+                    cursor: canSave ? "pointer" : "not-allowed",
+                  }}
+                >
+                  {batchSaving
+                    ? "保存中…"
+                    : `保存する（${batchItems.filter((it) => it.status === "pending").length}枚）`}
+                </button>
+              );
+            })()}
           </div>
         </div>
       )}
