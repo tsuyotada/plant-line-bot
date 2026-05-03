@@ -20,8 +20,9 @@ function getPlantLabel(plantType: string): string {
   return PLANT_LABEL_MAP[plantType] ?? plantType;
 }
 
-// LINE Quick Reply の上限は13件。12件を植物に使い、残り1件を「次へ」ボタンに確保する
-const PLANT_PAGE_SIZE = 12;
+// LINE Quick Reply 上限13件。前後ナビボタン最大2件を確保し、植物スロットは11件に固定する。
+// これにより「前のみ」「次のみ」「前後両方」どの組み合わせでも合計≤13件を保証できる。
+const PLANT_PAGE_SIZE = 11;
 
 async function fetchActivePlants(supabase: ReturnType<typeof getSupabase>) {
   const { data: raw } = await supabase
@@ -43,29 +44,47 @@ async function fetchActivePlants(supabase: ReturnType<typeof getSupabase>) {
 
 function buildPlantPageItems(plants: any[], pendingId: string, page: number): any[] {
   const start = page * PLANT_PAGE_SIZE;
+  const hasPrev = page > 0;
   const hasMore = plants.length > start + PLANT_PAGE_SIZE;
+  // hasMore=false のとき plants.slice(start) は必ず ≤11 件（数学的保証）
   const pageSlice = hasMore
     ? plants.slice(start, start + PLANT_PAGE_SIZE)
     : plants.slice(start);
 
-  const items = pageSlice.map((plant: any) => ({
-    type: "action",
-    action: {
-      type: "postback",
-      label: getPlantLabel(plant.plant_type).slice(0, 20),
-      data: `action=select_plant&id=${pendingId}&plant_id=${plant.id}`,
-      displayText: getPlantLabel(plant.plant_type),
-    },
-  }));
+  const items: any[] = [];
+
+  if (hasPrev) {
+    items.push({
+      type: "action",
+      action: {
+        type: "postback",
+        label: "前のページを見る",
+        data: `action=more_plants&id=${pendingId}&page=${page - 1}`,
+        displayText: "前のページを見る",
+      },
+    });
+  }
+
+  for (const plant of pageSlice) {
+    items.push({
+      type: "action",
+      action: {
+        type: "postback",
+        label: getPlantLabel(plant.plant_type).slice(0, 20),
+        data: `action=select_plant&id=${pendingId}&plant_id=${plant.id}`,
+        displayText: getPlantLabel(plant.plant_type),
+      },
+    });
+  }
 
   if (hasMore) {
     items.push({
       type: "action",
       action: {
         type: "postback",
-        label: "次の植物を見る",
+        label: "次のページを見る",
         data: `action=more_plants&id=${pendingId}&page=${page + 1}`,
-        displayText: "次の植物を見る",
+        displayText: "次のページを見る",
       },
     });
   }
@@ -214,7 +233,8 @@ async function handlePostback(event: any, lineToken: string) {
 
     const items = buildPlantPageItems(plants, pendingId, 0);
     const totalPages = Math.ceil(plants.length / PLANT_PAGE_SIZE);
-    console.log(`[Plants] page=1/${totalPages} 表示件数=${items.length}`);
+    const hasMoreFirst = plants.length > PLANT_PAGE_SIZE;
+    console.log(`[Plants] page=1/${totalPages} 表示件数=${items.length} 前へ=なし 次へ=${hasMoreFirst}`);
 
     await replyToLine(lineToken, replyToken, [
       {
@@ -249,7 +269,9 @@ async function handlePostback(event: any, lineToken: string) {
     const plants = await fetchActivePlants(supabase);
     const totalPages = Math.ceil(plants.length / PLANT_PAGE_SIZE);
 
-    console.log(`[Plants] more_plants page=${page + 1}/${totalPages} 全件数=${plants.length}`);
+    const hasPrevLog = page > 0;
+    const hasMoreLog = plants.length > page * PLANT_PAGE_SIZE + PLANT_PAGE_SIZE;
+    console.log(`[Plants] more_plants page=${page + 1}/${totalPages} 全件数=${plants.length} 前へ=${hasPrevLog} 次へ=${hasMoreLog}`);
 
     const items = buildPlantPageItems(plants, pendingId, page);
     console.log(`[Plants] page=${page + 1}/${totalPages} 表示件数=${items.length}`);
