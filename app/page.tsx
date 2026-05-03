@@ -651,26 +651,52 @@ export default async function Home() {
                   marginBottom: 14,
                 }}
               >
-                通知を受け取る
+                LINEで通知を受け取る
               </div>
-              <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
-                <div className="qr-placeholder">
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "#93c9a0", letterSpacing: 0.5 }}>
-                    QR
-                  </span>
+
+              {/* QR + ボタン */}
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                <img
+                  src="/images/line-qr.png"
+                  alt="LINE友だち追加QRコード"
+                  style={{ width: 180, height: 180, borderRadius: 10, border: "1px solid #e8e4dc", display: "block" }}
+                />
+                <div style={{ fontSize: 11, color: "#7a8a7a", textAlign: "center", lineHeight: 1.5 }}>
+                  QRを読み取るか、下のリンクから追加できます
                 </div>
-                <div style={{ paddingTop: 2 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#2d4a3e", marginBottom: 5 }}>
-                    通知を受け取る
-                  </div>
-                  <p style={{ fontSize: 12, color: "#7a8a7a", margin: "0 0 10px", lineHeight: 1.65 }}>
-                    Receive plant care notifications.
-                  </p>
-                  <div style={{ fontSize: 11, color: "#c8c0b4", lineHeight: 1.5 }}>
-                    — LINE登録はこちら（準備中）
-                  </div>
-                </div>
+                <a
+                  href="https://line.me/R/ti/p/@100ukedv"
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: "inline-block",
+                    padding: "8px 20px",
+                    background: "#06c755",
+                    color: "#ffffff",
+                    textDecoration: "none",
+                    borderRadius: 8,
+                    fontWeight: 700,
+                    fontSize: 13,
+                  }}
+                >
+                  LINEで友だち追加
+                </a>
               </div>
+
+              {/* 使い方説明 */}
+              <p
+                style={{
+                  fontSize: 11,
+                  color: "#7a8a7a",
+                  margin: 0,
+                  lineHeight: 1.75,
+                  padding: "10px 0 0",
+                  borderTop: "1px solid #f0ebe2",
+                }}
+              >
+                友だち追加後に「登録」と送ると、毎朝の植物通知が届きます🌱<br />
+                停止したいときは「解除」と送ってください。
+              </p>
             </div>
           </div>
           </div>{/* /col-right */}
