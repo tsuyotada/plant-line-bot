@@ -161,6 +161,7 @@ export function PlantColumn({
   const [formPhotoPreview, setFormPhotoPreview] = useState<string | null>(null);
   const [isArchivedOpen, setIsArchivedOpen] = useState(false);
   const [photoMenuOpenId, setPhotoMenuOpenId] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, { current: number; total: number }>>({});
 
   const formRef = useRef<HTMLFormElement>(null);
   const photoInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -197,36 +198,79 @@ export function PlantColumn({
   }
 
   async function handlePhotoChange(plantId: string, e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const allFiles = Array.from(e.target.files ?? []);
+    if (allFiles.length === 0) return;
 
     setUploadErrors((prev) => { const next = { ...prev }; delete next[plantId]; return next; });
-    if (file.size > 5 * 1024 * 1024) {
-      setUploadErrors((prev) => ({ ...prev, [plantId]: "画像サイズが大きすぎます（5MB以内にしてください）" }));
+
+    const oversized = allFiles.filter((f) => f.size > 5 * 1024 * 1024);
+    const files = allFiles.filter((f) => f.size <= 5 * 1024 * 1024);
+
+    if (files.length === 0) {
+      setUploadErrors((prev) => ({ ...prev, [plantId]: `画像サイズが大きすぎます（5MB以内にしてください）` }));
+      e.target.value = "";
       return;
     }
+    if (oversized.length > 0) {
+      setUploadErrors((prev) => ({ ...prev, [plantId]: `${oversized.length}枚は5MBを超えたためスキップします` }));
+    }
 
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const result = ev.target?.result;
-      if (typeof result === "string") setPhotoPreviews((prev) => ({ ...prev, [plantId]: result }));
+    // 最初の1枚をプレビュー表示
+    const firstReader = new FileReader();
+    firstReader.onload = (ev) => {
+      if (typeof ev.target?.result === "string") {
+        setPhotoPreviews((prev) => ({ ...prev, [plantId]: ev.target!.result as string }));
+      }
     };
-    reader.readAsDataURL(file);
+    firstReader.readAsDataURL(files[0]);
 
     setUploadingIds((prev) => ({ ...prev, [plantId]: true }));
-    try {
-      const compressed = await compressImage(file);
-      const fd = new FormData();
-      fd.set("plant_id", plantId);
-      fd.set("photo", new File([compressed], file.name.replace(/\.[^/.]+$/, "") + ".jpg", { type: "image/jpeg" }));
-      const result = await uploadPhotoAction(fd);
-      if (!result.success) {
-        setUploadErrors((prev) => ({ ...prev, [plantId]: result.error ?? "アップロードに失敗しました。" }));
+    setUploadProgress((prev) => ({ ...prev, [plantId]: { current: 0, total: files.length } }));
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      setUploadProgress((prev) => ({ ...prev, [plantId]: { current: i + 1, total: files.length } }));
+
+      // 2枚目以降はプレビューを更新
+      if (i > 0) {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          if (typeof ev.target?.result === "string") {
+            setPhotoPreviews((prev) => ({ ...prev, [plantId]: ev.target!.result as string }));
+          }
+        };
+        reader.readAsDataURL(file);
       }
-    } catch {
+
+      try {
+        const compressed = await compressImage(file);
+        const fd = new FormData();
+        fd.set("plant_id", plantId);
+        fd.set("photo", new File([compressed], file.name.replace(/\.[^/.]+$/, "") + ".jpg", { type: "image/jpeg" }));
+        const result = await uploadPhotoAction(fd);
+        if (result.success) {
+          successCount++;
+        } else {
+          failCount++;
+          console.error(`[Upload] 失敗 file=${file.name}`, result.error);
+        }
+      } catch {
+        failCount++;
+        console.error(`[Upload] 例外 file=${file.name}`);
+      }
+    }
+
+    setUploadingIds((prev) => { const next = { ...prev }; delete next[plantId]; return next; });
+    setUploadProgress((prev) => { const next = { ...prev }; delete next[plantId]; return next; });
+    e.target.value = "";
+
+    if (failCount > 0 && successCount === 0) {
       setUploadErrors((prev) => ({ ...prev, [plantId]: "アップロードに失敗しました。通信状態を確認してください。" }));
-    } finally {
-      setUploadingIds((prev) => { const next = { ...prev }; delete next[plantId]; return next; });
+    } else if (failCount > 0) {
+      setUploadErrors((prev) => ({ ...prev, [plantId]: `${failCount}枚のアップロードに失敗しました（${successCount}枚は成功）` }));
     }
   }
 
@@ -631,7 +675,13 @@ export function PlantColumn({
                           </span>
                         )}
                         {uploadingIds[plant.id] ? (
-                          <div className="photo-upload-loading-hint">アップロード中…</div>
+                          <div className="photo-upload-loading-hint">
+                            {(() => {
+                              const prog = uploadProgress[plant.id];
+                              if (prog && prog.total > 1) return `${prog.current}/${prog.total}枚 アップロード中…`;
+                              return "アップロード中…";
+                            })()}
+                          </div>
                         ) : displayPhoto ? (
                           <div className="photo-hover-hint">クリックして拡大</div>
                         ) : null}
@@ -662,6 +712,7 @@ export function PlantColumn({
                         ref={(el) => { photoLibraryInputRefs.current[plant.id] = el; }}
                         type="file"
                         accept="image/*"
+                        multiple
                         style={{ display: "none" }}
                         onChange={(e) => handlePhotoChange(plant.id, e)}
                       />
