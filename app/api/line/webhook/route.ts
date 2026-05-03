@@ -20,6 +20,59 @@ function getPlantLabel(plantType: string): string {
   return PLANT_LABEL_MAP[plantType] ?? plantType;
 }
 
+// LINE Quick Reply の上限は13件。12件を植物に使い、残り1件を「次へ」ボタンに確保する
+const PLANT_PAGE_SIZE = 12;
+
+async function fetchActivePlants(supabase: ReturnType<typeof getSupabase>) {
+  const { data: raw } = await supabase
+    .from("plants")
+    .select("id, plant_type, sort_order")
+    .is("archived_at", null)
+    .order("created_at", { ascending: true });
+
+  // Webアプリと同じ並び順（sort_order優先、nullは末尾）
+  return (raw ?? []).sort((a: any, b: any) => {
+    const aOrd: number | null = a.sort_order ?? null;
+    const bOrd: number | null = b.sort_order ?? null;
+    if (aOrd !== null && bOrd !== null) return aOrd - bOrd;
+    if (aOrd !== null) return -1;
+    if (bOrd !== null) return 1;
+    return 0;
+  });
+}
+
+function buildPlantPageItems(plants: any[], pendingId: string, page: number): any[] {
+  const start = page * PLANT_PAGE_SIZE;
+  const hasMore = plants.length > start + PLANT_PAGE_SIZE;
+  const pageSlice = hasMore
+    ? plants.slice(start, start + PLANT_PAGE_SIZE)
+    : plants.slice(start);
+
+  const items = pageSlice.map((plant: any) => ({
+    type: "action",
+    action: {
+      type: "postback",
+      label: getPlantLabel(plant.plant_type).slice(0, 20),
+      data: `action=select_plant&id=${pendingId}&plant_id=${plant.id}`,
+      displayText: getPlantLabel(plant.plant_type),
+    },
+  }));
+
+  if (hasMore) {
+    items.push({
+      type: "action",
+      action: {
+        type: "postback",
+        label: "次の植物を見る",
+        data: `action=more_plants&id=${pendingId}&page=${page + 1}`,
+        displayText: "次の植物を見る",
+      },
+    });
+  }
+
+  return items;
+}
+
 function getSupabase() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -145,12 +198,11 @@ async function handlePostback(event: any, lineToken: string) {
       .update({ status: "selecting_plant" })
       .eq("id", pendingId);
 
-    const { data: plants } = await supabase
-      .from("plants")
-      .select("id, plant_type")
-      .order("created_at", { ascending: false });
+    const plants = await fetchActivePlants(supabase);
 
-    if (!plants || plants.length === 0) {
+    console.log(`[Plants] 取得件数=${plants.length} 候補: ${plants.map((p: any) => getPlantLabel(p.plant_type)).join(", ")}`);
+
+    if (plants.length === 0) {
       await replyToLine(lineToken, replyToken, [
         {
           type: "text",
@@ -160,15 +212,9 @@ async function handlePostback(event: any, lineToken: string) {
       return;
     }
 
-    const items = plants.slice(0, 13).map((plant: any) => ({
-      type: "action",
-      action: {
-        type: "postback",
-        label: getPlantLabel(plant.plant_type).slice(0, 20),
-        data: `action=select_plant&id=${pendingId}&plant_id=${plant.id}`,
-        displayText: getPlantLabel(plant.plant_type),
-      },
-    }));
+    const items = buildPlantPageItems(plants, pendingId, 0);
+    const totalPages = Math.ceil(plants.length / PLANT_PAGE_SIZE);
+    console.log(`[Plants] page=1/${totalPages} 表示件数=${items.length}`);
 
     await replyToLine(lineToken, replyToken, [
       {
@@ -191,6 +237,28 @@ async function handlePostback(event: any, lineToken: string) {
       {
         type: "text",
         text: "今回はアドバイスを行いませんでした。\n必要なときは、また写真を送ってください🌱",
+      },
+    ]);
+    return;
+  }
+
+  // ── 「次の植物を見る」が押された → 次ページを Quick Reply で表示 ──
+  if (action === "more_plants" && pendingId) {
+    const page = parseInt(params.get("page") ?? "1", 10);
+
+    const plants = await fetchActivePlants(supabase);
+    const totalPages = Math.ceil(plants.length / PLANT_PAGE_SIZE);
+
+    console.log(`[Plants] more_plants page=${page + 1}/${totalPages} 全件数=${plants.length}`);
+
+    const items = buildPlantPageItems(plants, pendingId, page);
+    console.log(`[Plants] page=${page + 1}/${totalPages} 表示件数=${items.length}`);
+
+    await replyToLine(lineToken, replyToken, [
+      {
+        type: "text",
+        text: `どの植物の写真として追加しますか？（${page + 1}ページ目）`,
+        quickReply: { items },
       },
     ]);
     return;
@@ -258,6 +326,7 @@ async function handlePostback(event: any, lineToken: string) {
       .single();
 
     const plantName = plant ? getPlantLabel(plant.plant_type) : "植物";
+    console.log(`[Plants] ユーザー選択 plant_id=${plantId} plantName=${plantName}`);
 
     // 登録完了を reply token で即返信
     await replyToLine(lineToken, replyToken, [
