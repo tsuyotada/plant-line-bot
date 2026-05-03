@@ -1067,10 +1067,37 @@ export async function POST(req: Request) {
 
     // ── コマンド：通知テスト ────────────────────────────────────────
     if (userMessage === "通知テスト") {
+      const { data: regRecord } = await supabase
+        .from("line_notification_users")
+        .select("is_active")
+        .eq("line_user_id", lineUserId)
+        .maybeSingle();
+      const isRegistered = regRecord?.is_active === true;
+      console.log(`[LINE] notification test requested userId=${lineUserId} registered=${isRegistered}`);
+
       const { message } = await buildDailyNotificationMessage();
-      await replyToLine(lineToken, replyToken, [
-        { type: "text", text: `📋 通知テスト：\n\n${message}` },
-      ]);
+
+      if (isRegistered) {
+        await replyToLine(lineToken, replyToken, [
+          { type: "text", text: `📋 通知テスト：\n\n${message}` },
+        ]);
+      } else {
+        await replyToLine(lineToken, replyToken, [
+          { type: "text", text: `📋 通知テスト：\n\n${message}` },
+          {
+            type: "text",
+            text: "いかがでしょうか？\nこのようなメッセージが毎朝届くようになります。\n\nよければ登録してみてください👇",
+            quickReply: {
+              items: [
+                {
+                  type: "action",
+                  action: { type: "message", label: "登録する", text: "登録" },
+                },
+              ],
+            },
+          },
+        ]);
+      }
       return NextResponse.json({ ok: true });
     }
 
