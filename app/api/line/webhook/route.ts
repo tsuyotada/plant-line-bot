@@ -25,6 +25,7 @@ function getPlantLabel(plantType: string): string {
 // LINE Quick Reply 上限13件。前後ナビボタン最大2件を確保し、植物スロットは11件に固定する。
 // これにより「前のみ」「次のみ」「前後両方」どの組み合わせでも合計≤13件を保証できる。
 const PLANT_PAGE_SIZE = 11;
+const CONFIDENCE_THRESHOLD = 0.6;
 
 async function fetchActivePlants(supabase: ReturnType<typeof getSupabase>) {
   const { data: raw } = await supabase
@@ -154,6 +155,50 @@ function buildBatchPlantPageItems(plants: any[], batchSessionId: string, page: n
         type: "postback",
         label: "次のページを見る",
         data: `action=more_plants_batch&batch_id=${batchSessionId}&page=${page + 1}`,
+        displayText: "次のページを見る",
+      },
+    });
+  }
+  return items;
+}
+
+// ── 不確定写真用 Quick Reply アイテム生成 ────────────────────────
+function buildUncertainPlantPageItems(plants: any[], batchSessionId: string, pendingPhotoId: string, page: number): any[] {
+  const start = page * PLANT_PAGE_SIZE;
+  const hasPrev = page > 0;
+  const hasMore = plants.length > start + PLANT_PAGE_SIZE;
+  const pageSlice = hasMore ? plants.slice(start, start + PLANT_PAGE_SIZE) : plants.slice(start);
+  const items: any[] = [];
+
+  if (hasPrev) {
+    items.push({
+      type: "action",
+      action: {
+        type: "postback",
+        label: "前のページを見る",
+        data: `action=more_plants_uncertain&batch_id=${batchSessionId}&photo_id=${pendingPhotoId}&page=${page - 1}`,
+        displayText: "前のページを見る",
+      },
+    });
+  }
+  for (const plant of pageSlice) {
+    items.push({
+      type: "action",
+      action: {
+        type: "postback",
+        label: getPlantLabel(plant.plant_type).slice(0, 20),
+        data: `action=select_plant_uncertain&batch_id=${batchSessionId}&photo_id=${pendingPhotoId}&plant_id=${plant.id}`,
+        displayText: getPlantLabel(plant.plant_type),
+      },
+    });
+  }
+  if (hasMore) {
+    items.push({
+      type: "action",
+      action: {
+        type: "postback",
+        label: "次のページを見る",
+        data: `action=more_plants_uncertain&batch_id=${batchSessionId}&photo_id=${pendingPhotoId}&page=${page + 1}`,
         displayText: "次のページを見る",
       },
     });
@@ -418,8 +463,6 @@ async function handleImageMessage(event: any, lineToken: string) {
 
   console.log(`[AI] 識別結果: matchedPlantId=${aiResult?.matchedPlantId ?? "null"} matchedPlantName=${aiResult?.matchedPlantName ?? "null"} confidence=${aiResult?.confidence ?? "null"} reason=${aiResult?.reason ?? ""}`);
 
-  const CONFIDENCE_THRESHOLD = 0.6;
-
   if (aiResult && aiResult.confidence >= CONFIDENCE_THRESHOLD) {
     // AI が信頼度高く推定できた → ユーザーに確認
     await replyToLine(lineToken, replyToken, [
@@ -644,6 +687,93 @@ async function handlePostback(event: any, lineToken: string) {
     ]);
     return;
   }
+
+  // ── 不確定写真：植物を選んで保存 → 次の要確認写真へ ───────────
+  if (action === "select_plant_uncertain") {
+    const photoId = params.get("photo_id");
+    const lineUserId: string = event.source?.userId ?? "";
+    if (!batchSessionId || !photoId || !plantId) return;
+
+    const { data: photo } = await supabase.from("pending_line_photos").select().eq("id", photoId).single();
+    if (!photo) {
+      await replyToLine(lineToken, replyToken, [{ type: "text", text: "写真が見つかりませんでした🌱" }]);
+      return;
+    }
+
+    const { data: urlData } = supabase.storage.from("plant-photos").getPublicUrl(photo.storage_path);
+    const { error: insertError } = await supabase.from("plant_photos").insert({
+      plant_id: plantId,
+      image_url: urlData.publicUrl,
+      storage_path: photo.storage_path,
+      taken_at: new Date().toISOString(),
+    });
+    if (insertError) {
+      console.error(`[Uncertain] plant_photos insert失敗 photo=${photoId}`, insertError);
+      await replyToLine(lineToken, replyToken, [{ type: "text", text: "保存に失敗しました。もう一度お試しください🌱" }]);
+      return;
+    }
+    await supabase.from("pending_line_photos").update({ status: "completed" }).eq("id", photoId);
+    revalidatePath("/");
+
+    const { data: plantData } = await supabase.from("plants").select("plant_type").eq("id", plantId).single();
+    const plantName = plantData ? getPlantLabel(plantData.plant_type) : "植物";
+    console.log(`[Uncertain] 保存完了 photo=${photoId} plant=${plantName}`);
+
+    // 次の要確認写真を取得
+    const { data: nextPhotos } = await supabase
+      .from("pending_line_photos")
+      .select()
+      .eq("batch_session_id", batchSessionId)
+      .eq("status", "needs_selection")
+      .order("created_at", { ascending: true })
+      .limit(1);
+
+    if (!nextPhotos || nextPhotos.length === 0) {
+      await supabase.from("line_batch_sessions").update({ status: "completed" }).eq("id", batchSessionId);
+      await replyToLine(lineToken, replyToken, [
+        { type: "text", text: `${plantName}として保存しました✅\nすべての写真の登録が完了しました🌱` },
+      ]);
+      return;
+    }
+
+    const nextPhoto = nextPhotos[0];
+    const { data: nextUrlData } = supabase.storage.from("plant-photos").getPublicUrl(nextPhoto.storage_path);
+    const { count: remainCount } = await supabase
+      .from("pending_line_photos")
+      .select("*", { count: "exact", head: true })
+      .eq("batch_session_id", batchSessionId)
+      .eq("status", "needs_selection");
+
+    const plants = await fetchActivePlants(supabase);
+    const items = buildUncertainPlantPageItems(plants, batchSessionId, nextPhoto.id, 0);
+
+    await replyToLine(lineToken, replyToken, [
+      { type: "text", text: `${plantName}として保存しました✅` },
+      { type: "image", originalContentUrl: nextUrlData.publicUrl, previewImageUrl: nextUrlData.publicUrl },
+      { type: "text", text: `次の写真（残り${remainCount ?? "?"}枚）\nどの植物ですか？`, quickReply: { items } },
+    ]);
+    return;
+  }
+
+  // ── 不確定写真：植物選択のページング ────────────────────────────
+  if (action === "more_plants_uncertain") {
+    const photoId = params.get("photo_id");
+    if (!batchSessionId || !photoId) return;
+    const page = parseInt(params.get("page") ?? "0", 10);
+
+    const plants = await fetchActivePlants(supabase);
+    const items = buildUncertainPlantPageItems(plants, batchSessionId, photoId, page);
+
+    const { data: photo } = await supabase.from("pending_line_photos").select().eq("id", photoId).single();
+    const msgs: any[] = [];
+    if (photo) {
+      const { data: photoUrlData } = supabase.storage.from("plant-photos").getPublicUrl(photo.storage_path);
+      msgs.push({ type: "image", originalContentUrl: photoUrlData.publicUrl, previewImageUrl: photoUrlData.publicUrl });
+    }
+    msgs.push({ type: "text", text: `植物を選んでください（${page + 1}ページ目）`, quickReply: { items } });
+    await replyToLine(lineToken, replyToken, msgs);
+    return;
+  }
 }
 
 export async function POST(req: Request) {
@@ -715,17 +845,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    // ── コマンド：完了（バッチ → 植物選択へ） ───────────────────────
+    // ── コマンド：完了（AI識別 → 自動保存 or 要確認） ────────────────
     if (userMessage === "完了") {
       const batchSession = await getActiveBatchSession(supabase, lineUserId);
       if (batchSession) {
-        const { data: batchPhotos, count } = await supabase
+        const { data: batchPhotos } = await supabase
           .from("pending_line_photos")
-          .select("id", { count: "exact" })
+          .select("*")
           .eq("batch_session_id", batchSession.id)
-          .eq("status", "batching");
+          .eq("status", "batching")
+          .order("created_at", { ascending: true });
 
-        if (!batchPhotos || (count ?? 0) === 0) {
+        if (!batchPhotos || batchPhotos.length === 0) {
           await replyToLine(lineToken, replyToken, [
             { type: "text", text: "写真が届いていません📷\n写真を送ってから「完了」と送ってください。" },
           ]);
@@ -735,14 +866,74 @@ export async function POST(req: Request) {
         await supabase.from("line_batch_sessions").update({ status: "selecting_plant" }).eq("id", batchSession.id);
 
         const plants = await fetchActivePlants(supabase);
-        const items = buildBatchPlantPageItems(plants, batchSession.id, 0);
-        console.log(`[Batch] 植物選択へ batchId=${batchSession.id} count=${count}`);
+        const plantsForAI = plants.map((p: any) => ({
+          id: p.id,
+          name: getPlantLabel(p.plant_type),
+          species: p.species ?? null,
+          memo: p.memo ?? null,
+        }));
+
+        // AI で各写真を識別 → 自信あり=自動保存 / 自信なし=要確認キュー
+        const autoSavedNames: string[] = [];
+        const uncertainPhotoIds: string[] = [];
+
+        for (const photo of batchPhotos) {
+          const { data: urlData } = supabase.storage.from("plant-photos").getPublicUrl(photo.storage_path);
+          const aiResult = await identifyPlantFromPhoto({ imageUrl: urlData.publicUrl, plants: plantsForAI });
+          console.log(`[Batch/AI] photo=${photo.id} confidence=${aiResult?.confidence ?? "null"} plant=${aiResult?.matchedPlantName ?? "null"}`);
+
+          if (aiResult && aiResult.confidence >= CONFIDENCE_THRESHOLD) {
+            const { error: insertError } = await supabase.from("plant_photos").insert({
+              plant_id: aiResult.matchedPlantId,
+              image_url: urlData.publicUrl,
+              storage_path: photo.storage_path,
+              taken_at: new Date().toISOString(),
+            });
+            if (!insertError) {
+              await supabase.from("pending_line_photos").update({ status: "completed" }).eq("id", photo.id);
+              autoSavedNames.push(aiResult.matchedPlantName);
+            } else {
+              console.error(`[Batch/AI] 自動保存失敗 photo=${photo.id}`, insertError);
+              await supabase.from("pending_line_photos").update({ status: "needs_selection" }).eq("id", photo.id);
+              uncertainPhotoIds.push(photo.id);
+            }
+          } else {
+            await supabase.from("pending_line_photos").update({ status: "needs_selection" }).eq("id", photo.id);
+            uncertainPhotoIds.push(photo.id);
+          }
+        }
+
+        revalidatePath("/");
+        console.log(`[Batch/AI] 自動保存=${autoSavedNames.length}枚 要確認=${uncertainPhotoIds.length}枚`);
+
+        if (uncertainPhotoIds.length === 0) {
+          await supabase.from("line_batch_sessions").update({ status: "completed" }).eq("id", batchSession.id);
+          await replyToLine(lineToken, replyToken, [
+            { type: "text", text: `${batchPhotos.length}枚すべてAIが自動で保存しました🌱\n（${autoSavedNames.join("、")}）` },
+          ]);
+          return NextResponse.json({ ok: true });
+        }
+
+        // 要確認写真を1枚ずつ表示
+        const { data: firstUncertainData } = await supabase
+          .from("pending_line_photos")
+          .select()
+          .eq("id", uncertainPhotoIds[0])
+          .single();
+
+        if (!firstUncertainData) {
+          await replyToLine(lineToken, replyToken, [{ type: "text", text: "エラーが発生しました🌱" }]);
+          return NextResponse.json({ ok: true });
+        }
+
+        const { data: firstUrlData } = supabase.storage.from("plant-photos").getPublicUrl(firstUncertainData.storage_path);
+        const items = buildUncertainPlantPageItems(plants, batchSession.id, firstUncertainData.id, 0);
+        const autoMsg = autoSavedNames.length > 0 ? `${autoSavedNames.length}枚はAIが自動で保存しました🌱\n` : "";
+
         await replyToLine(lineToken, replyToken, [
-          {
-            type: "text",
-            text: `${count}枚の写真を受け取りました🌱\nどの植物として保存しますか？`,
-            quickReply: { items },
-          },
+          { type: "text", text: `${autoMsg}${uncertainPhotoIds.length}枚の植物を確認してください。` },
+          { type: "image", originalContentUrl: firstUrlData.publicUrl, previewImageUrl: firstUrlData.publicUrl },
+          { type: "text", text: `1枚目（全${uncertainPhotoIds.length}枚）\nどの植物ですか？`, quickReply: { items } },
         ]);
         return NextResponse.json({ ok: true });
       }
