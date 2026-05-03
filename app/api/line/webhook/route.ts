@@ -101,6 +101,134 @@ function getSupabase() {
   );
 }
 
+// ── バッチセッション取得 ──────────────────────────────────────────
+async function getActiveBatchSession(
+  supabase: ReturnType<typeof getSupabase>,
+  lineUserId: string
+) {
+  const { data } = await supabase
+    .from("line_batch_sessions")
+    .select("id")
+    .eq("line_user_id", lineUserId)
+    .eq("status", "active")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data ?? null;
+}
+
+// ── バッチ用 Quick Reply アイテム生成 ─────────────────────────────
+function buildBatchPlantPageItems(plants: any[], batchSessionId: string, page: number): any[] {
+  const start = page * PLANT_PAGE_SIZE;
+  const hasPrev = page > 0;
+  const hasMore = plants.length > start + PLANT_PAGE_SIZE;
+  const pageSlice = hasMore ? plants.slice(start, start + PLANT_PAGE_SIZE) : plants.slice(start);
+  const items: any[] = [];
+
+  if (hasPrev) {
+    items.push({
+      type: "action",
+      action: {
+        type: "postback",
+        label: "前のページを見る",
+        data: `action=more_plants_batch&batch_id=${batchSessionId}&page=${page - 1}`,
+        displayText: "前のページを見る",
+      },
+    });
+  }
+  for (const plant of pageSlice) {
+    items.push({
+      type: "action",
+      action: {
+        type: "postback",
+        label: getPlantLabel(plant.plant_type).slice(0, 20),
+        data: `action=select_plant_batch&batch_id=${batchSessionId}&plant_id=${plant.id}`,
+        displayText: getPlantLabel(plant.plant_type),
+      },
+    });
+  }
+  if (hasMore) {
+    items.push({
+      type: "action",
+      action: {
+        type: "postback",
+        label: "次のページを見る",
+        data: `action=more_plants_batch&batch_id=${batchSessionId}&page=${page + 1}`,
+        displayText: "次のページを見る",
+      },
+    });
+  }
+  return items;
+}
+
+// ── バッチ写真を一括保存し AIアドバイスを送信 ──────────────────────
+async function saveBatchPhotosAndAdvise(
+  supabase: ReturnType<typeof getSupabase>,
+  lineToken: string,
+  replyToken: string,
+  lineUserId: string,
+  batchSessionId: string,
+  plantId: string
+): Promise<void> {
+  const { data: batchPhotos } = await supabase
+    .from("pending_line_photos")
+    .select()
+    .eq("batch_session_id", batchSessionId)
+    .eq("status", "batching");
+
+  if (!batchPhotos || batchPhotos.length === 0) {
+    await replyToLine(lineToken, replyToken, [
+      { type: "text", text: "写真が見つかりませんでした。もう一度お試しください🌱" },
+    ]);
+    return;
+  }
+
+  const insertData = batchPhotos.map((photo: any) => ({
+    plant_id: plantId,
+    image_url: supabase.storage.from("plant-photos").getPublicUrl(photo.storage_path).data.publicUrl,
+    storage_path: photo.storage_path,
+    taken_at: new Date().toISOString(),
+  }));
+
+  const { error: insertError } = await supabase.from("plant_photos").insert(insertData);
+  if (insertError) {
+    console.error(`[Batch] plant_photos insert失敗`, insertError);
+    await replyToLine(lineToken, replyToken, [
+      { type: "text", text: "写真の保存に失敗しました。もう一度お試しください🌱" },
+    ]);
+    return;
+  }
+
+  await supabase.from("pending_line_photos").update({ status: "completed" }).eq("batch_session_id", batchSessionId);
+  await supabase.from("line_batch_sessions").update({ status: "completed" }).eq("id", batchSessionId);
+  revalidatePath("/");
+  console.log(`[Batch] ${batchPhotos.length}枚保存完了 plant_id=${plantId}`);
+
+  const { data: plant } = await supabase
+    .from("plants")
+    .select("plant_type, initial_state_type, initial_state_note")
+    .eq("id", plantId)
+    .single();
+  const plantName = plant ? getPlantLabel(plant.plant_type) : "植物";
+
+  await replyToLine(lineToken, replyToken, [
+    { type: "text", text: `${plantName}の写真${batchPhotos.length}枚を保存しました🌱\n少しお待ちください…` },
+  ]);
+
+  // 1枚目の画像でAIアドバイス
+  const firstPhoto = batchPhotos[0];
+  const { data: urlData } = supabase.storage.from("plant-photos").getPublicUrl(firstPhoto.storage_path);
+  const advice = await generatePhotoAdvice({
+    imageUrl: urlData.publicUrl,
+    plantName,
+    initialStateType: plant?.initial_state_type ?? null,
+    initialStateNote: plant?.initial_state_note ?? null,
+  });
+  if (advice && lineUserId) {
+    await pushToLine(lineToken, lineUserId, [{ type: "text", text: advice }]);
+  }
+}
+
 // 植物写真を plant_photos に保存し、AIアドバイスを push 送信する共通処理
 async function savePlantPhotoAndAdvise(
   supabase: ReturnType<typeof getSupabase>,
@@ -242,7 +370,29 @@ async function handleImageMessage(event: any, lineToken: string) {
 
   console.log(`[DB] pending_line_photos insert成功 id=${pending.id} storagePath=${storagePath}`);
 
-  // 4. AI で植物を推定 → 確認メッセージ送信
+  // 4. バッチモード確認 → アクティブなら一時蓄積して返す
+  const batchSession = await getActiveBatchSession(supabase, lineUserId);
+  if (batchSession) {
+    await supabase
+      .from("pending_line_photos")
+      .update({ batch_session_id: batchSession.id, status: "batching" })
+      .eq("id", pending.id);
+
+    const { count } = await supabase
+      .from("pending_line_photos")
+      .select("*", { count: "exact", head: true })
+      .eq("batch_session_id", batchSession.id)
+      .eq("status", "batching");
+
+    const photoCount = count ?? 1;
+    console.log(`[Batch] 蓄積 userId=${lineUserId} batchId=${batchSession.id} count=${photoCount}`);
+    await replyToLine(lineToken, replyToken, [
+      { type: "text", text: `${photoCount}枚目を受け取りました📷\n続けて送るか、「完了」で植物を選んでください。` },
+    ]);
+    return;
+  }
+
+  // 5. AI で植物を推定 → 確認メッセージ送信
   const plants = await fetchActivePlants(supabase);
 
   if (plants.length === 0) {
@@ -340,6 +490,7 @@ async function handlePostback(event: any, lineToken: string) {
   const action = params.get("action");
   const pendingId = params.get("id");
   const plantId = params.get("plant_id");
+  const batchSessionId = params.get("batch_id");
 
   // ── 「追加する」が押された → 植物一覧を Quick Reply で表示 ──
   if (action === "confirm_photo" && pendingId) {
@@ -468,6 +619,30 @@ async function handlePostback(event: any, lineToken: string) {
     const lineUserId: string = event.source?.userId ?? "";
     console.log(`[DB] plant_id=${plantId} pendingId=${pendingId}`);
     await savePlantPhotoAndAdvise(supabase, lineToken, replyToken, lineUserId, pendingId, plantId);
+    return;
+  }
+
+  // ── バッチ：植物が選ばれた → 全枚数を一括保存 ──────────────────
+  if (action === "select_plant_batch" && batchSessionId && plantId) {
+    const lineUserId: string = event.source?.userId ?? "";
+    console.log(`[Batch] 植物選択 batchId=${batchSessionId} plant_id=${plantId}`);
+    await saveBatchPhotosAndAdvise(supabase, lineToken, replyToken, lineUserId, batchSessionId, plantId);
+    return;
+  }
+
+  // ── バッチ：植物選択のページング ───────────────────────────────
+  if (action === "more_plants_batch" && batchSessionId) {
+    const page = parseInt(params.get("page") ?? "0", 10);
+    const plants = await fetchActivePlants(supabase);
+    const items = buildBatchPlantPageItems(plants, batchSessionId, page);
+    await replyToLine(lineToken, replyToken, [
+      {
+        type: "text",
+        text: `どの植物として保存しますか？（${page + 1}ページ目）`,
+        quickReply: { items },
+      },
+    ]);
+    return;
   }
 }
 
@@ -512,6 +687,82 @@ export async function POST(req: Request) {
     const replyToken: string = event.replyToken;
     const lineUserId: string = event.source?.userId ?? "";
     const supabase = getSupabase();
+
+    // ── コマンド：まとめて（バッチ開始） ───────────────────────────
+    if (userMessage === "まとめて" || userMessage === "複数枚") {
+      // 古いアクティブセッションがあればキャンセル
+      const { data: oldSessions } = await supabase
+        .from("line_batch_sessions")
+        .select("id")
+        .eq("line_user_id", lineUserId)
+        .eq("status", "active");
+
+      if (oldSessions && oldSessions.length > 0) {
+        const oldIds = oldSessions.map((s: any) => s.id);
+        await supabase.from("line_batch_sessions").update({ status: "canceled" }).in("id", oldIds);
+        await supabase.from("pending_line_photos").update({ status: "canceled" }).in("batch_session_id", oldIds);
+        console.log(`[Batch] 古いセッション${oldIds.length}件をキャンセル userId=${lineUserId}`);
+      }
+
+      await supabase.from("line_batch_sessions").insert({ line_user_id: lineUserId });
+      console.log(`[Batch] セッション開始 userId=${lineUserId}`);
+      await replyToLine(lineToken, replyToken, [
+        {
+          type: "text",
+          text: "複数枚モードを開始しました📷\n写真を何枚でも送ってください。\n送り終わったら「完了」と送ると植物を選んで一括保存できます。\n（中止するには「キャンセル」と送ってください）",
+        },
+      ]);
+      return NextResponse.json({ ok: true });
+    }
+
+    // ── コマンド：完了（バッチ → 植物選択へ） ───────────────────────
+    if (userMessage === "完了") {
+      const batchSession = await getActiveBatchSession(supabase, lineUserId);
+      if (batchSession) {
+        const { data: batchPhotos, count } = await supabase
+          .from("pending_line_photos")
+          .select("id", { count: "exact" })
+          .eq("batch_session_id", batchSession.id)
+          .eq("status", "batching");
+
+        if (!batchPhotos || (count ?? 0) === 0) {
+          await replyToLine(lineToken, replyToken, [
+            { type: "text", text: "写真が届いていません📷\n写真を送ってから「完了」と送ってください。" },
+          ]);
+          return NextResponse.json({ ok: true });
+        }
+
+        await supabase.from("line_batch_sessions").update({ status: "selecting_plant" }).eq("id", batchSession.id);
+
+        const plants = await fetchActivePlants(supabase);
+        const items = buildBatchPlantPageItems(plants, batchSession.id, 0);
+        console.log(`[Batch] 植物選択へ batchId=${batchSession.id} count=${count}`);
+        await replyToLine(lineToken, replyToken, [
+          {
+            type: "text",
+            text: `${count}枚の写真を受け取りました🌱\nどの植物として保存しますか？`,
+            quickReply: { items },
+          },
+        ]);
+        return NextResponse.json({ ok: true });
+      }
+      // バッチ中でなければ AI チャットへ流す
+    }
+
+    // ── コマンド：キャンセル（バッチ破棄） ──────────────────────────
+    if (userMessage === "キャンセル") {
+      const batchSession = await getActiveBatchSession(supabase, lineUserId);
+      if (batchSession) {
+        await supabase.from("line_batch_sessions").update({ status: "canceled" }).eq("id", batchSession.id);
+        await supabase.from("pending_line_photos").update({ status: "canceled" }).eq("batch_session_id", batchSession.id);
+        console.log(`[Batch] キャンセル batchId=${batchSession.id} userId=${lineUserId}`);
+        await replyToLine(lineToken, replyToken, [
+          { type: "text", text: "複数枚モードをキャンセルしました🌿\nまた写真を送るときは「まとめて」と送ってください。" },
+        ]);
+        return NextResponse.json({ ok: true });
+      }
+      // バッチ中でなければ AI チャットへ流す
+    }
 
     // ── コマンド：登録 ──────────────────────────────────────────────
     if (userMessage === "登録") {
