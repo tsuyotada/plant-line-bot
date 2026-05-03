@@ -4,6 +4,20 @@ import { useEffect, useRef, useState } from "react";
 
 const STORAGE_KEY = "gc-bg-image";
 
+const DEFAULT_BG_LIST = [
+  "/images/bg-1.jpg.jpg",
+  "/images/bg-2.jpg.jpg",
+  "/images/bg-3.jpg.jpg",
+  "/images/bg-4.jpg.jpg",
+  "/images/bg-5.jpg.jpg",
+  "/images/bg-6.jpg.jpg",
+  "/images/bg-7.jpg.jpg",
+  "/images/bg-8.jpg.jpg",
+  "/images/bg-9.jpg.jpg",
+  "/images/bg-10.jpg.jpg",
+  "/images/bg-11.jpg.jpg",
+];
+
 const fontFamily =
   'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 
@@ -25,11 +39,12 @@ export function BackgroundLayer() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    const randomDefault = DEFAULT_BG_LIST[Math.floor(Math.random() * DEFAULT_BG_LIST.length)];
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) setBgImage(stored);
+      setBgImage(stored ?? randomDefault);
     } catch {
-      // localStorage unavailable
+      setBgImage(randomDefault);
     }
   }, []);
 
