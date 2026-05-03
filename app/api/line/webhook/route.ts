@@ -353,6 +353,37 @@ async function savePlantPhotoAndAdvise(
   }
 }
 
+// ── 友だち追加時のウェルカムメッセージ ──────────────────────────
+async function handleFollowEvent(event: any, lineToken: string) {
+  const lineUserId: string = event.source?.userId ?? "unknown";
+  const replyToken: string = event.replyToken;
+  console.log(`[LINE] follow event received userId=${lineUserId}`);
+
+  await replyToLine(lineToken, replyToken, [
+    {
+      type: "text",
+      text: "こんにちは🌱\n植物の見守りBotです。\n\nこのBotでは、毎朝のケア通知や写真記録ができます。\n\nまずは下のボタンから登録してください。\n登録すると、毎朝の植物通知が届くようになります。\n\n写真を送ると、そのまま記録とアドバイスもできます📸\n\nやめたいときは『解除』と送ればOKです",
+      quickReply: {
+        items: [
+          {
+            type: "action",
+            action: { type: "message", label: "登録する", text: "登録" },
+          },
+          {
+            type: "action",
+            action: { type: "message", label: "通知テスト", text: "通知テスト" },
+          },
+          {
+            type: "action",
+            action: { type: "message", label: "使い方を見る", text: "通知" },
+          },
+        ],
+      },
+    },
+  ]);
+  console.log(`[LINE] welcome message sent userId=${lineUserId}`);
+}
+
 async function handleImageMessage(event: any, lineToken: string) {
   const supabase = getSupabase();
   const lineUserId: string = event.source?.userId ?? "unknown";
@@ -796,6 +827,12 @@ export async function POST(req: Request) {
 
     const event = events[0];
 
+    // フォロー（友だち追加）
+    if (event.type === "follow") {
+      await handleFollowEvent(event, lineToken);
+      return NextResponse.json({ ok: true });
+    }
+
     // 画像メッセージ
     if (event.type === "message" && event.message?.type === "image") {
       await handleImageMessage(event, lineToken);
@@ -974,8 +1011,20 @@ export async function POST(req: Request) {
           .insert({ line_user_id: lineUserId, is_active: true });
       }
       console.log(`[通知登録] userId=${lineUserId} 登録完了`);
+      console.log(`[LINE] register quick reply sent userId=${lineUserId}`);
       await replyToLine(lineToken, replyToken, [
-        { type: "text", text: "毎朝の植物通知を登録しました🌱\n毎朝お知らせします！" },
+        {
+          type: "text",
+          text: "登録しました🌱\n明日から毎朝の植物通知が届きます。\n\n今すぐ試したい場合は、下の『通知テスト』を押してください。",
+          quickReply: {
+            items: [
+              {
+                type: "action",
+                action: { type: "message", label: "通知テスト", text: "通知テスト" },
+              },
+            ],
+          },
+        },
       ]);
       return NextResponse.json({ ok: true });
     }
@@ -989,6 +1038,29 @@ export async function POST(req: Request) {
       console.log(`[通知登録] userId=${lineUserId} 解除完了`);
       await replyToLine(lineToken, replyToken, [
         { type: "text", text: "毎朝の植物通知を停止しました🌿\n再開したい場合は「登録」と送ってください。" },
+      ]);
+      return NextResponse.json({ ok: true });
+    }
+
+    // ── コマンド：通知（使い方案内） ──────────────────────────────────
+    if (userMessage === "通知") {
+      await replyToLine(lineToken, replyToken, [
+        {
+          type: "text",
+          text: "毎朝、植物のケアが必要かどうかをお知らせします🌱\n\n登録すると毎朝通知が届くようになります。\nやめたいときは「解除」と送ってください。",
+          quickReply: {
+            items: [
+              {
+                type: "action",
+                action: { type: "message", label: "登録する", text: "登録" },
+              },
+              {
+                type: "action",
+                action: { type: "message", label: "通知テスト", text: "通知テスト" },
+              },
+            ],
+          },
+        },
       ]);
       return NextResponse.json({ ok: true });
     }
