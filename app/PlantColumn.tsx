@@ -160,10 +160,19 @@ export function PlantColumn({
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [formPhotoPreview, setFormPhotoPreview] = useState<string | null>(null);
   const [isArchivedOpen, setIsArchivedOpen] = useState(false);
+  const [photoMenuOpenId, setPhotoMenuOpenId] = useState<string | null>(null);
 
   const formRef = useRef<HTMLFormElement>(null);
   const photoInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const photoLibraryInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const formPhotoInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!photoMenuOpenId) return;
+    function handleOutsideClick() { setPhotoMenuOpenId(null); }
+    document.addEventListener("click", handleOutsideClick);
+    return () => document.removeEventListener("click", handleOutsideClick);
+  }, [photoMenuOpenId]);
 
   useEffect(() => {
     setLocalPlants(plants);
@@ -272,6 +281,7 @@ export function PlantColumn({
           overflow: hidden;
           min-width: 0;
           transition: box-shadow 0.15s;
+          position: relative;
         }
         .plant-card-sortable:hover {
           box-shadow: 0 3px 10px rgba(60, 50, 30, 0.13);
@@ -341,6 +351,39 @@ export function PlantColumn({
         }
         .photo-camera-btn:hover {
           background: rgba(255, 255, 255, 0.98);
+        }
+        .photo-source-overlay {
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          background: rgba(255, 255, 255, 0.97);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          border-top: 1px solid #e8e4dc;
+          padding: 7px 8px;
+          display: flex;
+          gap: 6px;
+          z-index: 20;
+        }
+        .photo-source-btn {
+          flex: 1;
+          padding: 7px 4px;
+          border-radius: 7px;
+          border: 1px solid #e8e4dc;
+          background: #fafaf8;
+          font-size: 11px;
+          font-weight: 600;
+          color: #374151;
+          cursor: pointer;
+          font-family: inherit;
+          text-align: center;
+          transition: background 0.12s;
+          white-space: nowrap;
+        }
+        .photo-source-btn:hover {
+          background: #f2faf4;
+          border-color: #b8dfc0;
         }
         .plant-info-wrap {
           padding: 8px 10px 10px;
@@ -596,7 +639,7 @@ export function PlantColumn({
                           <button
                             type="button"
                             className="photo-camera-btn"
-                            onClick={(e) => { e.stopPropagation(); photoInputRefs.current[plant.id]?.click(); }}
+                            onClick={(e) => { e.stopPropagation(); setPhotoMenuOpenId((prev) => prev === plant.id ? null : plant.id); }}
                             aria-label="写真を追加"
                           >
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -612,6 +655,13 @@ export function PlantColumn({
                         type="file"
                         accept="image/*"
                         capture="environment"
+                        style={{ display: "none" }}
+                        onChange={(e) => handlePhotoChange(plant.id, e)}
+                      />
+                      <input
+                        ref={(el) => { photoLibraryInputRefs.current[plant.id] = el; }}
+                        type="file"
+                        accept="image/*"
                         style={{ display: "none" }}
                         onChange={(e) => handlePhotoChange(plant.id, e)}
                       />
@@ -690,6 +740,34 @@ export function PlantColumn({
                           </div>
                         )}
                       </div>
+
+                      {/* Photo source menu overlay */}
+                      {photoMenuOpenId === plant.id && !uploadingIds[plant.id] && (
+                        <div className="photo-source-overlay" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            className="photo-source-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              photoInputRefs.current[plant.id]?.click();
+                              setPhotoMenuOpenId(null);
+                            }}
+                          >
+                            📷 撮影
+                          </button>
+                          <button
+                            type="button"
+                            className="photo-source-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              photoLibraryInputRefs.current[plant.id]?.click();
+                              setPhotoMenuOpenId(null);
+                            }}
+                          >
+                            🖼 ライブラリ
+                          </button>
+                        </div>
+                      )}
                     </SortablePlantCard>
                   );
                 })}
