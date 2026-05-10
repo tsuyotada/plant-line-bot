@@ -28,6 +28,9 @@ type BatchItem = {
   plantId: string;
   status: "pending" | "uploading" | "done" | "error";
   errorMsg?: string;
+  identifying?: boolean;
+  autoSelected?: boolean;
+  autoSelectReason?: string;
 };
 
 type Props = {
@@ -97,6 +100,30 @@ async function compressImage(file: File): Promise<Blob> {
         "image/jpeg",
         0.7
       );
+    };
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error("image load failed")); };
+    img.src = objectUrl;
+  });
+}
+
+async function compressToDataUrl(file: File, maxWidth = 512): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      let { width, height } = img;
+      if (width > maxWidth) {
+        height = Math.round(height * (maxWidth / width));
+        width = maxWidth;
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { reject(new Error("canvas unavailable")); return; }
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", 0.7));
     };
     img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error("image load failed")); };
     img.src = objectUrl;
@@ -320,18 +347,27 @@ export function PlantColumn({
       return;
     }
 
+    // Plant list is known at file selection time
+    const plantCount = localPlants.length;
+    const needsIdentify = plantCount > 1;
+
     const items: BatchItem[] = await Promise.all(
       files.map(
         (file, i) =>
           new Promise<BatchItem>((resolve) => {
             const reader = new FileReader();
             reader.onload = (ev) => {
+              // If only 1 plant exists, auto-select it immediately (confidence = 1.0)
+              const singlePlantId = plantCount === 1 ? localPlants[0].id : "";
               resolve({
                 id: `${Date.now()}-${i}`,
                 file,
                 preview: ev.target?.result as string,
-                plantId: "",
+                plantId: singlePlantId,
                 status: "pending",
+                identifying: needsIdentify,
+                autoSelected: plantCount === 1,
+                autoSelectReason: plantCount === 1 ? "登録植物が1種類" : undefined,
               });
             };
             reader.readAsDataURL(file);
@@ -341,6 +377,48 @@ export function PlantColumn({
 
     setBatchItems(items);
     setIsBatchModalOpen(true);
+
+    // Run AI identification in background when multiple plants exist
+    if (needsIdentify) {
+      const plantParams = localPlants.map((p) => ({
+        id: p.id,
+        name: getPlantLabel(p.plant_type),
+        species: p.species ?? null,
+        memo: p.memo ?? null,
+      }));
+
+      await Promise.allSettled(
+        items.map(async (item) => {
+          try {
+            const smallDataUrl = await compressToDataUrl(item.file, 512);
+            const res = await fetch("/api/identify-plant", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ imageDataUrl: smallDataUrl, plants: plantParams }),
+            });
+            const data = await res.json();
+            const result = data.result as { matchedPlantId: string; confidence: number; reason: string } | null;
+            setBatchItems((prev) =>
+              prev.map((it) =>
+                it.id === item.id
+                  ? {
+                      ...it,
+                      identifying: false,
+                      ...(result && result.confidence >= 0.6
+                        ? { plantId: result.matchedPlantId, autoSelected: true, autoSelectReason: result.reason }
+                        : {}),
+                    }
+                  : it
+              )
+            );
+          } catch {
+            setBatchItems((prev) =>
+              prev.map((it) => (it.id === item.id ? { ...it, identifying: false } : it))
+            );
+          }
+        })
+      );
+    }
   }
 
   async function handleBatchSave() {
@@ -1186,7 +1264,9 @@ export function PlantColumn({
                   写真をまとめて追加
                 </div>
                 <div style={{ fontSize: 11, color: "#a0a8a2", marginTop: 2, fontFamily }}>
-                  各写真の植物を選んでから「保存する」を押してください
+                  {batchItems.some((it) => it.identifying)
+                    ? "植物を推定中です…確認して「保存する」を押してください"
+                    : "各写真の植物を確認してから「保存する」を押してください"}
                 </div>
               </div>
               {!batchSaving && (
@@ -1231,20 +1311,32 @@ export function PlantColumn({
                     <select
                       className="batch-plant-select"
                       value={item.plantId}
-                      disabled={item.status === "uploading" || item.status === "done"}
+                      disabled={item.status === "uploading" || item.status === "done" || item.identifying}
                       onChange={(e) =>
                         setBatchItems((prev) =>
-                          prev.map((it, i) => i === idx ? { ...it, plantId: e.target.value } : it)
+                          prev.map((it, i) =>
+                            i === idx
+                              ? { ...it, plantId: e.target.value, autoSelected: false, autoSelectReason: undefined }
+                              : it
+                          )
                         )
                       }
                     >
-                      <option value="">植物を選択</option>
+                      <option value="">{item.identifying ? "推定中…" : "植物を選択"}</option>
                       {localPlants.map((plant) => (
                         <option key={plant.id} value={plant.id}>
                           {getPlantLabel(plant.plant_type)}{plant.species ? ` (${plant.species})` : ""}
                         </option>
                       ))}
                     </select>
+                    {item.autoSelected && !item.identifying && (
+                      <div style={{ fontSize: 10, color: "#6db07b", marginTop: 3, display: "flex", alignItems: "center", gap: 4, fontFamily }}>
+                        <span>✦ 自動選択</span>
+                        {item.autoSelectReason && (
+                          <span style={{ color: "#a0a8a2" }}>· {item.autoSelectReason}</span>
+                        )}
+                      </div>
+                    )}
                     {item.status === "error" && item.errorMsg && (
                       <div className="batch-error-msg">{item.errorMsg}</div>
                     )}
