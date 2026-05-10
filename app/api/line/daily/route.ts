@@ -35,6 +35,14 @@ export async function GET() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
+  // メッセージ本文をDBに保存（今日やること表示に使用）
+  const { error: logError } = await supabase
+    .from("daily_notification_logs")
+    .upsert({ date: today, message_body: message }, { onConflict: "date" });
+  if (logError) {
+    console.error("[Daily] daily_notification_logs保存失敗:", logError.message);
+  }
+
   const { data: users, error: usersError } = await supabase
     .from("line_notification_users")
     .select("line_user_id")

@@ -2,13 +2,20 @@ import { supabase } from "../src/lib/supabase";
 import { revalidatePath } from "next/cache";
 import { BackgroundLayer } from "./BackgroundLayer";
 import { PlantColumn } from "./PlantColumn";
-import { buildTodayTasksForPlants } from "@/lib/plantGrowthAdvisor";
+import { getCarePriority } from "@/lib/dailyCareMessage";
 
 // DB migration required (run once):
 // alter table plants add column if not exists sort_order integer;
 // update plants set sort_order = sub.rn - 1
 //   from (select id, row_number() over (order by created_at) as rn from plants) sub
 //   where plants.id = sub.id;
+//
+// create table if not exists daily_notification_logs (
+//   id uuid primary key default gen_random_uuid(),
+//   date date not null unique,
+//   message_body text not null,
+//   created_at timestamptz default now()
+// );
 
 function todayString() {
   return new Date().toISOString().slice(0, 10);
@@ -248,30 +255,25 @@ export default async function Home() {
     }
   }
 
-  // AI-generated today tasks (growth-stage based)
-  const plantsForAdvisor = plants.map((p) => ({
-    id: p.id,
-    display_name: getPlantLabel(p.plant_type),
-    species: p.species ?? null,
-    started_at: p.started_at ?? null,
-    planted_at: p.planted_at ?? null,
-    memo: p.memo ?? null,
-    location: p.location ?? null,
-  }));
+  // Fetch today's LINE notification message for 今日やること display
+  const { data: todayLog } = await supabase
+    .from("daily_notification_logs")
+    .select("message_body")
+    .eq("date", today)
+    .maybeSingle();
+  const todayMessage: string | null = todayLog?.message_body ?? null;
 
-  let todayTasks: Awaited<ReturnType<typeof buildTodayTasksForPlants>> = [];
-  try {
-    todayTasks = await buildTodayTasksForPlants(plantsForAdvisor, today);
-  } catch (err) {
-    console.error("AI task generation error:", err);
-  }
-
-  // Badge record: derived from AI tasks (not care_events)
+  // Badge record: derived from photo recency (urgent/attention → 要対応)
+  const todayMs = new Date(today).getTime();
   const plantHasTodayEventRecord = Object.fromEntries(
-    plants.map((plant) => [
-      plant.id,
-      todayTasks.some((t) => t.plant_id === plant.id),
-    ])
+    plants.map((plant) => {
+      const latestPhoto = photoHistories[plant.id]?.[0];
+      const daysSince = latestPhoto
+        ? Math.floor((todayMs - new Date(latestPhoto.takenAt).getTime()) / (1000 * 60 * 60 * 24))
+        : null;
+      const priority = getCarePriority(daysSince);
+      return [plant.id, priority === "urgent" || priority === "attention"];
+    })
   );
 
   const fontFamily =
@@ -527,56 +529,18 @@ export default async function Home() {
           <div className="col-board">
             <h2 className="col-heading">今日やること</h2>
 
-            {todayTasks.length === 0 ? (
-              <div className="empty-today-card">
-                <p style={{ color: "#7a9a7a", margin: 0, fontSize: 14, lineHeight: 1.6 }}>
-                  今日はゆっくり見守る日です 🌿
+            {todayMessage ? (
+              <div className="todo-card-active">
+                <p style={{ margin: 0, fontSize: 13, color: "#374151", lineHeight: 1.75, whiteSpace: "pre-wrap" }}>
+                  {todayMessage}
                 </p>
               </div>
             ) : (
-              todayTasks.map((pt) => (
-                <div key={pt.plant_id} className="todo-card-active">
-                  <div style={{ fontWeight: 700, fontSize: 14, color: "#2d4a3e", marginBottom: 3 }}>
-                    {pt.plant_name}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 10,
-                      color: "#a0a8a2",
-                      marginBottom: 8,
-                      letterSpacing: 0.3,
-                    }}
-                  >
-                    {pt.growth_stage}
-                  </div>
-                  {pt.tasks.map((task, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        fontSize: 13,
-                        color: "#374151",
-                        lineHeight: 1.65,
-                        marginBottom: i < pt.tasks.length - 1 ? 6 : 0,
-                        paddingLeft: 12,
-                        position: "relative",
-                      }}
-                    >
-                      <span
-                        style={{
-                          position: "absolute",
-                          left: 0,
-                          top: "0.15em",
-                          color: "#6db07b",
-                          fontSize: 11,
-                        }}
-                      >
-                        ✓
-                      </span>
-                      {task}
-                    </div>
-                  ))}
-                </div>
-              ))
+              <div className="empty-today-card">
+                <p style={{ color: "#7a9a7a", margin: 0, fontSize: 14, lineHeight: 1.6 }}>
+                  今日のお世話メッセージはまだ配信されていません
+                </p>
+              </div>
             )}
           </div>
 
