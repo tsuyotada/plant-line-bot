@@ -110,6 +110,16 @@ const CLOSING_LINES = [
   "毎日少しの観察が、元気な植物への一番の近道です🌿",
 ];
 
+const APP_LINK_PHRASES = [
+  "余力あれば水やり前に写真撮影も！👇",
+  "写真を残しておくと、次の変化に気づきやすいです👇",
+  "今日のお世話ついでに、1枚だけ記録しておきましょう👇",
+  "水やり前の様子を残しておくと、あとで見返しやすいです👇",
+  "植物の変化を写真で残しておきましょう👇",
+  "今日のお世話をアプリで確認する👇",
+  "写真つきで今日のお世話を確認する👇",
+];
+
 function getWeatherKey(w: WeatherInfo): string {
   if (w.temperatureC >= 28) return "hot";
   if (w.temperatureC <= 10) return "cold";
@@ -129,6 +139,11 @@ export function buildDailyCareMessage(
   const weatherLine = datePick(WEATHER_LINES[weatherKey], today, 0);
   const seasonLine = datePick(SEASON_LINES[season], today, 100);
   const closing = datePick(CLOSING_LINES, today, 99);
+  const appLinkPhrase = datePick(APP_LINK_PHRASES, today, 200);
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL ??
+    process.env.APP_URL ??
+    "https://plant-line-bot-forme.vercel.app/";
 
   const plantLines = plants
     .slice(0, 5)
@@ -162,5 +177,8 @@ export function buildDailyCareMessage(
     plantSection,
     "",
     closing,
+    "",
+    appLinkPhrase,
+    appUrl,
   ].join("\n");
 }
