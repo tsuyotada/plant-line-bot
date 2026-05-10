@@ -1133,28 +1133,36 @@ export async function POST(req: Request) {
           .insert({ line_user_id: lineUserId, is_active: false, has_tested_notification: true });
       }
 
-      const { message } = await buildDailyNotificationMessage();
+      const { message, spotlightPhotoUrl } = await buildDailyNotificationMessage();
+      console.log(`[LINE] 通知テスト message生成完了 spotlightPhotoUrl=${spotlightPhotoUrl ?? "なし"}`);
+
+      // Build message array: image (if available) + text, up to LINE's 5-message limit
+      const testMessages: object[] = [];
+      if (spotlightPhotoUrl) {
+        testMessages.push({
+          type: "image",
+          originalContentUrl: spotlightPhotoUrl,
+          previewImageUrl: spotlightPhotoUrl,
+        });
+      }
+      testMessages.push({ type: "text", text: `📋 通知テスト：\n\n${message}` });
 
       if (isRegistered) {
-        await replyToLine(lineToken, replyToken, [
-          { type: "text", text: `📋 通知テスト：\n\n${message}` },
-        ]);
+        await replyToLine(lineToken, replyToken, testMessages);
       } else {
-        await replyToLine(lineToken, replyToken, [
-          { type: "text", text: `📋 通知テスト：\n\n${message}` },
-          {
-            type: "text",
-            text: "いかがでしょうか？\nこのような通知が毎朝届くようになります。\n\nよければ登録してみてください👇",
-            quickReply: {
-              items: [
-                {
-                  type: "action",
-                  action: { type: "message", label: "登録する", text: "登録" },
-                },
-              ],
-            },
+        testMessages.push({
+          type: "text",
+          text: "いかがでしょうか？\nこのような通知が毎朝届くようになります。\n\nよければ登録してみてください👇",
+          quickReply: {
+            items: [
+              {
+                type: "action",
+                action: { type: "message", label: "登録する", text: "登録" },
+              },
+            ],
           },
-        ]);
+        });
+        await replyToLine(lineToken, replyToken, testMessages);
         console.log(`[LINE] notification test follow-up sent userId=${lineUserId}`);
       }
       return NextResponse.json({ ok: true });

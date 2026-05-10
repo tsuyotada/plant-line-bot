@@ -70,9 +70,13 @@ export async function buildDailyNotificationMessage(): Promise<{
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   const latestPhotoMap = new Map<string, string>();
   const latestPhotoUrlMap = new Map<string, string>();
+  const latestStoragePathMap = new Map<string, string>(); // plantId → storage_path (for signed URL generation)
   for (const photo of photosRaw ?? []) {
     if (!latestPhotoMap.has(photo.plant_id)) {
       latestPhotoMap.set(photo.plant_id, photo.taken_at);
+      if (photo.storage_path) {
+        latestStoragePathMap.set(photo.plant_id, photo.storage_path);
+      }
       const url: string | null =
         photo.image_url ||
         (photo.storage_path
@@ -130,6 +134,30 @@ export async function buildDailyNotificationMessage(): Promise<{
     };
   });
 
-  const { message, spotlightPhotoUrl } = buildDailyCareMessage(today, plantsWithRecency, careRulesMap);
+  const { message, spotlightPhotoUrl: rawSpotlightUrl } = buildDailyCareMessage(today, plantsWithRecency, careRulesMap);
+
+  // Upgrade spotlight to a signed URL (1h validity) so LINE servers can fetch the image
+  // regardless of whether the Supabase Storage bucket is public or private.
+  let spotlightPhotoUrl: string | null = rawSpotlightUrl;
+  if (rawSpotlightUrl) {
+    const spotlightPlantId = [...latestPhotoUrlMap.entries()]
+      .find(([, url]) => url === rawSpotlightUrl)?.[0];
+    const storagePath = spotlightPlantId ? latestStoragePathMap.get(spotlightPlantId) : undefined;
+    if (storagePath) {
+      const { data: signedData, error: signError } = await supabase
+        .storage
+        .from("plant-photos")
+        .createSignedUrl(storagePath, 3600);
+      if (signError) {
+        console.warn(`[Daily] spotlight署名付きURL生成失敗 storagePath=${storagePath}:`, signError.message);
+      } else if (signedData?.signedUrl) {
+        console.log(`[Daily] spotlight署名付きURL生成成功 storagePath=${storagePath}`);
+        spotlightPhotoUrl = signedData.signedUrl;
+      }
+    } else {
+      console.log(`[Daily] spotlight URL（image_url直接）: ${rawSpotlightUrl.slice(0, 100)}`);
+    }
+  }
+
   return { message, today, plantCount: plants.length, spotlightPhotoUrl };
 }
