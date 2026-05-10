@@ -261,8 +261,14 @@ export function buildDailyCareMessage(
     lines.push("", `💡 ${trivia}`);
   }
 
-  // App link
-  lines.push("", appLinkPhrase, appUrl, "詳細はアプリで見てください🌿");
+  // App link — no extra blank line when a closing line immediately precedes it
+  const lastLine = lines[lines.length - 1];
+  const closingLine = "今日は大きな異変はなさそうです。";
+  if (lastLine === closingLine) {
+    lines.push(appLinkPhrase, appUrl);
+  } else {
+    lines.push("", appLinkPhrase, appUrl);
+  }
 
   return { message: lines.join("\n"), spotlightPhotoUrl };
 }
