@@ -47,7 +47,7 @@ export async function buildDailyNotificationMessage(): Promise<{
       .order("created_at", { ascending: false }),
     supabase
       .from("plant_photos")
-      .select("plant_id, taken_at, image_url")
+      .select("plant_id, taken_at, image_url, storage_path")
       .order("taken_at", { ascending: false }),
     supabase
       .from("care_rules")
@@ -67,12 +67,18 @@ export async function buildDailyNotificationMessage(): Promise<{
     };
   }
 
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   const latestPhotoMap = new Map<string, string>();
   const latestPhotoUrlMap = new Map<string, string>();
   for (const photo of photosRaw ?? []) {
     if (!latestPhotoMap.has(photo.plant_id)) {
       latestPhotoMap.set(photo.plant_id, photo.taken_at);
-      if (photo.image_url) latestPhotoUrlMap.set(photo.plant_id, photo.image_url);
+      const url: string | null =
+        photo.image_url ||
+        (photo.storage_path
+          ? `${supabaseUrl}/storage/v1/object/public/plant-photos/${photo.storage_path}`
+          : null);
+      if (url) latestPhotoUrlMap.set(photo.plant_id, url);
     }
   }
 

@@ -83,9 +83,10 @@ export async function GET() {
         ]);
         if (!imgRes.ok) {
           imageFailCount++;
-          console.warn(`[Daily] 画像送信失敗 userId=${userId} status=${imgRes.status}`);
+          const errBody = await imgRes.text().catch(() => "");
+          console.warn(`[Daily] 画像送信失敗 userId=${userId} status=${imgRes.status} url=${spotlightPhotoUrl} body=${errBody}`);
         } else {
-          console.log(`[Daily] 画像送信成功 userId=${userId}`);
+          console.log(`[Daily] 画像送信成功 userId=${userId} url=${spotlightPhotoUrl}`);
         }
       } catch (err) {
         imageFailCount++;
