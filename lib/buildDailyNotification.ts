@@ -1,6 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { getTodayWeather } from "./dailyWeather";
-import { buildDailyCareMessage, PlantWithRecency } from "./dailyCareMessage";
+import { buildDailyCareMessage, PlantWithRecency, CareRule } from "./dailyCareMessage";
 
 const plantLabelMap: Record<string, string> = {
   tomato: "トマト",
@@ -34,15 +33,29 @@ export async function buildDailyNotificationMessage(): Promise<{
 
   const today = getTodayJst();
 
-  const { data: plantsRaw } = await supabase
-    .from("plants")
-    .select("*")
-    .is("archived_at", null)
-    .order("sort_order", { ascending: true, nullsFirst: false })
-    .order("created_at", { ascending: false });
+  const [
+    { data: plantsRaw },
+    { data: photosRaw },
+    { data: careRulesRaw },
+  ] = await Promise.all([
+    supabase
+      .from("plants")
+      .select("*")
+      .is("archived_at", null)
+      .order("sort_order", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("plant_photos")
+      .select("plant_id, taken_at")
+      .order("taken_at", { ascending: false }),
+    supabase
+      .from("care_rules")
+      .select("id, plant_id, task_type, task_detail, interval_days, title, message, confidence, is_active")
+      .eq("is_active", true),
+  ]);
 
   const plants = plantsRaw ?? [];
-  console.log(`[Daily] 通知対象植物数=${plants.length}`);
+  console.log(`[Daily] 通知対象植物数=${plants.length} care_rules=${careRulesRaw?.length ?? 0}`);
 
   if (plants.length === 0) {
     return {
@@ -52,11 +65,6 @@ export async function buildDailyNotificationMessage(): Promise<{
     };
   }
 
-  const { data: photosRaw } = await supabase
-    .from("plant_photos")
-    .select("plant_id, taken_at")
-    .order("taken_at", { ascending: false });
-
   const latestPhotoMap = new Map<string, string>();
   for (const photo of photosRaw ?? []) {
     if (!latestPhotoMap.has(photo.plant_id)) {
@@ -64,11 +72,12 @@ export async function buildDailyNotificationMessage(): Promise<{
     }
   }
 
-  const weather = await getTodayWeather(today);
-  console.log(
-    `[Daily] 天気: weather=${weather.weather} temp=${weather.temperatureC}°C` +
-    ` willRain=${weather.willRain} humidity=${weather.humidity}%`
-  );
+  // care_rules を plant_id でグループ化
+  const careRulesMap = new Map<string, CareRule[]>();
+  for (const rule of careRulesRaw ?? []) {
+    if (!careRulesMap.has(rule.plant_id)) careRulesMap.set(rule.plant_id, []);
+    careRulesMap.get(rule.plant_id)!.push(rule as CareRule);
+  }
 
   const todayMs = new Date(today).getTime();
   const plantsWithRecency: PlantWithRecency[] = plants.map((p) => {
@@ -80,7 +89,6 @@ export async function buildDailyNotificationMessage(): Promise<{
     }
     const displayName = getPlantLabel(p.plant_type);
 
-    // Fertilizer fields (fall back to defaults if columns not yet added)
     const fertilizerEnabled = p.fertilizer_enabled !== false;
     const fertilizerIntervalDays = (p.fertilizer_interval_days as number | null) ?? 14;
     const fertilizerBaseDate =
@@ -95,7 +103,8 @@ export async function buildDailyNotificationMessage(): Promise<{
     console.log(
       `[Daily] plant_id=${p.id} name=${displayName}` +
       ` daysSinceLastPhoto=${daysSinceLastPhoto ?? "null"}` +
-      ` daysSinceLastFertilized=${daysSinceLastFertilized} fertilizerEnabled=${fertilizerEnabled}`
+      ` daysSinceLastFertilized=${daysSinceLastFertilized} fertilizerEnabled=${fertilizerEnabled}` +
+      ` careRules=${careRulesMap.get(p.id)?.length ?? 0}`
     );
     return {
       id: p.id,
@@ -109,6 +118,6 @@ export async function buildDailyNotificationMessage(): Promise<{
     };
   });
 
-  const message = buildDailyCareMessage(today, plantsWithRecency, weather);
+  const message = buildDailyCareMessage(today, plantsWithRecency, careRulesMap);
   return { message, today, plantCount: plants.length };
 }

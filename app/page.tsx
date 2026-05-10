@@ -2,7 +2,8 @@ import { supabase } from "../src/lib/supabase";
 import { revalidatePath } from "next/cache";
 import { BackgroundLayer } from "./BackgroundLayer";
 import { PlantColumn } from "./PlantColumn";
-import { getCarePriority } from "@/lib/dailyCareMessage";
+import { getCarePriority, type CareRule } from "@/lib/dailyCareMessage";
+import { buildPlantCareCards, type PlantAdviceInput, type CareTag } from "@/lib/buildPlantCareAdvice";
 
 // DB migration required (run once):
 // alter table plants add column if not exists sort_order integer;
@@ -202,7 +203,7 @@ export default async function Home() {
   const [
     { data: allPlantsRaw, error: plantsError },
     { data: photosRaw, error: photosError },
-    { data: todayLog },
+    { data: careRulesRaw },
   ] = await Promise.all([
     supabase
       .from("plants")
@@ -215,12 +216,11 @@ export default async function Home() {
       .order("taken_at", { ascending: false })
       .limit(500),
     supabase
-      .from("daily_notification_logs")
-      .select("message_body")
-      .eq("date", today)
-      .maybeSingle(),
+      .from("care_rules")
+      .select("id, plant_id, task_type, task_detail, interval_days, title, message, confidence, is_active")
+      .eq("is_active", true),
   ]);
-  console.log(`[Page] db queries ${Date.now() - dbStart}ms (plants=${allPlantsRaw?.length ?? 0} photos=${photosRaw?.length ?? 0} plantsErr=${plantsError?.message ?? "-"} photosErr=${photosError?.message ?? "-"}`);
+  console.log(`[Page] db queries ${Date.now() - dbStart}ms (plants=${allPlantsRaw?.length ?? 0} photos=${photosRaw?.length ?? 0} careRules=${careRulesRaw?.length ?? 0} plantsErr=${plantsError?.message ?? "-"} photosErr=${photosError?.message ?? "-"}`);
 
   // Sort in JS so the query never fails when sort_order column doesn't exist yet.
   // Plants with sort_order set appear first (ascending), NULLs fall back to created_at order.
@@ -254,8 +254,6 @@ export default async function Home() {
     });
   }
 
-  const todayMessage: string | null = todayLog?.message_body ?? null;
-
   // Badge record: derived from photo recency (urgent/attention → 要対応)
   const todayMs = new Date(today).getTime();
   const plantHasTodayEventRecord = Object.fromEntries(
@@ -268,6 +266,40 @@ export default async function Home() {
       return [plant.id, priority === "urgent" || priority === "attention"];
     })
   );
+
+  // care_rules を plant_id でグループ化
+  const careRulesMap = new Map<string, CareRule[]>();
+  for (const rule of careRulesRaw ?? []) {
+    if (!careRulesMap.has(rule.plant_id)) careRulesMap.set(rule.plant_id, []);
+    careRulesMap.get(rule.plant_id)!.push(rule as CareRule);
+  }
+
+  // 植物ごとのケアアドバイスカード生成
+  const plantAdviceInputs: PlantAdviceInput[] = plants.map((plant) => {
+    const latestPhoto = photoHistories[plant.id]?.[0];
+    const daysSinceLastPhoto = latestPhoto
+      ? Math.floor((todayMs - new Date(latestPhoto.takenAt).getTime()) / (1000 * 60 * 60 * 24))
+      : null;
+    const fertilizerBaseDate =
+      (plant.last_fertilized_at as string | null) ??
+      (plant.created_at as string | null) ??
+      today;
+    const daysSinceLastFertilized = Math.floor(
+      (todayMs - new Date(String(fertilizerBaseDate).slice(0, 10)).getTime()) /
+        (1000 * 60 * 60 * 24)
+    );
+    return {
+      id: plant.id,
+      display_name: getPlantLabel(plant.plant_type),
+      daysSinceLastPhoto,
+      fertilizerEnabled: plant.fertilizer_enabled !== false,
+      fertilizerIntervalDays: (plant.fertilizer_interval_days as number | null) ?? 14,
+      daysSinceLastFertilized,
+      latestPhotoUrl: latestPhotos[plant.id] ?? null,
+    };
+  });
+
+  const plantCareCards = buildPlantCareCards(plantAdviceInputs, careRulesMap);
 
   console.log(`[Page] total render ${Date.now() - pageStart}ms`);
 
@@ -518,23 +550,86 @@ export default async function Home() {
             />
           </div>
 
-          {/* ── Right column (1/3幅): 今日やること + LINE通知 縦積み ── */}
+          {/* ── Right column (1/3幅): 今日のケアメモ + LINE通知 縦積み ── */}
           <div className="col-right">
-          {/* ── 今日やること ── */}
+          {/* ── 今日のケアメモ ── */}
           <div className="col-board">
-            <h2 className="col-heading">今日やること</h2>
+            <h2 className="col-heading">今日のケアメモ</h2>
 
-            {todayMessage ? (
-              <div className="todo-card-active">
-                <p style={{ margin: 0, fontSize: 13, color: "#374151", lineHeight: 1.75, whiteSpace: "pre-wrap" }}>
-                  {todayMessage}
+            {plants.length === 0 ? (
+              <div className="empty-today-card">
+                <p style={{ color: "#7a9a7a", margin: 0, fontSize: 14, lineHeight: 1.6 }}>
+                  植物が登録されていません
                 </p>
               </div>
             ) : (
-              <div className="empty-today-card">
-                <p style={{ color: "#7a9a7a", margin: 0, fontSize: 14, lineHeight: 1.6 }}>
-                  今日のお世話メッセージはまだ配信されていません
-                </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                {plantCareCards.map((card) => {
+                  const borderColor =
+                    card.priority === "urgent" ? "#ef4444" :
+                    card.priority === "attention" ? "#f59e0b" :
+                    "#6db07b";
+                  const bgColor =
+                    card.priority === "urgent" ? "#fff5f5" :
+                    card.priority === "attention" ? "#fffbeb" :
+                    "#ffffff";
+                  const tagStyle = (tag: CareTag) => {
+                    const configs: Record<CareTag, { bg: string; color: string }> = {
+                      "水やり":   { bg: "#dbeafe", color: "#1e40af" },
+                      "液体肥料": { bg: "#fef3c7", color: "#92400e" },
+                      "観察":     { bg: "#e0f2fe", color: "#0369a1" },
+                      "写真記録": { bg: "#ede9fe", color: "#5b21b6" },
+                      "剪定":     { bg: "#dcfce7", color: "#166534" },
+                      "収穫":     { bg: "#d1fae5", color: "#065f46" },
+                      "環境確認": { bg: "#f1f5f9", color: "#475569" },
+                    };
+                    const c = configs[tag] ?? { bg: "#f1f5f9", color: "#475569" };
+                    return { fontSize: 10, padding: "1px 6px", borderRadius: 10, fontWeight: 600, background: c.bg, color: c.color };
+                  };
+                  return (
+                    <div
+                      key={card.plantId}
+                      style={{
+                        background: bgColor,
+                        borderRadius: 10,
+                        padding: "10px 12px",
+                        boxShadow: "0 1px 3px rgba(60, 50, 30, 0.07)",
+                        borderLeft: `3px solid ${borderColor}`,
+                      }}
+                    >
+                      <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                        {card.latestPhotoUrl && (
+                          <img
+                            src={card.latestPhotoUrl}
+                            alt={card.plantName}
+                            style={{
+                              width: 44, height: 44,
+                              borderRadius: 6,
+                              objectFit: "cover",
+                              flexShrink: 0,
+                              border: "1px solid #e8e4dc",
+                            }}
+                          />
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, fontSize: 12, color: "#2d4a3e", marginBottom: 3 }}>
+                            {card.plantName}
+                          </div>
+                          <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.65 }}>
+                            {card.advice}
+                          </div>
+                          {card.tags.length > 0 && (
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 5 }}>
+                              {card.tags.map(tag => (
+                                <span key={tag} style={tagStyle(tag)}>{tag}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
