@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { BackgroundLayer } from "./BackgroundLayer";
 import { PlantColumn } from "./PlantColumn";
 import { getCarePriority, type CareRule } from "@/lib/dailyCareMessage";
-import { buildPlantCareCards, type PlantAdviceInput, type CareTag } from "@/lib/buildPlantCareAdvice";
+import { buildPlantCareCards, type PlantAdviceInput } from "@/lib/buildPlantCareAdvice";
 
 // DB migration required (run once):
 // alter table plants add column if not exists sort_order integer;
@@ -301,6 +301,27 @@ export default async function Home() {
 
   const plantCareCards = buildPlantCareCards(plantAdviceInputs, careRulesMap);
 
+  // PlantColumn に渡すケアカードマップ（plant_id → advice/tags/priority）
+  const careCardMap = Object.fromEntries(
+    plantCareCards.map(c => [c.plantId, { advice: c.advice, tags: c.tags, priority: c.priority }])
+  );
+
+  // 今日の1枚: 写真あり・urgent/attention 優先、なければ先頭
+  const spotlightCard = (() => {
+    const withPhoto = plantCareCards.filter(c => !!c.latestPhotoUrl);
+    if (withPhoto.length === 0) return null;
+    return withPhoto.find(c => c.priority === "urgent" || c.priority === "attention") ?? withPhoto[0];
+  })();
+
+  // 全体サマリー集計
+  const summaryStats = {
+    waterCount: plantCareCards.filter(c => c.tags.includes("水やり")).length,
+    fertilizerCount: plantCareCards.filter(c => c.tags.includes("液体肥料")).length,
+    observationCount: plantCareCards.filter(c => c.tags.includes("観察")).length,
+    photoCount: plantCareCards.filter(c => c.tags.includes("写真記録")).length,
+    total: plantCareCards.length,
+  };
+
   console.log(`[Page] total render ${Date.now() - pageStart}ms`);
 
   const fontFamily =
@@ -547,92 +568,112 @@ export default async function Home() {
               uploadPhotoAction={uploadPlantPhoto}
               latestPhotos={latestPhotos}
               photoHistories={photoHistories}
+              careCardMap={careCardMap}
             />
           </div>
 
-          {/* ── Right column (1/3幅): 今日のケアメモ + LINE通知 縦積み ── */}
+          {/* ── Right column (1/3幅): 今日の1枚・全体サマリー・LINE登録 ── */}
           <div className="col-right">
-          {/* ── 今日のケアメモ ── */}
-          <div className="col-board">
-            <h2 className="col-heading">今日のケアメモ</h2>
 
-            {plants.length === 0 ? (
-              <div className="empty-today-card">
-                <p style={{ color: "#7a9a7a", margin: 0, fontSize: 14, lineHeight: 1.6 }}>
-                  植物が登録されていません
-                </p>
+          {/* ── 今日の1枚 ── */}
+          <div className="col-board">
+            <h2 className="col-heading">今日の1枚</h2>
+
+            {spotlightCard ? (
+              <div style={{ background: "#ffffff", borderRadius: 10, overflow: "hidden", boxShadow: "0 1px 3px rgba(60,50,30,0.07)" }}>
+                <img
+                  src={spotlightCard.latestPhotoUrl!}
+                  alt={spotlightCard.plantName}
+                  style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", display: "block" }}
+                />
+                <div style={{ padding: "10px 12px 12px" }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: "#2d4a3e", marginBottom: 4 }}>
+                    {spotlightCard.plantName}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.65 }}>
+                    {spotlightCard.advice}
+                  </div>
+                  {spotlightCard.tags.length > 0 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 7 }}>
+                      {spotlightCard.tags.map((tag) => {
+                        const tagCfg: Record<string, { bg: string; color: string }> = {
+                          "水やり":   { bg: "#dbeafe", color: "#1e40af" },
+                          "液体肥料": { bg: "#fef3c7", color: "#92400e" },
+                          "観察":     { bg: "#e0f2fe", color: "#0369a1" },
+                          "写真記録": { bg: "#ede9fe", color: "#5b21b6" },
+                          "剪定":     { bg: "#dcfce7", color: "#166534" },
+                          "収穫":     { bg: "#d1fae5", color: "#065f46" },
+                          "環境確認": { bg: "#f1f5f9", color: "#475569" },
+                        };
+                        const c = tagCfg[tag] ?? { bg: "#f1f5f9", color: "#475569" };
+                        return (
+                          <span key={tag} style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, fontWeight: 600, background: c.bg, color: c.color }}>
+                            {tag}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                {plantCareCards.map((card) => {
-                  const borderColor =
-                    card.priority === "urgent" ? "#ef4444" :
-                    card.priority === "attention" ? "#f59e0b" :
-                    "#6db07b";
-                  const bgColor =
-                    card.priority === "urgent" ? "#fff5f5" :
-                    card.priority === "attention" ? "#fffbeb" :
-                    "#ffffff";
-                  const tagStyle = (tag: CareTag) => {
-                    const configs: Record<CareTag, { bg: string; color: string }> = {
-                      "水やり":   { bg: "#dbeafe", color: "#1e40af" },
-                      "液体肥料": { bg: "#fef3c7", color: "#92400e" },
-                      "観察":     { bg: "#e0f2fe", color: "#0369a1" },
-                      "写真記録": { bg: "#ede9fe", color: "#5b21b6" },
-                      "剪定":     { bg: "#dcfce7", color: "#166534" },
-                      "収穫":     { bg: "#d1fae5", color: "#065f46" },
-                      "環境確認": { bg: "#f1f5f9", color: "#475569" },
-                    };
-                    const c = configs[tag] ?? { bg: "#f1f5f9", color: "#475569" };
-                    return { fontSize: 10, padding: "1px 6px", borderRadius: 10, fontWeight: 600, background: c.bg, color: c.color };
-                  };
-                  return (
-                    <div
-                      key={card.plantId}
-                      style={{
-                        background: bgColor,
-                        borderRadius: 10,
-                        padding: "10px 12px",
-                        boxShadow: "0 1px 3px rgba(60, 50, 30, 0.07)",
-                        borderLeft: `3px solid ${borderColor}`,
-                      }}
-                    >
-                      <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                        {card.latestPhotoUrl && (
-                          <img
-                            src={card.latestPhotoUrl}
-                            alt={card.plantName}
-                            style={{
-                              width: 44, height: 44,
-                              borderRadius: 6,
-                              objectFit: "cover",
-                              flexShrink: 0,
-                              border: "1px solid #e8e4dc",
-                            }}
-                          />
-                        )}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 700, fontSize: 12, color: "#2d4a3e", marginBottom: 3 }}>
-                            {card.plantName}
-                          </div>
-                          <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.65 }}>
-                            {card.advice}
-                          </div>
-                          {card.tags.length > 0 && (
-                            <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 5 }}>
-                              {card.tags.map(tag => (
-                                <span key={tag} style={tagStyle(tag)}>{tag}</span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="empty-today-card">
+                <p style={{ color: "#7a9a7a", margin: 0, fontSize: 13, lineHeight: 1.6 }}>
+                  写真を記録すると、ここに今日の注目植物が表示されます。
+                </p>
               </div>
             )}
           </div>
+
+          {/* ── 全体サマリー ── */}
+          {summaryStats.total > 0 && (
+            <div className="col-board">
+              <h2 className="col-heading">全体サマリー</h2>
+
+              {/* 数値チップ */}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 10 }}>
+                {summaryStats.waterCount > 0 && (
+                  <div style={{ background: "#dbeafe", borderRadius: 8, padding: "5px 10px", display: "flex", flexDirection: "column", alignItems: "center", minWidth: 56 }}>
+                    <span style={{ fontSize: 18, fontWeight: 700, color: "#1e40af", lineHeight: 1 }}>{summaryStats.waterCount}</span>
+                    <span style={{ fontSize: 9, color: "#3b82f6", fontWeight: 600, marginTop: 2 }}>水やり</span>
+                  </div>
+                )}
+                {summaryStats.fertilizerCount > 0 && (
+                  <div style={{ background: "#fef3c7", borderRadius: 8, padding: "5px 10px", display: "flex", flexDirection: "column", alignItems: "center", minWidth: 56 }}>
+                    <span style={{ fontSize: 18, fontWeight: 700, color: "#92400e", lineHeight: 1 }}>{summaryStats.fertilizerCount}</span>
+                    <span style={{ fontSize: 9, color: "#d97706", fontWeight: 600, marginTop: 2 }}>液体肥料</span>
+                  </div>
+                )}
+                {summaryStats.observationCount > 0 && (
+                  <div style={{ background: "#e0f2fe", borderRadius: 8, padding: "5px 10px", display: "flex", flexDirection: "column", alignItems: "center", minWidth: 56 }}>
+                    <span style={{ fontSize: 18, fontWeight: 700, color: "#0369a1", lineHeight: 1 }}>{summaryStats.observationCount}</span>
+                    <span style={{ fontSize: 9, color: "#0ea5e9", fontWeight: 600, marginTop: 2 }}>観察</span>
+                  </div>
+                )}
+                {summaryStats.photoCount > 0 && (
+                  <div style={{ background: "#ede9fe", borderRadius: 8, padding: "5px 10px", display: "flex", flexDirection: "column", alignItems: "center", minWidth: 56 }}>
+                    <span style={{ fontSize: 18, fontWeight: 700, color: "#5b21b6", lineHeight: 1 }}>{summaryStats.photoCount}</span>
+                    <span style={{ fontSize: 9, color: "#7c3aed", fontWeight: 600, marginTop: 2 }}>写真記録</span>
+                  </div>
+                )}
+              </div>
+
+              {/* サマリー文 */}
+              <p style={{ margin: 0, fontSize: 12, color: "#374151", lineHeight: 1.75 }}>
+                {(() => {
+                  const parts: string[] = [];
+                  if (summaryStats.waterCount > 0) parts.push(`水やり候補が${summaryStats.waterCount}件`);
+                  if (summaryStats.fertilizerCount > 0) parts.push(`液体肥料のタイミングが${summaryStats.fertilizerCount}件`);
+                  if (parts.length > 0) return `今日は${parts.join("、")}あります。`;
+                  if (summaryStats.photoCount > 0) return "全体的に様子見でOKです。余力があれば写真を記録しておきましょう。";
+                  return "今日は大きな作業は不要です。ゆっくり様子を見てあげてください。";
+                })()}
+                {summaryStats.photoCount > 0 && (summaryStats.waterCount > 0 || summaryStats.fertilizerCount > 0) && (
+                  <><br />最近写真が少ない植物があるので、余力があれば記録しておくと変化に気づきやすいです。</>
+                )}
+              </p>
+            </div>
+          )}
 
           {/* ── LINE通知を受け取る ── */}
           <div className="col-board">

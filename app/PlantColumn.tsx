@@ -33,6 +33,12 @@ type BatchItem = {
   autoSelectReason?: string;
 };
 
+type CareCardInfo = {
+  advice: string;
+  tags: string[];
+  priority: string;
+};
+
 type Props = {
   plants: any[];
   archivedPlants: any[];
@@ -46,6 +52,7 @@ type Props = {
   uploadPhotoAction: (formData: FormData) => Promise<{ success: boolean; error?: string }>;
   latestPhotos: Record<string, string>;
   photoHistories: Record<string, PhotoHistoryItem[]>;
+  careCardMap: Record<string, CareCardInfo>;
 };
 
 const plantLabelMap: Record<string, string> = {
@@ -170,6 +177,16 @@ function SortablePlantCard({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+const TAG_COLORS: Record<string, { bg: string; color: string }> = {
+  "水やり":   { bg: "#dbeafe", color: "#1e40af" },
+  "液体肥料": { bg: "#fef3c7", color: "#92400e" },
+  "観察":     { bg: "#e0f2fe", color: "#0369a1" },
+  "写真記録": { bg: "#ede9fe", color: "#5b21b6" },
+  "剪定":     { bg: "#dcfce7", color: "#166534" },
+  "収穫":     { bg: "#d1fae5", color: "#065f46" },
+  "環境確認": { bg: "#f1f5f9", color: "#475569" },
+};
+
 export function PlantColumn({
   plants,
   archivedPlants,
@@ -183,6 +200,7 @@ export function PlantColumn({
   uploadPhotoAction,
   latestPhotos,
   photoHistories,
+  careCardMap,
 }: Props) {
   const [localPlants, setLocalPlants] = useState(plants);
   const [photoPreviews, setPhotoPreviews] = useState<Record<string, string>>({});
@@ -923,6 +941,7 @@ export function PlantColumn({
                   const hasTodayEvent = plantHasTodayEventRecord[plant.id] ?? false;
                   const stateLabel = getInitialStateLabel(plant.initial_state_type);
                   const isMenuOpen = openMenuId === plant.id;
+                  const careCard = careCardMap[plant.id] ?? null;
 
                   return (
                     <SortablePlantCard key={plant.id} id={plant.id}>
@@ -998,6 +1017,13 @@ export function PlantColumn({
                               <circle cx="12" cy="13" r="4" />
                             </svg>
                           </button>
+                        )}
+                        {/* 優先度インジケーター（urgent=赤/attention=オレンジ） */}
+                        {careCard && (careCard.priority === "urgent" || careCard.priority === "attention") && (
+                          <div style={{
+                            position: "absolute", bottom: 0, left: 0, right: 0, height: 3, zIndex: 3,
+                            background: careCard.priority === "urgent" ? "#ef4444" : "#f59e0b",
+                          }} />
                         )}
                       </div>
 
@@ -1089,6 +1115,33 @@ export function PlantColumn({
                         {uploadErrors[plant.id] && (
                           <div style={{ fontSize: 10, color: "#b91c1c", marginTop: 5, lineHeight: 1.5 }}>
                             {uploadErrors[plant.id]}
+                          </div>
+                        )}
+
+                        {/* ── ケアメモ ── */}
+                        {careCard && (
+                          <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #f0ebe2" }}>
+                            <div style={{
+                              fontSize: 11, color: "#374151", lineHeight: 1.6,
+                              overflow: "hidden",
+                              display: "-webkit-box",
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: "vertical",
+                            }}>
+                              {careCard.advice}
+                            </div>
+                            {careCard.tags.length > 0 && (
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 5 }}>
+                                {careCard.tags.map((tag) => {
+                                  const c = TAG_COLORS[tag] ?? { bg: "#f1f5f9", color: "#475569" };
+                                  return (
+                                    <span key={tag} style={{ fontSize: 9, padding: "1px 5px", borderRadius: 8, fontWeight: 600, background: c.bg, color: c.color }}>
+                                      {tag}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
