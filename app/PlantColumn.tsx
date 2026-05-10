@@ -202,11 +202,13 @@ export function PlantColumn({
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
   const [batchSaving, setBatchSaving] = useState(false);
   const [batchWarning, setBatchWarning] = useState<string | null>(null);
+  const [captureSession, setCaptureSession] = useState<File[]>([]);
 
   const formRef = useRef<HTMLFormElement>(null);
   const photoInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const photoLibraryInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const batchInputRef = useRef<HTMLInputElement | null>(null);
+  const captureSessionInputRef = useRef<HTMLInputElement | null>(null);
   const touchStartX = useRef<number>(0);
   const formPhotoInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -332,22 +334,10 @@ export function PlantColumn({
     }
   }
 
-  async function handleBatchFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const allFiles = Array.from(e.target.files ?? []);
-    e.target.value = "";
-    if (allFiles.length === 0) return;
+  // Core batch initialization — shared between file-select and capture-session flows
+  async function initBatchModal(files: File[], warning: string | null = null) {
+    setBatchWarning(warning);
 
-    const oversized = allFiles.filter((f) => f.size > 5 * 1024 * 1024);
-    const files = allFiles.filter((f) => f.size <= 5 * 1024 * 1024);
-
-    setBatchWarning(oversized.length > 0 ? `${oversized.length}枚は5MBを超えたためスキップします` : null);
-
-    if (files.length === 0) {
-      setBatchWarning("選択した画像がすべて5MBを超えています");
-      return;
-    }
-
-    // Plant list is known at file selection time
     const plantCount = localPlants.length;
     const needsIdentify = plantCount > 1;
 
@@ -357,7 +347,6 @@ export function PlantColumn({
           new Promise<BatchItem>((resolve) => {
             const reader = new FileReader();
             reader.onload = (ev) => {
-              // If only 1 plant exists, auto-select it immediately (confidence = 1.0)
               const singlePlantId = plantCount === 1 ? localPlants[0].id : "";
               resolve({
                 id: `${Date.now()}-${i}`,
@@ -378,7 +367,6 @@ export function PlantColumn({
     setBatchItems(items);
     setIsBatchModalOpen(true);
 
-    // Run AI identification in background when multiple plants exist
     if (needsIdentify) {
       const plantParams = localPlants.map((p) => ({
         id: p.id,
@@ -419,6 +407,39 @@ export function PlantColumn({
         })
       );
     }
+  }
+
+  async function handleBatchFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const allFiles = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    if (allFiles.length === 0) return;
+
+    const oversized = allFiles.filter((f) => f.size > 5 * 1024 * 1024);
+    const files = allFiles.filter((f) => f.size <= 5 * 1024 * 1024);
+
+    if (files.length === 0) {
+      setBatchWarning("選択した画像がすべて5MBを超えています");
+      return;
+    }
+
+    const warning = oversized.length > 0 ? `${oversized.length}枚は5MBを超えたためスキップします` : null;
+    await initBatchModal(files, warning);
+  }
+
+  // Capture session: accumulate shots one by one before entering batch modal
+  function handleCaptureSessionPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) return; // silently skip oversized
+    setCaptureSession((prev) => [...prev, file]);
+  }
+
+  async function finishCaptureSession() {
+    const files = captureSession;
+    setCaptureSession([]);
+    if (files.length === 0) return;
+    await initBatchModal(files, null);
   }
 
   async function handleBatchSave() {
@@ -870,6 +891,15 @@ export function PlantColumn({
           style={{ display: "none" }}
           onChange={handleBatchFileSelect}
         />
+        {/* Hidden camera input for capture session (まとめて撮影) */}
+        <input
+          ref={captureSessionInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          style={{ display: "none" }}
+          onChange={handleCaptureSessionPhoto}
+        />
 
         {hasError ? (
           <div className="todo-card">
@@ -1075,7 +1105,19 @@ export function PlantColumn({
                               setPhotoMenuOpenId(null);
                             }}
                           >
-                            📷 撮影
+                            📷 1枚撮影
+                          </button>
+                          <button
+                            type="button"
+                            className="photo-source-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCaptureSession([]);
+                              captureSessionInputRef.current?.click();
+                              setPhotoMenuOpenId(null);
+                            }}
+                          >
+                            📷 まとめて撮影
                           </button>
                           <button
                             type="button"
@@ -1203,6 +1245,81 @@ export function PlantColumn({
           </>
         )}
       </div>
+
+      {/* Capture session bar — shown while accumulating shots (まとめて撮影) */}
+      {captureSession.length > 0 && !isBatchModalOpen && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 200,
+            background: "rgba(30, 60, 40, 0.96)",
+            backdropFilter: "blur(8px)",
+            padding: "14px 20px",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            boxShadow: "0 -2px 16px rgba(0,0,0,0.18)",
+            fontFamily,
+          }}
+        >
+          <span style={{ color: "#a8d8b0", fontSize: 13, flex: 1, fontWeight: 600 }}>
+            📷 {captureSession.length}枚撮影済み
+          </span>
+          <button
+            type="button"
+            onClick={() => captureSessionInputRef.current?.click()}
+            style={{
+              background: "rgba(255,255,255,0.12)",
+              color: "#e8f5ec",
+              border: "1px solid rgba(255,255,255,0.2)",
+              borderRadius: 8,
+              padding: "8px 14px",
+              fontSize: 13,
+              cursor: "pointer",
+              fontFamily,
+              whiteSpace: "nowrap",
+            }}
+          >
+            もう1枚撮る
+          </button>
+          <button
+            type="button"
+            onClick={finishCaptureSession}
+            style={{
+              background: "#6db07b",
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              padding: "8px 16px",
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: "pointer",
+              fontFamily,
+              whiteSpace: "nowrap",
+            }}
+          >
+            登録へ進む
+          </button>
+          <button
+            type="button"
+            onClick={() => setCaptureSession([])}
+            style={{
+              background: "none",
+              color: "rgba(200,220,205,0.6)",
+              border: "none",
+              fontSize: 20,
+              cursor: "pointer",
+              lineHeight: 1,
+              padding: "0 4px",
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* Photo history modal */}
       {historyModalId && (
