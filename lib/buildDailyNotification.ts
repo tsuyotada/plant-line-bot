@@ -25,6 +25,7 @@ export async function buildDailyNotificationMessage(): Promise<{
   message: string;
   today: string;
   plantCount: number;
+  spotlightPhotoUrl: string | null;
 }> {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -46,7 +47,7 @@ export async function buildDailyNotificationMessage(): Promise<{
       .order("created_at", { ascending: false }),
     supabase
       .from("plant_photos")
-      .select("plant_id, taken_at")
+      .select("plant_id, taken_at, image_url")
       .order("taken_at", { ascending: false }),
     supabase
       .from("care_rules")
@@ -62,13 +63,16 @@ export async function buildDailyNotificationMessage(): Promise<{
       message: `【${today} のお世話メモ🌱】\n登録されている植物がありません🌿`,
       today,
       plantCount: 0,
+      spotlightPhotoUrl: null,
     };
   }
 
   const latestPhotoMap = new Map<string, string>();
+  const latestPhotoUrlMap = new Map<string, string>();
   for (const photo of photosRaw ?? []) {
     if (!latestPhotoMap.has(photo.plant_id)) {
       latestPhotoMap.set(photo.plant_id, photo.taken_at);
+      if (photo.image_url) latestPhotoUrlMap.set(photo.plant_id, photo.image_url);
     }
   }
 
@@ -112,6 +116,7 @@ export async function buildDailyNotificationMessage(): Promise<{
       plant_type: p.plant_type ?? null,
       location: p.location ?? null,
       latestPhotoAt,
+      latestPhotoUrl: latestPhotoUrlMap.get(p.id) ?? null,
       daysSinceLastPhoto,
       fertilizerEnabled,
       fertilizerIntervalDays,
@@ -119,6 +124,6 @@ export async function buildDailyNotificationMessage(): Promise<{
     };
   });
 
-  const message = buildDailyCareMessage(today, plantsWithRecency, careRulesMap);
-  return { message, today, plantCount: plants.length };
+  const { message, spotlightPhotoUrl } = buildDailyCareMessage(today, plantsWithRecency, careRulesMap);
+  return { message, today, plantCount: plants.length, spotlightPhotoUrl };
 }

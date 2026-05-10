@@ -7,6 +7,7 @@ export type PlantWithRecency = {
   location?: string | null;
   daysSinceLastPhoto: number | null;
   latestPhotoAt: string | null;
+  latestPhotoUrl?: string | null;
   fertilizerEnabled: boolean;
   fertilizerIntervalDays: number;
   daysSinceLastFertilized: number;
@@ -34,7 +35,7 @@ export function getCarePriority(days: number | null): CarePriority {
 }
 
 const APP_LINK_PHRASES = [
-  "余力あれば水やり前に写真撮影も！👇",
+  "余力があれば、水やり前に1枚写真を残しておくと変化に気づきやすいです👇",
   "写真を残しておくと、次の変化に気づきやすいです👇",
   "今日のお世話ついでに、1枚だけ記録しておきましょう👇",
   "水やり前の様子を残しておくと、あとで見返しやすいです👇",
@@ -52,92 +53,216 @@ function datePick<T>(items: T[], dateStr: string, salt: number): T {
   return items[Math.abs(h) % items.length];
 }
 
-// タスク種別の優先順位（LINE要約用）: 観察・環境系を水やり/肥料より優先
+// Notable task types: these are shown individually (never grouped)
+const NOTABLE_TASK_TYPES = new Set(["observation", "environment", "pruning", "harvesting", "soil", "support"]);
+const NOTABLE_TASK_RANK: Record<string, number> = {
+  observation: 1, environment: 2, soil: 3, pruning: 4, harvesting: 5, support: 6,
+};
 const LINE_TASK_RANK: Record<string, number> = {
-  observation: 1, environment: 2, soil: 3, support: 4,
-  pruning: 5, harvesting: 6, other: 7, watering: 99, fertilizing: 99,
+  observation: 1, environment: 2, soil: 3, support: 4, pruning: 5, harvesting: 6, other: 7, watering: 99, fertilizing: 99,
+};
+const GROUPING_THRESHOLD = 4; // 4件以上なら同一TODOをグルーピング
+
+type PlantActionType = "notable" | "both" | "water" | "fertilizer" | "ok";
+
+type ClassifiedPlant = {
+  plant: PlantWithRecency;
+  summary: string;
+  actionType: PlantActionType;
+  notableRule: CareRule | null;
 };
 
-function buildLineSummary(
-  plant: PlantWithRecency,
-  rules: CareRule[],
-): { summary: string; needsAction: boolean } {
+function classifyPlant(plant: PlantWithRecency, rules: CareRule[]): ClassifiedPlant {
   const priority = getCarePriority(plant.daysSinceLastPhoto);
   const needsWater = priority === "urgent" || priority === "attention";
   const needsFertilizer =
     plant.fertilizerEnabled &&
     plant.daysSinceLastFertilized >= plant.fertilizerIntervalDays;
-  const needsAction = needsWater || needsFertilizer;
 
-  let summary: string;
-  if (needsWater && needsFertilizer) {
-    summary = "水やりと液体肥料のタイミングです";
+  // Best notable rule (medium+ confidence, non-watering/fertilizing task)
+  const notableRule = rules
+    .filter(r => r.is_active && NOTABLE_TASK_TYPES.has(r.task_type) && r.confidence !== "low")
+    .sort((a, b) => (NOTABLE_TASK_RANK[a.task_type] ?? 7) - (NOTABLE_TASK_RANK[b.task_type] ?? 7))[0] ?? null;
+
+  let actionType: PlantActionType;
+  if (notableRule) {
+    actionType = "notable";
+  } else if (needsWater && needsFertilizer) {
+    actionType = "both";
   } else if (needsWater) {
-    // care_rule のタイトルが短ければそちらを使う（より具体的な表現）
-    const rule = rules
+    actionType = "water";
+  } else if (needsFertilizer) {
+    actionType = "fertilizer";
+  } else {
+    actionType = "ok";
+  }
+
+  // Build the one-line summary for bullet lists
+  let summary: string;
+  if (notableRule) {
+    const ruleText = notableRule.title.length <= 22
+      ? notableRule.title
+      : notableRule.message.slice(0, 35) + "…";
+    summary = ruleText;
+    if (needsWater && needsFertilizer) summary += "、水やりと液体肥料も";
+    else if (needsWater) summary += "、水やりも確認を";
+    else if (needsFertilizer) summary += "、液体肥料のタイミングも";
+  } else if (actionType === "both") {
+    summary = "水やりと液体肥料のタイミングです";
+  } else if (actionType === "water") {
+    const bestRule = rules
       .filter(r => r.is_active && r.task_type !== "fertilizing")
       .sort((a, b) => (LINE_TASK_RANK[a.task_type] ?? 8) - (LINE_TASK_RANK[b.task_type] ?? 8))[0];
-    if (rule?.title && rule.title.length <= 20) {
-      summary = rule.title;
+    if (bestRule?.title && bestRule.title.length <= 20) {
+      summary = bestRule.title;
     } else {
       summary = priority === "urgent" ? "土が乾いていたら水やりを" : "水やりのタイミングを確認して";
     }
-  } else if (needsFertilizer) {
+  } else if (actionType === "fertilizer") {
     summary = "液体肥料をあげるタイミングです";
   } else {
-    // 重要度の高い観察ルールがあれば反映
-    const rule = rules.find(
-      r => r.is_active && r.task_type === "observation" && r.confidence !== "low"
-    );
-    summary = rule?.title ?? "今日は観察中心で";
+    const obsRule = rules.find(r => r.is_active && r.task_type === "observation" && r.confidence !== "low");
+    summary = obsRule?.title ?? "今日は観察中心で";
   }
 
-  return { summary, needsAction };
+  return { plant, summary, actionType, notableRule };
+}
+
+// Build the multi-line description for the 📸 spotlight section
+function buildSpotlightDescription(c: ClassifiedPlant): string {
+  const { plant, actionType, notableRule } = c;
+  if (notableRule?.message) return notableRule.message;
+  if (actionType === "both") {
+    return `${plant.display_name}は水やりと液体肥料のタイミングです。様子も見てあげましょう。`;
+  }
+  if (actionType === "water") {
+    const priority = getCarePriority(plant.daysSinceLastPhoto);
+    if (priority === "urgent") {
+      return `${plant.display_name}はしばらく写真が記録されていません。土の乾き具合を確認してみましょう。`;
+    }
+    return `${plant.display_name}の水やりのタイミングが近づいています。`;
+  }
+  if (actionType === "fertilizer") {
+    return `${plant.display_name}に液体肥料をあげるタイミングです。`;
+  }
+  return `${plant.display_name}の最近の様子です。`;
+}
+
+// Pick the best spotlight plant: notable > both > water > fertilizer > ok (all require latestPhotoUrl)
+function pickSpotlight(classified: ClassifiedPlant[]): ClassifiedPlant | null {
+  const withPhoto = classified.filter(c => !!c.plant.latestPhotoUrl);
+  if (withPhoto.length === 0) return null;
+  const order: PlantActionType[] = ["notable", "both", "water", "fertilizer", "ok"];
+  for (const type of order) {
+    const found = withPhoto.find(c => c.actionType === type);
+    if (found) return found;
+  }
+  return withPhoto[0];
+}
+
+// Build 2-line grouped care summary for 4+ plants with same TODO
+function buildGroupedLines(label: string, items: ClassifiedPlant[]): string[] {
+  const shown = items.slice(0, 4).map(c => c.plant.display_name).join("、");
+  const rest = items.length - 4;
+  const suffix = rest > 0 ? ` ほか${rest}件` : "";
+  return [`${label}が${items.length}件あります。`, `対象：${shown}${suffix}`];
 }
 
 export function buildDailyCareMessage(
   today: string,
   plants: PlantWithRecency[],
   careRulesMap: Map<string, CareRule[]> = new Map(),
-): string {
+): { message: string; spotlightPhotoUrl: string | null } {
   const appLinkPhrase = datePick(APP_LINK_PHRASES, today, 200);
   const appUrl =
     process.env.NEXT_PUBLIC_APP_URL ??
     process.env.APP_URL ??
     "https://plant-line-bot-forme.vercel.app/";
 
-  const summaries = plants.slice(0, 8).map(plant => ({
-    plant,
-    ...buildLineSummary(plant, careRulesMap.get(plant.id) ?? []),
-  }));
+  const classified = plants.slice(0, 12).map(p =>
+    classifyPlant(p, careRulesMap.get(p.id) ?? [])
+  );
 
-  const actionItems = summaries.filter(s => s.needsAction);
+  // ── Spotlight ──────────────────────────────────────────
+  const spotlight = pickSpotlight(classified);
+  const spotlightPhotoUrl = spotlight?.plant.latestPhotoUrl ?? null;
 
-  const intro = actionItems.length > 0
-    ? "今日は少し気にかけたい植物があります。"
-    : "今日は全体的に様子見でOKです。";
+  // Trivia: use spotlight plant first, then first action plant, then any plant
+  const triviaPlant =
+    spotlight?.plant ??
+    classified.find(c => c.actionType !== "ok")?.plant ??
+    classified[0]?.plant ??
+    null;
+  const trivia = triviaPlant?.plant_type ? getPlantTrivia(triviaPlant.plant_type, today) : null;
 
-  const plantSection =
-    actionItems.length > 0
-      ? actionItems.map(({ plant, summary }) => `・${plant.display_name}：${summary}`).join("\n")
-      : "今日のお世話はありません 🌿";
+  // ── Classify action buckets ────────────────────────────
+  const notableItems  = classified.filter(c => c.actionType === "notable");
+  const bothItems     = classified.filter(c => c.actionType === "both");
+  const waterItems    = classified.filter(c => c.actionType === "water");
+  const fertItems     = classified.filter(c => c.actionType === "fertilizer");
+  const anyAction     = notableItems.length + bothItems.length + waterItems.length + fertItems.length > 0;
 
-  // Trivia: pick the most notable plant (first action item, or first plant overall)
-  const triviaTarget = (actionItems[0] ?? summaries[0])?.plant ?? null;
-  const trivia = triviaTarget?.plant_type
-    ? getPlantTrivia(triviaTarget.plant_type, today)
-    : null;
+  // ── Assemble message ───────────────────────────────────
+  const lines: string[] = ["【今日の植物メモ 🌱】", ""];
 
-  return [
-    "【今日の植物メモ 🌱】",
-    "",
-    intro,
-    "",
-    plantSection,
-    ...(trivia ? ["", `💡 ${trivia}`] : []),
-    "",
-    appLinkPhrase,
-    appUrl,
-    "詳細はアプリで見てください🌿",
-  ].join("\n");
+  // 📸 Spotlight block (only when there's a photo)
+  if (spotlight) {
+    lines.push("📸 今日の1枚");
+    lines.push(buildSpotlightDescription(spotlight));
+    if (trivia) lines.push(`💡 ${trivia}`);
+    lines.push("");
+  }
+
+  // Care block
+  if (!anyAction) {
+    lines.push("今日は全体的に大丈夫そうです。ゆっくり様子を見てあげてください。");
+  } else {
+    // ⚠️ Notable: always shown individually
+    if (notableItems.length > 0) {
+      lines.push("⚠️ 気になるサイン");
+      notableItems.forEach(c => lines.push(`・${c.plant.display_name}：${c.summary}`));
+    }
+
+    // 🌿 Routine care: group when ≥ GROUPING_THRESHOLD, individual otherwise
+    const routineLines: string[] = [];
+
+    if (bothItems.length >= GROUPING_THRESHOLD) {
+      routineLines.push(...buildGroupedLines("水やりと液体肥料のタイミング", bothItems));
+    } else {
+      bothItems.forEach(c => routineLines.push(`・${c.plant.display_name}：${c.summary}`));
+    }
+
+    if (waterItems.length >= GROUPING_THRESHOLD) {
+      routineLines.push(...buildGroupedLines("水やりのタイミング", waterItems));
+    } else {
+      waterItems.forEach(c => routineLines.push(`・${c.plant.display_name}：${c.summary}`));
+    }
+
+    if (fertItems.length >= GROUPING_THRESHOLD) {
+      routineLines.push(...buildGroupedLines("液体肥料のタイミング", fertItems));
+    } else {
+      fertItems.forEach(c => routineLines.push(`・${c.plant.display_name}：${c.summary}`));
+    }
+
+    if (routineLines.length > 0) {
+      if (notableItems.length > 0) lines.push(""); // separator between ⚠️ and 🌿
+      lines.push("🌿 今日のケア");
+      lines.push(...routineLines);
+    }
+
+    // Closing reassurance when there are no notable issues
+    if (notableItems.length === 0) {
+      lines.push("", "今日は大きな異変はなさそうです。");
+    }
+  }
+
+  // Trivia without spotlight: add after care section
+  if (!spotlight && trivia) {
+    lines.push("", `💡 ${trivia}`);
+  }
+
+  // App link
+  lines.push("", appLinkPhrase, appUrl, "詳細はアプリで見てください🌿");
+
+  return { message: lines.join("\n"), spotlightPhotoUrl };
 }

@@ -2,17 +2,14 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { buildDailyNotificationMessage } from "@/lib/buildDailyNotification";
 
-async function sendLine(token: string, userId: string, message: string) {
+async function sendLineMessages(token: string, userId: string, messages: object[]) {
   return fetch("https://api.line.me/v2/bot/message/push", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({
-      to: userId,
-      messages: [{ type: "text", text: message }],
-    }),
+    body: JSON.stringify({ to: userId, messages }),
   });
 }
 
@@ -25,9 +22,10 @@ export async function GET() {
     );
   }
 
-  // 1. 通知メッセージを生成
-  const { message, today, plantCount } = await buildDailyNotificationMessage();
+  // 1. 通知メッセージ（テキスト＋スポットライト画像URL）を生成
+  const { message, today, plantCount, spotlightPhotoUrl } = await buildDailyNotificationMessage();
   console.log(`[Daily] 生成メッセージ:\n${message}`);
+  console.log(`[Daily] spotlightPhotoUrl=${spotlightPhotoUrl ?? "なし"}`);
 
   // 2. 通知先ユーザーをDBから取得
   const supabase = createClient(
@@ -70,30 +68,58 @@ export async function GET() {
   // 3. 全員に送信（1人失敗しても続行）
   let successCount = 0;
   let failCount = 0;
+  let imageFailCount = 0;
 
   for (const userId of recipients) {
+    // 3a. 今日の1枚 画像メッセージを先送り（失敗してもテキストは送る）
+    if (spotlightPhotoUrl) {
+      try {
+        const imgRes = await sendLineMessages(lineToken, userId, [
+          {
+            type: "image",
+            originalContentUrl: spotlightPhotoUrl,
+            previewImageUrl: spotlightPhotoUrl,
+          },
+        ]);
+        if (!imgRes.ok) {
+          imageFailCount++;
+          console.warn(`[Daily] 画像送信失敗 userId=${userId} status=${imgRes.status}`);
+        } else {
+          console.log(`[Daily] 画像送信成功 userId=${userId}`);
+        }
+      } catch (err) {
+        imageFailCount++;
+        console.warn(`[Daily] 画像送信例外 userId=${userId}`, err);
+      }
+    }
+
+    // 3b. テキストメッセージ送信（必ず実行）
     try {
-      const res = await sendLine(lineToken, userId, message);
+      const res = await sendLineMessages(lineToken, userId, [
+        { type: "text", text: message },
+      ]);
       if (res.ok) {
         successCount++;
-        console.log(`[Daily] 送信成功 userId=${userId}`);
+        console.log(`[Daily] テキスト送信成功 userId=${userId}`);
       } else {
         failCount++;
         const errorText = await res.text();
-        console.error(`[Daily] 送信失敗 userId=${userId} status=${res.status} body=${errorText}`);
+        console.error(`[Daily] テキスト送信失敗 userId=${userId} status=${res.status} body=${errorText}`);
       }
     } catch (err) {
       failCount++;
-      console.error(`[Daily] 送信例外 userId=${userId}`, err);
+      console.error(`[Daily] テキスト送信例外 userId=${userId}`, err);
     }
   }
 
-  console.log(`[Daily] 送信完了 成功=${successCount} 失敗=${failCount} 合計=${recipients.length}`);
+  console.log(`[Daily] 送信完了 成功=${successCount} 失敗=${failCount} 画像失敗=${imageFailCount} 合計=${recipients.length}`);
   return NextResponse.json({
     ok: true,
     today,
     count: plantCount,
     sent: successCount,
     failed: failCount,
+    imageFailed: imageFailCount,
+    spotlightSent: !!spotlightPhotoUrl && imageFailCount < recipients.length,
   });
 }
