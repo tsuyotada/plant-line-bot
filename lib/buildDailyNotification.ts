@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { getTodayWeather } from "./dailyWeather";
-import { buildDailyCareMessage, getCarePriority, PlantWithRecency } from "./dailyCareMessage";
+import { buildDailyCareMessage, PlantWithRecency } from "./dailyCareMessage";
 
 const plantLabelMap: Record<string, string> = {
   tomato: "トマト",
@@ -79,10 +79,23 @@ export async function buildDailyNotificationMessage(): Promise<{
       daysSinceLastPhoto = Math.floor((todayMs - photoDateMs) / (1000 * 60 * 60 * 24));
     }
     const displayName = getPlantLabel(p.plant_type);
-    const carePriority = getCarePriority(daysSinceLastPhoto);
+
+    // Fertilizer fields (fall back to defaults if columns not yet added)
+    const fertilizerEnabled = p.fertilizer_enabled !== false;
+    const fertilizerIntervalDays = (p.fertilizer_interval_days as number | null) ?? 14;
+    const fertilizerBaseDate =
+      (p.last_fertilized_at as string | null) ??
+      (p.created_at as string | null) ??
+      today;
+    const daysSinceLastFertilized = Math.floor(
+      (todayMs - new Date(String(fertilizerBaseDate).slice(0, 10)).getTime()) /
+        (1000 * 60 * 60 * 24)
+    );
+
     console.log(
       `[Daily] plant_id=${p.id} name=${displayName}` +
-      ` daysSinceLastPhoto=${daysSinceLastPhoto ?? "null"} carePriority=${carePriority}`
+      ` daysSinceLastPhoto=${daysSinceLastPhoto ?? "null"}` +
+      ` daysSinceLastFertilized=${daysSinceLastFertilized} fertilizerEnabled=${fertilizerEnabled}`
     );
     return {
       id: p.id,
@@ -90,6 +103,9 @@ export async function buildDailyNotificationMessage(): Promise<{
       location: p.location ?? null,
       latestPhotoAt,
       daysSinceLastPhoto,
+      fertilizerEnabled,
+      fertilizerIntervalDays,
+      daysSinceLastFertilized,
     };
   });
 

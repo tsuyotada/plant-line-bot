@@ -16,6 +16,10 @@ import { getCarePriority } from "@/lib/dailyCareMessage";
 //   message_body text not null,
 //   created_at timestamptz default now()
 // );
+//
+// alter table plants add column if not exists fertilizer_enabled boolean default true;
+// alter table plants add column if not exists fertilizer_interval_days integer default 14;
+// alter table plants add column if not exists last_fertilized_at date;
 
 function todayString() {
   return new Date().toISOString().slice(0, 10);

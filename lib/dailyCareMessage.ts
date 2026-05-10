@@ -6,6 +6,9 @@ export type PlantWithRecency = {
   location?: string | null;
   daysSinceLastPhoto: number | null;
   latestPhotoAt: string | null;
+  fertilizerEnabled: boolean;
+  fertilizerIntervalDays: number;
+  daysSinceLastFertilized: number;
 };
 
 export type CarePriority = "recent" | "normal" | "attention" | "urgent";
@@ -26,10 +29,6 @@ function getSeason(dateStr: string): Season {
   return "winter";
 }
 
-/**
- * 日付文字列 + salt をシードにした決定論的な配列選択。
- * 同じ日・同じ salt なら常に同じ要素を返す。
- */
 function datePick<T>(items: T[], dateStr: string, salt: number): T {
   const seed = `${dateStr}:${salt}`;
   let h = 0;
@@ -102,29 +101,6 @@ const SEASON_LINES: Record<Season, string[]> = {
   ],
 };
 
-const CARE_LINES: Record<CarePriority, string[]> = {
-  recent: [
-    "最近記録あり。今日は様子を見守るだけでOK",
-    "記録が新しいです。今日は軽く確認するだけで大丈夫",
-    "最近観察できています。今日は見守り中心で",
-  ],
-  normal: [
-    "少し日が空いています。土の表面を確認してみて",
-    "そろそろチェックを。土が乾いていたら水やりを",
-    "今日は土の乾き具合を確かめてみましょう",
-  ],
-  attention: [
-    "最後の記録からしばらく経っています。土や葉を確認して",
-    "少し間が空いています。鉢が軽くなっていたら水やり候補",
-    "今日は優先してチェックを。水切れの可能性があります",
-  ],
-  urgent: [
-    "しばらく記録がありません。水切れや葉の変化を確認して",
-    "久しぶりのチェックが必要かもしれません。今日は必ず見てあげて",
-    "記録がしばらくありません。土が乾いていたら水やりを優先して",
-  ],
-};
-
 const CLOSING_LINES = [
   "無理ない範囲で、ちょこっとだけ気にかけてあげてください🌿",
   "植物との時間を楽しんでください🌱",
@@ -134,43 +110,13 @@ const CLOSING_LINES = [
   "毎日少しの観察が、元気な植物への一番の近道です🌿",
 ];
 
-// ── Context-aware plant care line ─────────────────────────────────
-
-function getPlantCareLine(
-  plant: PlantWithRecency,
-  weatherKey: string,
-  season: Season,
-  today: string,
-  salt: number
-): string {
-  const priority = getCarePriority(plant.daysSinceLastPhoto);
-  const base = datePick(CARE_LINES[priority], today, salt);
-
-  if (weatherKey === "hot" && (priority === "urgent" || priority === "attention")) {
-    return base + "（暑い日は水切れに特に注意）";
-  }
-  if (weatherKey === "rainy" && (priority === "urgent" || priority === "attention")) {
-    return base + "（雨の日は水やりより蒸れ・水はけのチェックを）";
-  }
-  if (weatherKey === "cold" && (priority === "urgent" || priority === "attention")) {
-    return base + "（寒さが続く日は置き場所も確認して）";
-  }
-  if (season === "summer" && priority !== "recent") {
-    return base + "（朝夕の観察がおすすめ）";
-  }
-  if (season === "winter" && (priority === "urgent" || priority === "attention")) {
-    return base + "（水のあげすぎ注意）";
-  }
-  return base;
-}
-
-// ── Message builder ───────────────────────────────────────────────
-
 function getWeatherKey(w: WeatherInfo): string {
   if (w.temperatureC >= 28) return "hot";
   if (w.temperatureC <= 10) return "cold";
   return w.weather; // "sunny" | "cloudy" | "rainy"
 }
+
+// ── Message builder ───────────────────────────────────────────────
 
 export function buildDailyCareMessage(
   today: string,
@@ -182,13 +128,30 @@ export function buildDailyCareMessage(
 
   const weatherLine = datePick(WEATHER_LINES[weatherKey], today, 0);
   const seasonLine = datePick(SEASON_LINES[season], today, 100);
-
-  const plantLines = plants.slice(0, 5).map((plant, i) => {
-    const careLine = getPlantCareLine(plant, weatherKey, season, today, i + 1);
-    return `・${plant.display_name}：${careLine}`;
-  });
-
   const closing = datePick(CLOSING_LINES, today, 99);
+
+  const plantLines = plants
+    .slice(0, 5)
+    .flatMap((plant) => {
+      const needsWatering = getCarePriority(plant.daysSinceLastPhoto) !== "recent";
+      const needsFertilizer =
+        plant.fertilizerEnabled &&
+        plant.daysSinceLastFertilized >= plant.fertilizerIntervalDays;
+
+      if (needsWatering && needsFertilizer) {
+        return [`・${plant.display_name}：水やりと液体肥料をしましょう`];
+      } else if (needsWatering) {
+        return [`・${plant.display_name}：水やりをしましょう`];
+      } else if (needsFertilizer) {
+        return [`・${plant.display_name}：液体肥料をあげるタイミングです`];
+      }
+      return [];
+    });
+
+  const plantSection =
+    plantLines.length > 0
+      ? plantLines.join("\n")
+      : "今日のお世話はありません 🌿";
 
   return [
     "【今日の植物メモ 🌱】",
@@ -196,7 +159,7 @@ export function buildDailyCareMessage(
     weatherLine,
     seasonLine,
     "",
-    plantLines.join("\n"),
+    plantSection,
     "",
     closing,
   ].join("\n");
