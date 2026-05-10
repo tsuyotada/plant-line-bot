@@ -1160,20 +1160,20 @@ export async function POST(req: Request) {
     }
 
     // ── AI チャット（会話履歴付き） ────────────────────────────────
+    // 案A: 保存前に過去履歴を取得 → 今回メッセージは末尾に一度だけ渡す
+    // messages 順: system → 古い履歴 → 新しい履歴 → 今回の user
     const supabaseChat = getSupabase();
 
-    // 1. ユーザーメッセージを保存
+    // 1. 先に過去履歴を取得（今回のメッセージはまだ保存していない）
+    const pastHistory = await fetchConversationHistory(supabaseChat, lineUserId, 20);
+
+    // 2. 今回の user メッセージを保存
     await saveConversationMessage(supabaseChat, lineUserId, "user", userMessage);
 
-    // 2. 直近の会話履歴を取得（今回のユーザーメッセージは含めない）
-    const history = await fetchConversationHistory(supabaseChat, lineUserId, 20);
-    // 末尾が今回保存したばかりのユーザーメッセージなので除く
-    const historyWithoutCurrent = history.slice(0, -1);
-
-    // 3. AI 返信を生成
+    // 3. AI 返信を生成（過去履歴 + 今回メッセージで重複なし）
     const aiReply = await generatePlantChatReply({
       userMessage,
-      conversationHistory: historyWithoutCurrent,
+      conversationHistory: pastHistory,
     });
     const replyText =
       aiReply ?? "うまく答えられませんでした。もう一度試してください🌱";
