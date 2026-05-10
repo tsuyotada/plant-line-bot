@@ -53,11 +53,19 @@ function datePick<T>(items: T[], dateStr: string, salt: number): T {
   return items[Math.abs(h) % items.length];
 }
 
-// Notable task types: these are shown individually (never grouped)
-const NOTABLE_TASK_TYPES = new Set(["observation", "environment", "pruning", "harvesting", "soil", "support"]);
-const NOTABLE_TASK_RANK: Record<string, number> = {
-  observation: 1, environment: 2, soil: 3, pruning: 4, harvesting: 5, support: 6,
-};
+// Keywords that indicate an actual detected problem (not routine care reminders).
+// Care rules matching these are shown in ⚠️; everything else goes to 🌿 routine care.
+const PROBLEM_SIGN_KEYWORDS = [
+  "虫", "害虫", "病害虫", "カビ", "菌", "黄化", "黄色", "しおれ", "萎れ",
+  "枯れ", "腐れ", "腐敗", "落葉", "葉が落ち", "元気がない", "異常",
+  "過湿", "根腐れ", "乾燥しすぎ",
+];
+
+function hasActualProblemSign(rule: CareRule): boolean {
+  const text = `${rule.title} ${rule.task_detail} ${rule.message}`;
+  return PROBLEM_SIGN_KEYWORDS.some(kw => text.includes(kw));
+}
+
 const LINE_TASK_RANK: Record<string, number> = {
   observation: 1, environment: 2, soil: 3, support: 4, pruning: 5, harvesting: 6, other: 7, watering: 99, fertilizing: 99,
 };
@@ -79,10 +87,13 @@ function classifyPlant(plant: PlantWithRecency, rules: CareRule[]): ClassifiedPl
     plant.fertilizerEnabled &&
     plant.daysSinceLastFertilized >= plant.fertilizerIntervalDays;
 
-  // Best notable rule (medium+ confidence, non-watering/fertilizing task)
+  // Notable rule = only care rules containing detected-problem keywords (not routine reminders)
   const notableRule = rules
-    .filter(r => r.is_active && NOTABLE_TASK_TYPES.has(r.task_type) && r.confidence !== "low")
-    .sort((a, b) => (NOTABLE_TASK_RANK[a.task_type] ?? 7) - (NOTABLE_TASK_RANK[b.task_type] ?? 7))[0] ?? null;
+    .filter(r => r.is_active && r.confidence !== "low" && hasActualProblemSign(r))
+    .sort((a, b) => {
+      const cs: Record<string, number> = { high: 0, medium: 1, low: 2 };
+      return (cs[a.confidence] ?? 1) - (cs[b.confidence] ?? 1);
+    })[0] ?? null;
 
   let actionType: PlantActionType;
   if (notableRule) {
@@ -128,24 +139,16 @@ function classifyPlant(plant: PlantWithRecency, rules: CareRule[]): ClassifiedPl
   return { plant, summary, actionType, notableRule };
 }
 
-// Build the multi-line description for the 📸 spotlight section
+// Build the multi-line description for the 📸 spotlight section.
+// Always uses observation-style text — never care instructions or TODO phrases.
 function buildSpotlightDescription(c: ClassifiedPlant): string {
-  const { plant, actionType, notableRule } = c;
-  if (notableRule?.message) return notableRule.message;
-  if (actionType === "both") {
-    return `${plant.display_name}は水やりと液体肥料のタイミングです。様子も見てあげましょう。`;
-  }
-  if (actionType === "water") {
-    const priority = getCarePriority(plant.daysSinceLastPhoto);
-    if (priority === "urgent") {
-      return `${plant.display_name}はしばらく写真が記録されていません。土の乾き具合を確認してみましょう。`;
-    }
-    return `${plant.display_name}の水やりのタイミングが近づいています。`;
-  }
-  if (actionType === "fertilizer") {
-    return `${plant.display_name}に液体肥料をあげるタイミングです。`;
-  }
-  return `${plant.display_name}の最近の様子です。`;
+  const { plant } = c;
+  const days = plant.daysSinceLastPhoto;
+  const name = plant.display_name;
+  if (days === null || days === 0) return `${name}の最新の様子です。`;
+  if (days === 1) return `${name}の昨日の様子です。`;
+  if (days <= 3) return `${name}の${days}日前の様子です。`;
+  return `${name}はしばらく写真の記録がありません。`;
 }
 
 // Pick the best spotlight plant: notable > both > water > fertilizer > ok (all require latestPhotoUrl)
@@ -223,25 +226,46 @@ export function buildDailyCareMessage(
       notableItems.forEach(c => lines.push(`・${c.plant.display_name}：${c.summary}`));
     }
 
-    // 🌿 Routine care: group when ≥ GROUPING_THRESHOLD, individual otherwise
+    // 🌿 Routine care: merge bothItems into fert/water pools for threshold check
     const routineLines: string[] = [];
+    const allFertPlants = [...bothItems, ...fertItems];
+    const allWaterPlants = [...bothItems, ...waterItems];
 
-    if (bothItems.length >= GROUPING_THRESHOLD) {
-      routineLines.push(...buildGroupedLines("水やりと液体肥料のタイミング", bothItems));
+    if (allFertPlants.length >= GROUPING_THRESHOLD) {
+      // All fertilizer-needing plants (both water+fert and fert-only) grouped together
+      routineLines.push(...buildGroupedLines("液体肥料のタイミング", allFertPlants));
+      // Remaining water-only plants shown separately
+      if (waterItems.length >= GROUPING_THRESHOLD) {
+        routineLines.push(...buildGroupedLines("水やりのタイミング", waterItems));
+      } else {
+        waterItems.forEach(c => routineLines.push(`・${c.plant.display_name}：${c.summary}`));
+      }
+    } else if (allWaterPlants.length >= GROUPING_THRESHOLD) {
+      // All water-needing plants grouped together (no large fert pool)
+      routineLines.push(...buildGroupedLines("水やりのタイミング", allWaterPlants));
+      // Remaining fert-only plants shown separately
+      if (fertItems.length >= GROUPING_THRESHOLD) {
+        routineLines.push(...buildGroupedLines("液体肥料のタイミング", fertItems));
+      } else {
+        fertItems.forEach(c => routineLines.push(`・${c.plant.display_name}：${c.summary}`));
+      }
     } else {
-      bothItems.forEach(c => routineLines.push(`・${c.plant.display_name}：${c.summary}`));
-    }
-
-    if (waterItems.length >= GROUPING_THRESHOLD) {
-      routineLines.push(...buildGroupedLines("水やりのタイミング", waterItems));
-    } else {
-      waterItems.forEach(c => routineLines.push(`・${c.plant.display_name}：${c.summary}`));
-    }
-
-    if (fertItems.length >= GROUPING_THRESHOLD) {
-      routineLines.push(...buildGroupedLines("液体肥料のタイミング", fertItems));
-    } else {
-      fertItems.forEach(c => routineLines.push(`・${c.plant.display_name}：${c.summary}`));
+      // All buckets below threshold — show individually
+      if (bothItems.length >= GROUPING_THRESHOLD) {
+        routineLines.push(...buildGroupedLines("水やりと液体肥料のタイミング", bothItems));
+      } else {
+        bothItems.forEach(c => routineLines.push(`・${c.plant.display_name}：${c.summary}`));
+      }
+      if (waterItems.length >= GROUPING_THRESHOLD) {
+        routineLines.push(...buildGroupedLines("水やりのタイミング", waterItems));
+      } else {
+        waterItems.forEach(c => routineLines.push(`・${c.plant.display_name}：${c.summary}`));
+      }
+      if (fertItems.length >= GROUPING_THRESHOLD) {
+        routineLines.push(...buildGroupedLines("液体肥料のタイミング", fertItems));
+      } else {
+        fertItems.forEach(c => routineLines.push(`・${c.plant.display_name}：${c.summary}`));
+      }
     }
 
     if (routineLines.length > 0) {
