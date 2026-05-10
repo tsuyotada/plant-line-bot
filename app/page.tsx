@@ -322,7 +322,10 @@ export default async function Home() {
   const summaryStats = {
     waterCount: plantCareCards.filter(c => c.tags.includes("水やり")).length,
     fertilizerCount: plantCareCards.filter(c => c.tags.includes("液体肥料")).length,
-    observationCount: plantCareCards.filter(c => c.tags.includes("観察")).length,
+    // 観察・環境確認は同じ「見守り」カテゴリ。植物単位で重複カウントしない
+    observationCount: plantCareCards.filter(c =>
+      c.tags.some(t => t === "観察" || t === "環境確認")
+    ).length,
     photoCount: plantCareCards.filter(c => c.tags.includes("写真記録")).length,
     total: plantCareCards.length,
   };
@@ -640,47 +643,63 @@ export default async function Home() {
             <div className="col-board">
               <h2 className="col-heading">全体サマリー</h2>
 
-              {/* 数値チップ */}
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 10 }}>
-                {summaryStats.waterCount > 0 && (
-                  <div style={{ background: "#dbeafe", borderRadius: 8, padding: "5px 10px", display: "flex", flexDirection: "column", alignItems: "center", minWidth: 56 }}>
-                    <span style={{ fontSize: 18, fontWeight: 700, color: "#1e40af", lineHeight: 1 }}>{summaryStats.waterCount}</span>
-                    <span style={{ fontSize: 9, color: "#3b82f6", fontWeight: 600, marginTop: 2 }}>水やり</span>
+              {/* 🌿 今日の主なお世話：水やり・液体肥料 */}
+              {(summaryStats.waterCount > 0 || summaryStats.fertilizerCount > 0) && (
+                <div style={{ marginBottom: 10 }}>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: "#3d6b3d", margin: "0 0 4px 0" }}>
+                    🌿 今日の主なお世話
+                  </p>
+                  <div style={{ background: "#f0fdf4", borderRadius: 8, padding: "8px 10px", fontSize: 12, color: "#374151", lineHeight: 1.75 }}>
+                    {summaryStats.waterCount > 0 && summaryStats.fertilizerCount > 0 ? (
+                      <>水やり候補が<b>{summaryStats.waterCount}件</b>、液体肥料のタイミングが<b>{summaryStats.fertilizerCount}件</b>あります。</>
+                    ) : summaryStats.waterCount > 0 ? (
+                      <>水やり候補が<b>{summaryStats.waterCount}件</b>あります。</>
+                    ) : (
+                      <>液体肥料のタイミングが<b>{summaryStats.fertilizerCount}件</b>あります。</>
+                    )}
+                    {(summaryStats.waterCount + summaryStats.fertilizerCount) >= 5 && (
+                      <><br /><span style={{ color: "#6b7280" }}>対象が多めなので、まずはよく育っている植物や最近元気のない植物から確認しましょう。</span></>
+                    )}
                   </div>
-                )}
-                {summaryStats.fertilizerCount > 0 && (
-                  <div style={{ background: "#fef3c7", borderRadius: 8, padding: "5px 10px", display: "flex", flexDirection: "column", alignItems: "center", minWidth: 56 }}>
-                    <span style={{ fontSize: 18, fontWeight: 700, color: "#92400e", lineHeight: 1 }}>{summaryStats.fertilizerCount}</span>
-                    <span style={{ fontSize: 9, color: "#d97706", fontWeight: 600, marginTop: 2 }}>液体肥料</span>
-                  </div>
-                )}
-                {summaryStats.observationCount > 0 && (
-                  <div style={{ background: "#e0f2fe", borderRadius: 8, padding: "5px 10px", display: "flex", flexDirection: "column", alignItems: "center", minWidth: 56 }}>
-                    <span style={{ fontSize: 18, fontWeight: 700, color: "#0369a1", lineHeight: 1 }}>{summaryStats.observationCount}</span>
-                    <span style={{ fontSize: 9, color: "#0ea5e9", fontWeight: 600, marginTop: 2 }}>観察</span>
-                  </div>
-                )}
-                {summaryStats.photoCount > 0 && (
-                  <div style={{ background: "#ede9fe", borderRadius: 8, padding: "5px 10px", display: "flex", flexDirection: "column", alignItems: "center", minWidth: 56 }}>
-                    <span style={{ fontSize: 18, fontWeight: 700, color: "#5b21b6", lineHeight: 1 }}>{summaryStats.photoCount}</span>
-                    <span style={{ fontSize: 9, color: "#7c3aed", fontWeight: 600, marginTop: 2 }}>写真記録</span>
-                  </div>
-                )}
-              </div>
+                </div>
+              )}
 
-              {/* サマリー文 */}
-              <p style={{ margin: 0, fontSize: 12, color: "#374151", lineHeight: 1.75 }}>
-                {(() => {
-                  const parts: string[] = [];
-                  if (summaryStats.waterCount > 0) parts.push(`水やり候補が${summaryStats.waterCount}件`);
-                  if (summaryStats.fertilizerCount > 0) parts.push(`液体肥料のタイミングが${summaryStats.fertilizerCount}件`);
-                  if (parts.length > 0) return `今日は${parts.join("、")}あります。`;
-                  if (summaryStats.photoCount > 0) return "全体的に様子見でOKです。余力があれば写真を記録しておきましょう。";
-                  return "今日は大きな作業は不要です。ゆっくり様子を見てあげてください。";
-                })()}
-                {summaryStats.photoCount > 0 && (summaryStats.waterCount > 0 || summaryStats.fertilizerCount > 0) && (
-                  <><br />最近写真が少ない植物があるので、余力があれば記録しておくと変化に気づきやすいです。</>
-                )}
+              {/* 👀 見守りポイント：観察・環境確認 */}
+              {summaryStats.observationCount > 0 && (
+                <div style={{ marginBottom: 10 }}>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: "#0369a1", margin: "0 0 4px 0" }}>
+                    👀 見守りポイント
+                  </p>
+                  <div style={{ background: "#f0f9ff", borderRadius: 8, padding: "8px 10px", fontSize: 12, color: "#374151", lineHeight: 1.75 }}>
+                    <b>{summaryStats.observationCount}件</b>は通常の観察対象です。
+                    <br /><span style={{ color: "#6b7280" }}>葉色・虫食い・土の乾き具合を軽く見ておくと安心です。</span>
+                  </div>
+                </div>
+              )}
+
+              {/* 📸 写真記録のおすすめ */}
+              {summaryStats.photoCount > 0 && (
+                <div style={{ marginBottom: 10 }}>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: "#7c3aed", margin: "0 0 4px 0" }}>
+                    📸 写真記録のおすすめ
+                  </p>
+                  <div style={{ background: "#faf5ff", borderRadius: 8, padding: "8px 10px", fontSize: 12, color: "#374151", lineHeight: 1.75 }}>
+                    <b>{summaryStats.photoCount}件</b>の植物がしばらく写真のない状態です。
+                    <br /><span style={{ color: "#6b7280" }}>余力があれば、お世話のついでに1枚記録しておくと変化に気づきやすいです。</span>
+                  </div>
+                </div>
+              )}
+
+              {/* 全て問題なし */}
+              {summaryStats.waterCount === 0 && summaryStats.fertilizerCount === 0 &&
+               summaryStats.observationCount === 0 && summaryStats.photoCount === 0 && (
+                <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 10px", lineHeight: 1.75 }}>
+                  今日は大きな作業は不要です。ゆっくり様子を見てあげてください。
+                </p>
+              )}
+
+              <p style={{ margin: 0, fontSize: 11, color: "#9ca3af", lineHeight: 1.5 }}>
+                詳しくは各植物カードのケアメモを確認してください。
               </p>
             </div>
           )}
