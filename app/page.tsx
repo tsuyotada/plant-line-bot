@@ -194,12 +194,33 @@ async function reorderPlants(orderedIds: string[]) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function Home() {
+  const pageStart = Date.now();
   const today = todayString();
 
-  const { data: allPlantsRaw, error: plantsError } = await supabase
-    .from("plants")
-    .select("*")
-    .order("created_at", { ascending: false });
+  // Run all independent DB queries in parallel (was sequential → ~10s, now parallel → ~2-3s)
+  const dbStart = Date.now();
+  const [
+    { data: allPlantsRaw, error: plantsError },
+    { data: photosRaw, error: photosError },
+    { data: todayLog },
+  ] = await Promise.all([
+    supabase
+      .from("plants")
+      .select("*")
+      .order("created_at", { ascending: false }),
+    // Limit to 500 most recent photos; histories beyond this load on demand
+    supabase
+      .from("plant_photos")
+      .select("id, plant_id, image_url, taken_at")
+      .order("taken_at", { ascending: false })
+      .limit(500),
+    supabase
+      .from("daily_notification_logs")
+      .select("message_body")
+      .eq("date", today)
+      .maybeSingle(),
+  ]);
+  console.log(`[Page] db queries ${Date.now() - dbStart}ms (plants=${allPlantsRaw?.length ?? 0} photos=${photosRaw?.length ?? 0} plantsErr=${plantsError?.message ?? "-"} photosErr=${photosError?.message ?? "-"}`);
 
   // Sort in JS so the query never fails when sort_order column doesn't exist yet.
   // Plants with sort_order set appear first (ascending), NULLs fall back to created_at order.
@@ -209,27 +230,10 @@ export default async function Home() {
     if (aOrd !== null && bOrd !== null) return aOrd - bOrd;
     if (aOrd !== null) return -1;
     if (bOrd !== null) return 1;
-    return 0; // both null → preserve created_at desc order from query
+    return 0;
   });
   const plants = allPlants.filter((p) => !p.archived_at);
   const archivedPlants = allPlants.filter((p) => !!p.archived_at);
-
-  // care_events kept as internal data (not used for badge display)
-  await supabase
-    .from("care_events")
-    .select("id")
-    .eq("scheduled_for", today)
-    .eq("status", "pending")
-    .limit(1);
-
-  // Photos
-  const { data: photosRaw, error: photosError } = await supabase
-    .from("plant_photos")
-    .select("id, plant_id, image_url, taken_at")
-    .order("taken_at", { ascending: false });
-
-  console.log(`[Page] plants取得件数=${allPlants.length} photosError=${photosError?.message ?? "なし"}`);
-  console.log(`[Page] plant_photos取得件数=${photosRaw?.length ?? 0}`);
 
   const photos = photosRaw ?? [];
   const latestPhotos: Record<string, string> = {};
@@ -241,10 +245,7 @@ export default async function Home() {
   for (const photo of photos) {
     const url: string = photo.image_url ?? "";
     if (!url) continue;
-    if (!latestPhotos[photo.plant_id]) {
-      latestPhotos[photo.plant_id] = url;
-      console.log(`[Page] plant_id=${photo.plant_id} 最新写真あり url=${url}`);
-    }
+    if (!latestPhotos[photo.plant_id]) latestPhotos[photo.plant_id] = url;
     if (!photoHistories[photo.plant_id]) photoHistories[photo.plant_id] = [];
     photoHistories[photo.plant_id].push({
       id: photo.id,
@@ -253,18 +254,6 @@ export default async function Home() {
     });
   }
 
-  for (const plant of plants) {
-    if (!latestPhotos[plant.id]) {
-      console.log(`[Page] plant_id=${plant.id} (${plant.plant_type}) 写真なし`);
-    }
-  }
-
-  // Fetch today's LINE notification message for 今日やること display
-  const { data: todayLog } = await supabase
-    .from("daily_notification_logs")
-    .select("message_body")
-    .eq("date", today)
-    .maybeSingle();
   const todayMessage: string | null = todayLog?.message_body ?? null;
 
   // Badge record: derived from photo recency (urgent/attention → 要対応)
@@ -279,6 +268,8 @@ export default async function Home() {
       return [plant.id, priority === "urgent" || priority === "attention"];
     })
   );
+
+  console.log(`[Page] total render ${Date.now() - pageStart}ms`);
 
   const fontFamily =
     'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';

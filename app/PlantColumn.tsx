@@ -922,6 +922,8 @@ export function PlantColumn({
                           <img
                             src={displayPhoto}
                             alt={getPlantLabel(plant.plant_type)}
+                            loading="lazy"
+                            decoding="async"
                             style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" }}
                           />
                         ) : (
@@ -1238,6 +1240,8 @@ export function PlantColumn({
                       <img
                         src={photo.url}
                         alt={photo.takenAt}
+                        loading="lazy"
+                        decoding="async"
                         style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 8, display: "block", cursor: "zoom-in" }}
                         onClick={() => setLightbox({ urls, index: photoIdx })}
                       />
