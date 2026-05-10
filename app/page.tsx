@@ -4,6 +4,7 @@ import { BackgroundLayer } from "./BackgroundLayer";
 import { PlantColumn } from "./PlantColumn";
 import { getCarePriority, type CareRule } from "@/lib/dailyCareMessage";
 import { buildPlantCareCards, type PlantAdviceInput } from "@/lib/buildPlantCareAdvice";
+import { getPlantTrivia } from "@/lib/plantTrivias";
 
 // DB migration required (run once):
 // alter table plants add column if not exists sort_order integer;
@@ -291,6 +292,7 @@ export default async function Home() {
     return {
       id: plant.id,
       display_name: getPlantLabel(plant.plant_type),
+      plantType: plant.plant_type ?? null,
       daysSinceLastPhoto,
       fertilizerEnabled: plant.fertilizer_enabled !== false,
       fertilizerIntervalDays: (plant.fertilizer_interval_days as number | null) ?? 14,
@@ -312,6 +314,9 @@ export default async function Home() {
     if (withPhoto.length === 0) return null;
     return withPhoto.find(c => c.priority === "urgent" || c.priority === "attention") ?? withPhoto[0];
   })();
+  const spotlightTrivia = spotlightCard
+    ? getPlantTrivia(spotlightCard.plantType ?? null, today)
+    : null;
 
   // 全体サマリー集計
   const summaryStats = {
@@ -593,6 +598,11 @@ export default async function Home() {
                   <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.65 }}>
                     {spotlightCard.advice}
                   </div>
+                  {spotlightTrivia && (
+                    <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.65, marginTop: 6, paddingTop: 6, borderTop: "1px solid #f0ebe2", fontStyle: "italic" }}>
+                      💡 {spotlightTrivia}
+                    </div>
+                  )}
                   {spotlightCard.tags.length > 0 && (
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 7 }}>
                       {spotlightCard.tags.map((tag) => {

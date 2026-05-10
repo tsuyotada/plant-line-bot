@@ -109,6 +109,7 @@ export async function buildDailyNotificationMessage(): Promise<{
     return {
       id: p.id,
       display_name: displayName,
+      plant_type: p.plant_type ?? null,
       location: p.location ?? null,
       latestPhotoAt,
       daysSinceLastPhoto,

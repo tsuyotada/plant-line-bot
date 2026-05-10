@@ -17,18 +17,28 @@ const SYSTEM_PROMPT = `あなたは家庭菜園・観葉植物のやさしい相
 ・写真がないと判断できない場合は、写真があるとより正確に見られると伝える
 ・医療・食中毒・毒性が関わる場合は、安全側に寄せる
 ・前のメッセージの文脈を踏まえて答える
-・「それ」「さっきの」など代名詞は会話履歴から補完する`;
+・「それ」「さっきの」など代名詞は会話履歴から補完する
+・植物の豆知識が自然に使えそうなら、1つだけ柔らかく触れてください。無理に入れなくて構いません。
+・虫・病気・弱りなどの注意サインがある場合は、豆知識より注意喚起を優先してください。`;
 
 export type ConversationMessage = {
   role: "user" | "assistant";
   content: string;
 };
 
+export type PlantContext = {
+  name: string;
+  plantType: string | null;
+  trivia: string | null;
+  species?: string | null;
+};
+
 export async function generatePlantChatReply(params: {
   userMessage: string;
   conversationHistory?: ConversationMessage[];
+  plantContext?: PlantContext[];
 }): Promise<string | null> {
-  const { userMessage, conversationHistory = [] } = params;
+  const { userMessage, conversationHistory = [], plantContext } = params;
 
   if (!userMessage.trim()) return null;
 
@@ -38,12 +48,30 @@ export async function generatePlantChatReply(params: {
   try {
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
       { role: "system", content: SYSTEM_PROMPT },
+    ];
+
+    if (plantContext && plantContext.length > 0) {
+      const lines = plantContext
+        .map((p) => {
+          let line = `- ${p.name}`;
+          if (p.species) line += `（${p.species}）`;
+          if (p.trivia) line += `：${p.trivia}`;
+          return line;
+        })
+        .join("\n");
+      messages.push({
+        role: "system",
+        content: `【管理中の植物と今日の豆知識】\n${lines}`,
+      });
+    }
+
+    messages.push(
       ...recentHistory.map((m) => ({
         role: m.role as "user" | "assistant",
         content: m.content,
       })),
       { role: "user", content: userMessage },
-    ];
+    );
 
     const response = await client.chat.completions.create({
       model: "gpt-4o-mini",

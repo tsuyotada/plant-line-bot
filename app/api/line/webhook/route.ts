@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { generatePlantChatReply, ConversationMessage } from "@/lib/aiPlantChat";
+import { generatePlantChatReply, ConversationMessage, PlantContext } from "@/lib/aiPlantChat";
+import { getPlantTrivia } from "@/lib/plantTrivias";
 import { fetchLineImage, replyToLine, pushToLine } from "@/lib/linePhotoUtils";
 import { generatePhotoAdvice } from "@/lib/aiPhotoAdvice";
 import { identifyPlantFromPhoto } from "@/lib/aiPlantIdentify";
@@ -1170,10 +1171,21 @@ export async function POST(req: Request) {
     // 2. 今回の user メッセージを保存
     await saveConversationMessage(supabaseChat, lineUserId, "user", userMessage);
 
-    // 3. AI 返信を生成（過去履歴 + 今回メッセージで重複なし）
+    // 3. 管理中の植物と今日の豆知識をコンテキストとして渡す
+    const todayJst = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo" }).format(new Date());
+    const activePlants = await fetchActivePlants(supabaseChat);
+    const plantContext: PlantContext[] = activePlants.map((p: any) => ({
+      name: getPlantLabel(p.plant_type),
+      plantType: p.plant_type ?? null,
+      trivia: getPlantTrivia(p.plant_type, todayJst),
+      species: p.species ?? null,
+    }));
+
+    // 4. AI 返信を生成（過去履歴 + 今回メッセージで重複なし）
     const aiReply = await generatePlantChatReply({
       userMessage,
       conversationHistory: pastHistory,
+      plantContext,
     });
     const replyText =
       aiReply ?? "うまく答えられませんでした。もう一度試してください🌱";

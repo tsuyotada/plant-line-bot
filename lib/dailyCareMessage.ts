@@ -1,6 +1,9 @@
+import { getPlantTrivia } from "./plantTrivias";
+
 export type PlantWithRecency = {
   id: string;
   display_name: string;
+  plant_type?: string | null;
   location?: string | null;
   daysSinceLastPhoto: number | null;
   latestPhotoAt: string | null;
@@ -119,12 +122,19 @@ export function buildDailyCareMessage(
       ? actionItems.map(({ plant, summary }) => `・${plant.display_name}：${summary}`).join("\n")
       : "今日のお世話はありません 🌿";
 
+  // Trivia: pick the most notable plant (first action item, or first plant overall)
+  const triviaTarget = (actionItems[0] ?? summaries[0])?.plant ?? null;
+  const trivia = triviaTarget?.plant_type
+    ? getPlantTrivia(triviaTarget.plant_type, today)
+    : null;
+
   return [
     "【今日の植物メモ 🌱】",
     "",
     intro,
     "",
     plantSection,
+    ...(trivia ? ["", `💡 ${trivia}`] : []),
     "",
     appLinkPhrase,
     appUrl,

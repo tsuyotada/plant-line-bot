@@ -12,6 +12,7 @@ export type CareTag =
 export type PlantAdviceInput = {
   id: string;
   display_name: string;
+  plantType?: string | null;
   daysSinceLastPhoto: number | null;
   fertilizerEnabled: boolean;
   fertilizerIntervalDays: number;
@@ -22,6 +23,7 @@ export type PlantAdviceInput = {
 export type PlantCareCard = {
   plantId: string;
   plantName: string;
+  plantType?: string | null;
   advice: string;
   tags: CareTag[];
   priority: CarePriority;
@@ -100,6 +102,7 @@ export function buildPlantCareCards(
     return {
       plantId: plant.id,
       plantName: plant.display_name,
+      plantType: plant.plantType ?? null,
       advice: parts.join(" "),
       tags,
       priority,
