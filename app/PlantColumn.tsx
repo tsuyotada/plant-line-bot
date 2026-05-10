@@ -187,6 +187,18 @@ const TAG_COLORS: Record<string, { bg: string; color: string }> = {
   "環境確認": { bg: "#f1f5f9", color: "#475569" },
 };
 
+const TAG_TODO: Record<string, string> = {
+  "水やり":   "水やりをしましょう。",
+  "液体肥料": "液体肥料をあげるタイミングです。",
+  "観察":     "葉や茎の様子を観察してみましょう。",
+  "写真記録": "今日の様子を写真に残しましょう。",
+  "剪定":     "不要な葉・枝を剪定しましょう。",
+  "収穫":     "収穫できそうな実を確認しましょう。",
+  "環境確認": "置き場所・日当たりを確認してみましょう。",
+};
+
+const TAG_PRIORITY_ORDER = ["水やり", "液体肥料", "観察", "剪定", "収穫", "環境確認", "写真記録"];
+
 export function PlantColumn({
   plants,
   archivedPlants,
@@ -214,7 +226,8 @@ export function PlantColumn({
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [formPhotoPreview, setFormPhotoPreview] = useState<string | null>(null);
   const [isArchivedOpen, setIsArchivedOpen] = useState(false);
-  const [photoMenuOpenId, setPhotoMenuOpenId] = useState<string | null>(null);
+  const [photoMenuState, setPhotoMenuState] = useState<{ plantId: string; top: number; right: number } | null>(null);
+  const [expandedCareIds, setExpandedCareIds] = useState<Set<string>>(new Set());
   const [uploadProgress, setUploadProgress] = useState<Record<string, { current: number; total: number }>>({});
   const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
@@ -231,11 +244,11 @@ export function PlantColumn({
   const formPhotoInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    if (!photoMenuOpenId) return;
-    function handleOutsideClick() { setPhotoMenuOpenId(null); }
+    if (!photoMenuState) return;
+    function handleOutsideClick() { setPhotoMenuState(null); }
     document.addEventListener("click", handleOutsideClick);
     return () => document.removeEventListener("click", handleOutsideClick);
-  }, [photoMenuOpenId]);
+  }, [photoMenuState]);
 
   useEffect(() => {
     setLocalPlants(plants);
@@ -616,34 +629,22 @@ export function PlantColumn({
         .photo-camera-btn:hover {
           background: rgba(255, 255, 255, 0.98);
         }
-        .photo-source-overlay {
-          position: absolute;
-          bottom: 0;
-          left: 0;
-          right: 0;
-          background: rgba(255, 255, 255, 0.97);
-          backdrop-filter: blur(8px);
-          -webkit-backdrop-filter: blur(8px);
-          border-top: 1px solid #e8e4dc;
-          padding: 7px 8px;
-          display: flex;
-          gap: 6px;
-          z-index: 20;
-        }
         .photo-source-btn {
-          flex: 1;
-          padding: 7px 4px;
+          display: block;
+          width: 100%;
+          padding: 8px 12px;
           border-radius: 7px;
           border: 1px solid #e8e4dc;
           background: #fafaf8;
-          font-size: 11px;
+          font-size: 12px;
           font-weight: 600;
           color: #374151;
           cursor: pointer;
           font-family: inherit;
-          text-align: center;
+          text-align: left;
           transition: background 0.12s;
           white-space: nowrap;
+          box-sizing: border-box;
         }
         .photo-source-btn:hover {
           background: #f2faf4;
@@ -1009,7 +1010,17 @@ export function PlantColumn({
                           <button
                             type="button"
                             className="photo-camera-btn"
-                            onClick={(e) => { e.stopPropagation(); setPhotoMenuOpenId((prev) => prev === plant.id ? null : plant.id); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              setPhotoMenuState((prev) =>
+                                prev?.plantId === plant.id ? null : {
+                                  plantId: plant.id,
+                                  top: rect.bottom + 6,
+                                  right: window.innerWidth - rect.right,
+                                }
+                              );
+                            }}
                             aria-label="写真を追加"
                           >
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1119,72 +1130,79 @@ export function PlantColumn({
                         )}
 
                         {/* ── ケアメモ ── */}
-                        {careCard && (
-                          <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #f0ebe2" }}>
-                            <div style={{
-                              fontSize: 11, color: "#374151", lineHeight: 1.6,
-                              overflow: "hidden",
-                              display: "-webkit-box",
-                              WebkitLineClamp: 2,
-                              WebkitBoxOrient: "vertical",
-                            }}>
-                              {careCard.advice}
+                        {careCard && (() => {
+                          const isExpanded = expandedCareIds.has(plant.id);
+                          const priorityTodos = TAG_PRIORITY_ORDER
+                            .filter(tag => careCard.tags.includes(tag))
+                            .map(tag => ({ tag, todo: TAG_TODO[tag] ?? tag }));
+                          const showToggle = priorityTodos.length > 2 || careCard.advice.length > 60;
+                          const visibleTodos = isExpanded ? priorityTodos : priorityTodos.slice(0, 2);
+
+                          return (
+                            <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #f0ebe2" }}>
+                              {visibleTodos.length > 0 ? (
+                                <ul style={{ margin: 0, paddingLeft: 14, fontSize: 11, color: "#374151", lineHeight: 1.7 }}>
+                                  {visibleTodos.map(({ tag, todo }) => (
+                                    <li key={tag}>{todo}</li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <div style={{
+                                  fontSize: 11, color: "#374151", lineHeight: 1.6,
+                                  ...(!isExpanded ? {
+                                    overflow: "hidden",
+                                    display: "-webkit-box",
+                                    WebkitLineClamp: 2,
+                                    WebkitBoxOrient: "vertical",
+                                  } : {}),
+                                }}>
+                                  {careCard.advice}
+                                </div>
+                              )}
+
+                              {isExpanded && (
+                                <>
+                                  {careCard.advice.length > 0 && (
+                                    <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.6, marginTop: 5 }}>
+                                      {careCard.advice}
+                                    </div>
+                                  )}
+                                  {careCard.tags.length > 0 && (
+                                    <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 5 }}>
+                                      {careCard.tags.map((tag) => {
+                                        const c = TAG_COLORS[tag] ?? { bg: "#f1f5f9", color: "#475569" };
+                                        return (
+                                          <span key={tag} style={{ fontSize: 9, padding: "1px 5px", borderRadius: 8, fontWeight: 600, background: c.bg, color: c.color }}>
+                                            {tag}
+                                          </span>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </>
+                              )}
+
+                              {showToggle && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setExpandedCareIds((prev) => {
+                                      const next = new Set(prev);
+                                      if (next.has(plant.id)) next.delete(plant.id); else next.add(plant.id);
+                                      return next;
+                                    });
+                                  }}
+                                  style={{ background: "none", border: "none", padding: 0, marginTop: 4, fontSize: 10, color: "#6db07b", cursor: "pointer", fontFamily, fontWeight: 600, display: "block" }}
+                                >
+                                  {isExpanded ? "閉じる ▲" : "続きを読む ▼"}
+                                </button>
+                              )}
                             </div>
-                            {careCard.tags.length > 0 && (
-                              <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 5 }}>
-                                {careCard.tags.map((tag) => {
-                                  const c = TAG_COLORS[tag] ?? { bg: "#f1f5f9", color: "#475569" };
-                                  return (
-                                    <span key={tag} style={{ fontSize: 9, padding: "1px 5px", borderRadius: 8, fontWeight: 600, background: c.bg, color: c.color }}>
-                                      {tag}
-                                    </span>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        )}
+                          );
+                        })()}
                       </div>
 
-                      {/* Photo source menu overlay */}
-                      {photoMenuOpenId === plant.id && !uploadingIds[plant.id] && (
-                        <div className="photo-source-overlay" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            type="button"
-                            className="photo-source-btn"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              photoInputRefs.current[plant.id]?.click();
-                              setPhotoMenuOpenId(null);
-                            }}
-                          >
-                            📷 1枚撮影
-                          </button>
-                          <button
-                            type="button"
-                            className="photo-source-btn"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setCaptureSession([]);
-                              captureSessionInputRef.current?.click();
-                              setPhotoMenuOpenId(null);
-                            }}
-                          >
-                            📷 まとめて撮影
-                          </button>
-                          <button
-                            type="button"
-                            className="photo-source-btn"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              photoLibraryInputRefs.current[plant.id]?.click();
-                              setPhotoMenuOpenId(null);
-                            }}
-                          >
-                            🖼 ライブラリ
-                          </button>
-                        </div>
-                      )}
                     </SortablePlantCard>
                   );
                 })}
@@ -1570,6 +1588,52 @@ export function PlantColumn({
               );
             })()}
           </div>
+        </div>
+      )}
+
+      {/* Fixed-position photo source menu (position: fixed to escape overflow:hidden) */}
+      {photoMenuState && !uploadingIds[photoMenuState.plantId] && (
+        <div
+          style={{
+            position: "fixed",
+            top: photoMenuState.top,
+            right: photoMenuState.right,
+            zIndex: 1000,
+            background: "rgba(255,255,255,0.97)",
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
+            borderRadius: 10,
+            boxShadow: "0 4px 20px rgba(0,0,0,0.18)",
+            border: "1px solid #e8e4dc",
+            padding: 6,
+            display: "flex",
+            flexDirection: "column",
+            gap: 4,
+            minWidth: 150,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            className="photo-source-btn"
+            onClick={(e) => { e.stopPropagation(); photoInputRefs.current[photoMenuState.plantId]?.click(); setPhotoMenuState(null); }}
+          >
+            📷 1枚撮影
+          </button>
+          <button
+            type="button"
+            className="photo-source-btn"
+            onClick={(e) => { e.stopPropagation(); setCaptureSession([]); captureSessionInputRef.current?.click(); setPhotoMenuState(null); }}
+          >
+            📷 まとめて撮影
+          </button>
+          <button
+            type="button"
+            className="photo-source-btn"
+            onClick={(e) => { e.stopPropagation(); photoLibraryInputRefs.current[photoMenuState.plantId]?.click(); setPhotoMenuState(null); }}
+          >
+            🖼 ライブラリ
+          </button>
         </div>
       )}
 
