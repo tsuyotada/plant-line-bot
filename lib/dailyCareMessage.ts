@@ -191,7 +191,7 @@ export function buildDailyCareMessage(
     classified.find(c => c.actionType !== "ok")?.plant ??
     classified[0]?.plant ??
     null;
-  const trivia = triviaPlant?.plant_type ? getPlantTrivia(triviaPlant.plant_type, today) : null;
+  const trivia = getPlantTrivia(triviaPlant?.plant_type ?? null, today, triviaPlant?.display_name ?? null);
 
   // ── Classify action buckets ────────────────────────────
   const notableItems  = classified.filter(c => c.actionType === "notable");
