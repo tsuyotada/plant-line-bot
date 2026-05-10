@@ -830,7 +830,14 @@ export function PlantColumn({
                         }}
                         onClick={() => {
                           if (uploadingIds[plant.id]) return;
-                          if (displayPhoto) setLightbox({ urls: [displayPhoto], index: 0 });
+                          if (!displayPhoto) return;
+                          if (preview) {
+                            setLightbox({ urls: [displayPhoto], index: 0 });
+                          } else {
+                            const history = photoHistories[plant.id] ?? [];
+                            const urls = history.length > 0 ? history.map((p) => p.url) : [displayPhoto];
+                            setLightbox({ urls, index: 0 });
+                          }
                         }}
                       >
                         {displayPhoto ? (
