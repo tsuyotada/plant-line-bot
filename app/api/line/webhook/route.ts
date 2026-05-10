@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { generatePlantChatReply } from "@/lib/aiPlantChat";
+import { generatePlantChatReply, ConversationMessage } from "@/lib/aiPlantChat";
 import { fetchLineImage, replyToLine, pushToLine } from "@/lib/linePhotoUtils";
 import { generatePhotoAdvice } from "@/lib/aiPhotoAdvice";
 import { identifyPlantFromPhoto } from "@/lib/aiPlantIdentify";
@@ -100,6 +100,41 @@ function getSupabase() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
+}
+
+// ── 会話履歴 ──────────────────────────────────────────────────────
+
+async function fetchConversationHistory(
+  supabase: ReturnType<typeof getSupabase>,
+  lineUserId: string,
+  limit = 20
+): Promise<ConversationMessage[]> {
+  const { data, error } = await supabase
+    .from("line_conversation_messages")
+    .select("role, content")
+    .eq("line_user_id", lineUserId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) {
+    console.error("[Chat] 履歴取得失敗:", error.message);
+    return [];
+  }
+  // DB は新しい順で返るので逆順にして時系列にする
+  return (data ?? []).reverse() as ConversationMessage[];
+}
+
+async function saveConversationMessage(
+  supabase: ReturnType<typeof getSupabase>,
+  lineUserId: string,
+  role: "user" | "assistant",
+  content: string
+): Promise<void> {
+  const { error } = await supabase
+    .from("line_conversation_messages")
+    .insert({ line_user_id: lineUserId, role, content });
+  if (error) {
+    console.error(`[Chat] メッセージ保存失敗 role=${role}:`, error.message);
+  }
 }
 
 // ── バッチセッション取得 ──────────────────────────────────────────
@@ -1124,10 +1159,27 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    // ── AI チャット（既存） ─────────────────────────────────────────
-    const aiReply = await generatePlantChatReply({ userMessage });
+    // ── AI チャット（会話履歴付き） ────────────────────────────────
+    const supabaseChat = getSupabase();
+
+    // 1. ユーザーメッセージを保存
+    await saveConversationMessage(supabaseChat, lineUserId, "user", userMessage);
+
+    // 2. 直近の会話履歴を取得（今回のユーザーメッセージは含めない）
+    const history = await fetchConversationHistory(supabaseChat, lineUserId, 20);
+    // 末尾が今回保存したばかりのユーザーメッセージなので除く
+    const historyWithoutCurrent = history.slice(0, -1);
+
+    // 3. AI 返信を生成
+    const aiReply = await generatePlantChatReply({
+      userMessage,
+      conversationHistory: historyWithoutCurrent,
+    });
     const replyText =
       aiReply ?? "うまく答えられませんでした。もう一度試してください🌱";
+
+    // 4. アシスタントの返答を保存
+    await saveConversationMessage(supabaseChat, lineUserId, "assistant", replyText);
 
     await replyToLine(lineToken, replyToken, [
       { type: "text", text: replyText },
