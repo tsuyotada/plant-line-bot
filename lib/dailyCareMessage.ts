@@ -53,17 +53,12 @@ function datePick<T>(items: T[], dateStr: string, salt: number): T {
   return items[Math.abs(h) % items.length];
 }
 
-// Keywords that indicate an actual detected problem (not routine care reminders).
-// Care rules matching these are shown in ⚠️; everything else goes to 🌿 routine care.
-const PROBLEM_SIGN_KEYWORDS = [
-  "虫", "害虫", "病害虫", "カビ", "菌", "黄化", "黄色", "しおれ", "萎れ",
-  "枯れ", "腐れ", "腐敗", "落葉", "葉が落ち", "元気がない", "異常",
-  "過湿", "根腐れ", "乾燥しすぎ",
-];
-
-function hasActualProblemSign(rule: CareRule): boolean {
-  const text = `${rule.title} ${rule.task_detail} ${rule.message}`;
-  return PROBLEM_SIGN_KEYWORDS.some(kw => text.includes(kw));
+// care_rules are AI-generated routine maintenance schedules, not anomaly detections.
+// Their descriptions routinely mention "害虫がいないか確認" etc., so keyword matching
+// always produces false positives. ⚠️ is reserved for future photo-analysis anomalies.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function hasActualProblemSign(_rule: CareRule): boolean {
+  return false;
 }
 
 const LINE_TASK_RANK: Record<string, number> = {
@@ -274,10 +269,6 @@ export function buildDailyCareMessage(
       lines.push(...routineLines);
     }
 
-    // Closing reassurance when there are no notable issues
-    if (notableItems.length === 0) {
-      lines.push("", "今日は大きな異変はなさそうです。");
-    }
   }
 
   // Trivia without spotlight: add after care section
@@ -285,14 +276,7 @@ export function buildDailyCareMessage(
     lines.push("", `💡 ${trivia}`);
   }
 
-  // App link — no extra blank line when a closing line immediately precedes it
-  const lastLine = lines[lines.length - 1];
-  const closingLine = "今日は大きな異変はなさそうです。";
-  if (lastLine === closingLine) {
-    lines.push(appLinkPhrase, appUrl);
-  } else {
-    lines.push("", appLinkPhrase, appUrl);
-  }
+  lines.push("", appLinkPhrase, appUrl);
 
   return { message: lines.join("\n"), spotlightPhotoUrl };
 }
