@@ -393,14 +393,15 @@ export default async function Home() {
 
         /* ─── Column heading ─── */
         .col-heading {
-          font-size: 12px;
-          font-weight: 700;
-          color: #2d4a3e;
+          font-size: 13px;
+          font-weight: 800;
+          color: #1e4430;
           margin: 0 0 14px;
-          letter-spacing: 0.6px;
-          text-transform: uppercase;
-          padding-left: 10px;
-          border-left: 3px solid #6db07b;
+          letter-spacing: 0.1px;
+          padding: 4px 10px 4px 10px;
+          border-left: 3px solid #52b56e;
+          background: linear-gradient(90deg, rgba(82, 181, 110, 0.09) 0%, transparent 100%);
+          border-radius: 0 5px 5px 0;
           line-height: 1.4;
         }
 
@@ -680,7 +681,7 @@ export default async function Home() {
 
             return (
               <div className="col-board">
-                <h2 className="col-heading">まとめてやるケア</h2>
+                <h2 className="col-heading">まとめて気にかける</h2>
                 {hasGrouped ? (
                   <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.8 }}>
                     <p style={{ margin: "0 0 4px", fontWeight: 700, color: "#2d4a3e" }}>{line1}</p>
@@ -703,7 +704,7 @@ export default async function Home() {
           {/* ── 全体サマリー ── */}
           {summaryStats.total > 0 && (
             <div className="col-board">
-              <h2 className="col-heading">全体サマリー</h2>
+              <h2 className="col-heading">今日のまとめ</h2>
 
               {/* 🌿 今日の主なお世話：水やり・液体肥料 */}
               {(summaryStats.waterCount > 0 || summaryStats.fertilizerCount > 0) && (

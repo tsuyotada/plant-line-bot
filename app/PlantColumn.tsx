@@ -891,7 +891,7 @@ export function PlantColumn({
 
       <div className="col-board">
         <div className="plants-heading-row">
-          <h2 className="col-heading" style={{ margin: 0 }}>育てている植物</h2>
+          <h2 className="col-heading" style={{ margin: 0 }}>うちの植物たち</h2>
           {localPlants.length > 0 && (
             <button
               type="button"
