@@ -409,6 +409,7 @@ export function PlantColumn({
         name: getPlantLabel(p.plant_type),
         species: p.species ?? null,
         memo: p.memo ?? null,
+        latestPhotoUrl: latestPhotos[p.id] ?? null,
       }));
 
       await Promise.allSettled(
