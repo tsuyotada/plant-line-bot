@@ -361,6 +361,20 @@ export default async function Home() {
           .col-plants, .col-right { grid-column: span 1; }
         }
 
+        /* ─── Mobile reorder: spotlight → plants → sidebar ─── */
+        .sidebar-section {
+          display: flex;
+          flex-direction: column;
+          gap: 18px;
+        }
+        @media (max-width: 960px) {
+          .board-grid { display: flex; flex-direction: column; }
+          .col-right { display: contents; }
+          .spotlight-section { order: 1; }
+          .col-plants { order: 2; }
+          .sidebar-section { order: 3; }
+        }
+
         /* ─── Column panel ─── */
         .col-board {
           background: rgba(253, 250, 244, 0.96);
@@ -583,7 +597,8 @@ export default async function Home() {
           {/* ── Right column (1/3幅): 今日の1枚・全体サマリー・LINE登録 ── */}
           <div className="col-right">
 
-          {/* ── 今日の1枚 ── */}
+          {/* ── 今日の1枚（モバイルでは最上部に来る） ── */}
+          <div className="spotlight-section">
           <div className="col-board">
             <h2 className="col-heading">今日の1枚</h2>
 
@@ -637,6 +652,10 @@ export default async function Home() {
               </div>
             )}
           </div>
+          </div>{/* /spotlight-section */}
+
+          {/* ── サイドバー: 全体サマリー・LINE（モバイルでは植物カードの下） ── */}
+          <div className="sidebar-section">
 
           {/* ── 全体サマリー ── */}
           {summaryStats.total > 0 && (
@@ -757,6 +776,7 @@ export default async function Home() {
               </p>
             </div>
           </div>
+          </div>{/* /sidebar-section */}
           </div>{/* /col-right */}
         </div>
       </main>
