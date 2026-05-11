@@ -362,6 +362,11 @@ export default async function Home() {
         }
 
         /* ─── Mobile reorder: spotlight → plants → sidebar ─── */
+        .spotlight-section {
+          display: flex;
+          flex-direction: column;
+          gap: 18px;
+        }
         .sidebar-section {
           display: flex;
           flex-direction: column;
@@ -652,6 +657,44 @@ export default async function Home() {
               </div>
             )}
           </div>
+
+          {/* ── まとめてやるケア ── */}
+          {summaryStats.total > 0 && (() => {
+            const { fertilizerCount, waterCount, observationCount } = summaryStats;
+            const hasGrouped = fertilizerCount >= 2 || waterCount >= 2 || observationCount >= 2;
+
+            let line1 = "";
+            let line2 = "";
+            let line3 = "";
+            if (fertilizerCount >= 2) {
+              line1 = `液体肥料の対象が${fertilizerCount}件あります。`;
+              line2 = "今日は液肥をまとめてあげるとよさそうです。";
+              line3 = "余裕があれば、気になる植物から見てみましょう。";
+            } else if (waterCount >= 2) {
+              line1 = `水やりの対象が${waterCount}件あります。`;
+              line2 = "ベランダに出たついでに、土の乾き具合をまとめて見てみましょう。";
+            } else if (observationCount >= 2) {
+              line1 = `${observationCount}件の植物が観察のタイミングです。`;
+              line2 = "ベランダを通るときに、葉や茎の様子をさらっと見てみましょう。";
+            }
+
+            return (
+              <div className="col-board">
+                <h2 className="col-heading">まとめてやるケア</h2>
+                {hasGrouped ? (
+                  <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.8 }}>
+                    <p style={{ margin: "0 0 4px", fontWeight: 700, color: "#2d4a3e" }}>{line1}</p>
+                    <p style={{ margin: "0 0 4px" }}>{line2}</p>
+                    {line3 && <p style={{ margin: 0, color: "#6b7280" }}>{line3}</p>}
+                  </div>
+                ) : (
+                  <p style={{ fontSize: 12, color: "#6b7280", margin: 0, lineHeight: 1.75 }}>
+                    今日はまとめて気にかけるケアはなさそうです。
+                  </p>
+                )}
+              </div>
+            );
+          })()}
           </div>{/* /spotlight-section */}
 
           {/* ── サイドバー: 全体サマリー・LINE（モバイルでは植物カードの下） ── */}
