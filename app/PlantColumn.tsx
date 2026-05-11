@@ -238,7 +238,6 @@ export function PlantColumn({
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [formPhotoPreview, setFormPhotoPreview] = useState<string | null>(null);
   const [isArchivedOpen, setIsArchivedOpen] = useState(false);
-  const [photoMenuState, setPhotoMenuState] = useState<{ plantId: string; top: number; right: number } | null>(null);
   const [expandedCareIds, setExpandedCareIds] = useState<Set<string>>(new Set());
   const [uploadProgress, setUploadProgress] = useState<Record<string, { current: number; total: number }>>({});
   const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
@@ -251,13 +250,6 @@ export function PlantColumn({
   const batchInputRef = useRef<HTMLInputElement | null>(null);
   const touchStartX = useRef<number>(0);
   const formPhotoInputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    if (!photoMenuState) return;
-    function handleOutsideClick() { setPhotoMenuState(null); }
-    document.addEventListener("click", handleOutsideClick);
-    return () => document.removeEventListener("click", handleOutsideClick);
-  }, [photoMenuState]);
 
   useEffect(() => {
     setLocalPlants(plants);
@@ -649,27 +641,6 @@ export function PlantColumn({
         .photo-camera-btn:hover {
           background: rgba(255, 255, 255, 0.98);
         }
-        .photo-source-btn {
-          display: block;
-          width: 100%;
-          padding: 10px 12px;
-          border-radius: 7px;
-          border: 1px solid #e8e4dc;
-          background: #fafaf8;
-          font-size: 12px;
-          font-weight: 600;
-          color: #374151;
-          cursor: pointer;
-          font-family: inherit;
-          text-align: left;
-          transition: background 0.12s;
-          box-sizing: border-box;
-          line-height: 1.4;
-        }
-        .photo-source-btn:hover {
-          background: #f2faf4;
-          border-color: #b8dfc0;
-        }
         .plant-info-wrap {
           padding: 8px 10px 10px;
         }
@@ -912,6 +883,15 @@ export function PlantColumn({
       <div className="col-board">
         <div className="plants-heading-row">
           <h2 className="col-heading" style={{ margin: 0 }}>My plants</h2>
+          {localPlants.length > 0 && (
+            <button
+              type="button"
+              className="btn-batch-upload"
+              onClick={() => batchInputRef.current?.click()}
+            >
+              カメラロールから選ぶ
+            </button>
+          )}
         </div>
         <input
           ref={batchInputRef}
@@ -1014,14 +994,7 @@ export function PlantColumn({
                             className="photo-camera-btn"
                             onClick={(e) => {
                               e.stopPropagation();
-                              const rect = e.currentTarget.getBoundingClientRect();
-                              setPhotoMenuState((prev) =>
-                                prev?.plantId === plant.id ? null : {
-                                  plantId: plant.id,
-                                  top: rect.bottom + 6,
-                                  right: window.innerWidth - rect.right,
-                                }
-                              );
+                              photoInputRefs.current[plant.id]?.click();
                             }}
                             aria-label="写真を追加"
                           >
@@ -1507,47 +1480,6 @@ export function PlantColumn({
               );
             })()}
           </div>
-        </div>
-      )}
-
-      {/* Fixed-position photo source menu (position: fixed to escape overflow:hidden) */}
-      {photoMenuState && !uploadingIds[photoMenuState.plantId] && (
-        <div
-          style={{
-            position: "fixed",
-            top: photoMenuState.top,
-            right: photoMenuState.right,
-            zIndex: 1000,
-            background: "rgba(255,255,255,0.97)",
-            backdropFilter: "blur(8px)",
-            WebkitBackdropFilter: "blur(8px)",
-            borderRadius: 10,
-            boxShadow: "0 4px 20px rgba(0,0,0,0.18)",
-            border: "1px solid #e8e4dc",
-            padding: 6,
-            display: "flex",
-            flexDirection: "column",
-            gap: 4,
-            minWidth: 210,
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            type="button"
-            className="photo-source-btn"
-            onClick={(e) => { e.stopPropagation(); photoInputRefs.current[photoMenuState.plantId]?.click(); setPhotoMenuState(null); }}
-          >
-            <span style={{ display: "block" }}>📷 今すぐ撮る</span>
-            <span style={{ display: "block", fontSize: 10, color: "#9ca3af", fontWeight: 400, marginTop: 2 }}>1枚だけ撮って、すぐ登録します</span>
-          </button>
-          <button
-            type="button"
-            className="photo-source-btn"
-            onClick={(e) => { e.stopPropagation(); batchInputRef.current?.click(); setPhotoMenuState(null); }}
-          >
-            <span style={{ display: "block" }}>🖼 カメラロールからまとめて選ぶ</span>
-            <span style={{ display: "block", fontSize: 10, color: "#9ca3af", fontWeight: 400, marginTop: 2 }}>複数の写真を選んで植物に分けます</span>
-          </button>
         </div>
       )}
 
