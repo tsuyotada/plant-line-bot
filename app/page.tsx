@@ -1,4 +1,4 @@
-import { supabase } from "../src/lib/supabase";
+import { supabaseServer as supabase } from "../src/lib/supabase-server";
 import { revalidatePath } from "next/cache";
 import { BackgroundLayer } from "./BackgroundLayer";
 import { PlantColumn } from "./PlantColumn";
