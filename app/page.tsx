@@ -678,17 +678,30 @@ export default async function Home() {
             let line1 = "";
             let line2 = "";
             let line3 = "";
-            if (fertilizerCount >= 2) {
-              line1 = `液体肥料の対象が${fertilizerCount}件あります。`;
-              line2 = "今日は液肥をまとめてあげるとよさそうです。";
-              line3 = "余裕があれば、気になる植物から見てみましょう。";
-            } else if (waterCount >= 2) {
-              line1 = `水やりの対象が${waterCount}件あります。`;
-              line2 = "ベランダに出たついでに、土の乾き具合をまとめて見てみましょう。";
-            } else if (observationCount >= 2) {
-              line1 = `${observationCount}件の植物が観察のタイミングです。`;
-              line2 = "ベランダを通るときに、葉や茎の様子をさらっと見てみましょう。";
-            }
+            // 対象植物を絞り込む（優先順：液体肥料 → 水やり → 観察）
+            const targetPlants: typeof plantCareCards = (() => {
+              if (fertilizerCount >= 2) {
+                line1 = `液体肥料の対象が${fertilizerCount}件あります。`;
+                line2 = "今日は液肥をまとめてあげるとよさそうです。";
+                line3 = "余裕があれば、気になる植物から見てみましょう。";
+                return plantCareCards.filter(c => c.tags.includes("液体肥料"));
+              }
+              if (waterCount >= 2) {
+                line1 = `水やりの対象が${waterCount}件あります。`;
+                line2 = "ベランダに出たついでに、土の乾き具合をまとめて見てみましょう。";
+                return plantCareCards.filter(c => c.tags.includes("水やり"));
+              }
+              if (observationCount >= 2) {
+                line1 = `${observationCount}件の植物が観察のタイミングです。`;
+                line2 = "ベランダを通るときに、葉や茎の様子をさらっと見てみましょう。";
+                return plantCareCards.filter(c => c.tags.some(t => t === "観察" || t === "環境確認"));
+              }
+              return [];
+            })();
+
+            const SHOW_MAX = 3;
+            const shownPlants = targetPlants.slice(0, SHOW_MAX);
+            const restCount = targetPlants.length - shownPlants.length;
 
             return (
               <div className="col-board">
@@ -697,7 +710,14 @@ export default async function Home() {
                   <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.8 }}>
                     <p style={{ margin: "0 0 4px", fontWeight: 700, color: "#2d4a3e" }}>{line1}</p>
                     <p style={{ margin: "0 0 4px" }}>{line2}</p>
-                    {line3 && <p style={{ margin: 0, color: "#6b7280" }}>{line3}</p>}
+                    {line3 && <p style={{ margin: "0 0 8px", color: "#6b7280" }}>{line3}</p>}
+                    {shownPlants.length > 0 && (
+                      <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #f0ebe2", fontSize: 11, color: "#6b7280", lineHeight: 1.7 }}>
+                        <span style={{ fontWeight: 600, color: "#4b7a5a" }}>今日見る植物：</span>
+                        {shownPlants.map(c => c.plantName).join("・")}
+                        {restCount > 0 && <span style={{ color: "#9ca3af" }}> ほか{restCount}件</span>}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <p style={{ fontSize: 12, color: "#6b7280", margin: 0, lineHeight: 1.75 }}>
