@@ -391,18 +391,29 @@ export default async function Home() {
           box-shadow: 0 2px 16px rgba(60, 50, 30, 0.10);
         }
 
-        /* ─── Column heading ─── */
+        /* ─── Column heading (Trello board label style) ─── */
         .col-heading {
-          font-size: 13px;
+          font-size: 14px;
           font-weight: 800;
-          color: #1e4430;
+          color: #1a3320;
           margin: 0 0 14px;
-          letter-spacing: 0.1px;
-          padding: 4px 10px 4px 10px;
-          border-left: 3px solid #52b56e;
-          background: linear-gradient(90deg, rgba(82, 181, 110, 0.09) 0%, transparent 100%);
-          border-radius: 0 5px 5px 0;
-          line-height: 1.4;
+          letter-spacing: -0.1px;
+          line-height: 1.3;
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          padding: 0;
+          border: none;
+          background: none;
+        }
+        .col-heading::before {
+          content: '';
+          display: block;
+          width: 11px;
+          height: 11px;
+          border-radius: 3px;
+          background: #48b06a;
+          flex-shrink: 0;
         }
 
         /* ─── Plants grid (auto-fill, responsive columns) ─── */
@@ -606,7 +617,7 @@ export default async function Home() {
           {/* ── 今日の1枚（モバイルでは最上部に来る） ── */}
           <div className="spotlight-section">
           <div className="col-board">
-            <h2 className="col-heading">今日の1枚</h2>
+            <h2 className="col-heading">Today's pick</h2>
 
             {spotlightCard ? (
               <div style={{ background: "#ffffff", borderRadius: 10, overflow: "hidden", boxShadow: "0 1px 3px rgba(60,50,30,0.07)" }}>
@@ -681,7 +692,7 @@ export default async function Home() {
 
             return (
               <div className="col-board">
-                <h2 className="col-heading">まとめて気にかける</h2>
+                <h2 className="col-heading">Care batch</h2>
                 {hasGrouped ? (
                   <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.8 }}>
                     <p style={{ margin: "0 0 4px", fontWeight: 700, color: "#2d4a3e" }}>{line1}</p>
@@ -704,7 +715,7 @@ export default async function Home() {
           {/* ── 全体サマリー ── */}
           {summaryStats.total > 0 && (
             <div className="col-board">
-              <h2 className="col-heading">今日のまとめ</h2>
+              <h2 className="col-heading">Care summary</h2>
 
               {/* 🌿 今日の主なお世話：水やり・液体肥料 */}
               {(summaryStats.waterCount > 0 || summaryStats.fertilizerCount > 0) && (
@@ -769,7 +780,7 @@ export default async function Home() {
 
           {/* ── LINE通知を受け取る ── */}
           <div className="col-board">
-            <h2 className="col-heading">LINE通知を受け取る</h2>
+            <h2 className="col-heading">LINE reminders</h2>
 
             <div className="line-card" style={{ marginBottom: 0 }}>
               {/* QR + ボタン */}
