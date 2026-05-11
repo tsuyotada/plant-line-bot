@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   DndContext,
   closestCenter,
@@ -214,6 +215,7 @@ export function PlantColumn({
   photoHistories,
   careCardMap,
 }: Props) {
+  const router = useRouter();
   const [localPlants, setLocalPlants] = useState(plants);
   const [photoPreviews, setPhotoPreviews] = useState<Record<string, string>>({});
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -363,6 +365,9 @@ export function PlantColumn({
     } else if (failCount > 0) {
       setUploadErrors((prev) => ({ ...prev, [plantId]: `${failCount}枚のアップロードに失敗しました（${successCount}枚は成功）` }));
     }
+    if (successCount > 0) {
+      router.refresh();
+    }
   }
 
   // Core batch initialization — shared between file-select and capture-session flows
@@ -502,6 +507,7 @@ export function PlantColumn({
 
     setBatchSaving(false);
     if (results.every((it) => it.status === "done")) {
+      router.refresh();
       setIsBatchModalOpen(false);
       setBatchItems([]);
     }
