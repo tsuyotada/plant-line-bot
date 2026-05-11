@@ -245,13 +245,10 @@ export function PlantColumn({
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
   const [batchSaving, setBatchSaving] = useState(false);
   const [batchWarning, setBatchWarning] = useState<string | null>(null);
-  const [captureSession, setCaptureSession] = useState<File[]>([]);
 
   const formRef = useRef<HTMLFormElement>(null);
   const photoInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
-  const photoLibraryInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const batchInputRef = useRef<HTMLInputElement | null>(null);
-  const captureSessionInputRef = useRef<HTMLInputElement | null>(null);
   const touchStartX = useRef<number>(0);
   const formPhotoInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -488,22 +485,6 @@ export function PlantColumn({
     await initBatchModal(files, warning);
   }
 
-  // Capture session: accumulate shots one by one before entering batch modal
-  function handleCaptureSessionPhoto(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    if (file.size > 30 * 1024 * 1024) return; // 30MB超のみスキップ（通常のスマホ写真はすべて受け付ける）
-    setCaptureSession((prev) => [...prev, file]);
-  }
-
-  async function finishCaptureSession() {
-    const files = captureSession;
-    setCaptureSession([]);
-    if (files.length === 0) return;
-    await initBatchModal(files, null);
-  }
-
   async function handleBatchSave() {
     const items = [...batchItems];
     setBatchSaving(true);
@@ -671,7 +652,7 @@ export function PlantColumn({
         .photo-source-btn {
           display: block;
           width: 100%;
-          padding: 8px 12px;
+          padding: 10px 12px;
           border-radius: 7px;
           border: 1px solid #e8e4dc;
           background: #fafaf8;
@@ -682,8 +663,8 @@ export function PlantColumn({
           font-family: inherit;
           text-align: left;
           transition: background 0.12s;
-          white-space: nowrap;
           box-sizing: border-box;
+          line-height: 1.4;
         }
         .photo-source-btn:hover {
           background: #f2faf4;
@@ -931,15 +912,6 @@ export function PlantColumn({
       <div className="col-board">
         <div className="plants-heading-row">
           <h2 className="col-heading" style={{ margin: 0 }}>My plants</h2>
-          {localPlants.length > 0 && (
-            <button
-              type="button"
-              className="btn-batch-upload"
-              onClick={() => batchInputRef.current?.click()}
-            >
-              写真をまとめて追加
-            </button>
-          )}
         </div>
         <input
           ref={batchInputRef}
@@ -948,15 +920,6 @@ export function PlantColumn({
           multiple
           style={{ display: "none" }}
           onChange={handleBatchFileSelect}
-        />
-        {/* Hidden camera input for capture session (まとめて撮影) */}
-        <input
-          ref={captureSessionInputRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          style={{ display: "none" }}
-          onChange={handleCaptureSessionPhoto}
         />
 
         {hasError ? (
@@ -1082,14 +1045,6 @@ export function PlantColumn({
                         type="file"
                         accept="image/*"
                         capture="environment"
-                        style={{ display: "none" }}
-                        onChange={(e) => handlePhotoChange(plant.id, e)}
-                      />
-                      <input
-                        ref={(el) => { photoLibraryInputRefs.current[plant.id] = el; }}
-                        type="file"
-                        accept="image/*"
-                        multiple
                         style={{ display: "none" }}
                         onChange={(e) => handlePhotoChange(plant.id, e)}
                       />
@@ -1356,81 +1311,6 @@ export function PlantColumn({
         )}
       </div>
 
-      {/* Capture session bar — shown while accumulating shots (まとめて撮影) */}
-      {captureSession.length > 0 && !isBatchModalOpen && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: 0,
-            left: 0,
-            right: 0,
-            zIndex: 200,
-            background: "rgba(30, 60, 40, 0.96)",
-            backdropFilter: "blur(8px)",
-            padding: "14px 20px",
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            boxShadow: "0 -2px 16px rgba(0,0,0,0.18)",
-            fontFamily,
-          }}
-        >
-          <span style={{ color: "#a8d8b0", fontSize: 13, flex: 1, fontWeight: 600 }}>
-            📷 {captureSession.length}枚撮影済み
-          </span>
-          <button
-            type="button"
-            onClick={() => captureSessionInputRef.current?.click()}
-            style={{
-              background: "rgba(255,255,255,0.12)",
-              color: "#e8f5ec",
-              border: "1px solid rgba(255,255,255,0.2)",
-              borderRadius: 8,
-              padding: "8px 14px",
-              fontSize: 13,
-              cursor: "pointer",
-              fontFamily,
-              whiteSpace: "nowrap",
-            }}
-          >
-            もう1枚撮る
-          </button>
-          <button
-            type="button"
-            onClick={finishCaptureSession}
-            style={{
-              background: "#6db07b",
-              color: "#fff",
-              border: "none",
-              borderRadius: 8,
-              padding: "8px 16px",
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: "pointer",
-              fontFamily,
-              whiteSpace: "nowrap",
-            }}
-          >
-            登録へ進む
-          </button>
-          <button
-            type="button"
-            onClick={() => setCaptureSession([])}
-            style={{
-              background: "none",
-              color: "rgba(200,220,205,0.6)",
-              border: "none",
-              fontSize: 20,
-              cursor: "pointer",
-              lineHeight: 1,
-              padding: "0 4px",
-            }}
-          >
-            ×
-          </button>
-        </div>
-      )}
-
       {/* Photo history modal */}
       {historyModalId && (
         <div className="modal-overlay" onClick={() => setHistoryModalId(null)}>
@@ -1648,7 +1528,7 @@ export function PlantColumn({
             display: "flex",
             flexDirection: "column",
             gap: 4,
-            minWidth: 150,
+            minWidth: 210,
           }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -1657,21 +1537,16 @@ export function PlantColumn({
             className="photo-source-btn"
             onClick={(e) => { e.stopPropagation(); photoInputRefs.current[photoMenuState.plantId]?.click(); setPhotoMenuState(null); }}
           >
-            📷 1枚撮影
+            <span style={{ display: "block" }}>📷 今すぐ撮る</span>
+            <span style={{ display: "block", fontSize: 10, color: "#9ca3af", fontWeight: 400, marginTop: 2 }}>1枚だけ撮って、すぐ登録します</span>
           </button>
           <button
             type="button"
             className="photo-source-btn"
-            onClick={(e) => { e.stopPropagation(); setCaptureSession([]); captureSessionInputRef.current?.click(); setPhotoMenuState(null); }}
+            onClick={(e) => { e.stopPropagation(); batchInputRef.current?.click(); setPhotoMenuState(null); }}
           >
-            📷 まとめて撮影
-          </button>
-          <button
-            type="button"
-            className="photo-source-btn"
-            onClick={(e) => { e.stopPropagation(); photoLibraryInputRefs.current[photoMenuState.plantId]?.click(); setPhotoMenuState(null); }}
-          >
-            🖼 ライブラリ
+            <span style={{ display: "block" }}>🖼 カメラロールからまとめて選ぶ</span>
+            <span style={{ display: "block", fontSize: 10, color: "#9ca3af", fontWeight: 400, marginTop: 2 }}>複数の写真を選んで植物に分けます</span>
           </button>
         </div>
       )}
