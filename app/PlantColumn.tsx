@@ -86,32 +86,42 @@ function getInitialStateLabel(stateType: string | null | undefined): string | nu
 }
 
 async function compressImage(file: File): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const objectUrl = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-      const MAX_WIDTH = 1200;
-      let { width, height } = img;
-      if (width > MAX_WIDTH) {
-        height = Math.round(height * (MAX_WIDTH / width));
-        width = MAX_WIDTH;
-      }
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) { reject(new Error("canvas unavailable")); return; }
-      ctx.drawImage(img, 0, 0, width, height);
-      canvas.toBlob(
-        (blob) => { if (blob) resolve(blob); else reject(new Error("toBlob failed")); },
-        "image/jpeg",
-        0.7
-      );
-    };
-    img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error("image load failed")); };
-    img.src = objectUrl;
-  });
+  const compress = (maxLongEdge: number, quality: number) =>
+    new Promise<Blob>((resolve, reject) => {
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        let { width, height } = img;
+        const longEdge = Math.max(width, height);
+        if (longEdge > maxLongEdge) {
+          const ratio = maxLongEdge / longEdge;
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { reject(new Error("canvas unavailable")); return; }
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => { if (blob) resolve(blob); else reject(new Error("toBlob failed")); },
+          "image/jpeg",
+          quality
+        );
+      };
+      img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error("image load failed")); };
+      img.src = objectUrl;
+    });
+
+  // 1回目：長辺1920px / quality 0.82（AI判定・観察に十分な画質）
+  const blob = await compress(1920, 0.82);
+  // 3MBを超える場合だけ、より小さくリトライ
+  if (blob.size > 3 * 1024 * 1024) {
+    return compress(1200, 0.75);
+  }
+  return blob;
 }
 
 async function compressToDataUrl(file: File, maxWidth = 512): Promise<string> {
@@ -296,16 +306,18 @@ export function PlantColumn({
 
     setUploadErrors((prev) => { const next = { ...prev }; delete next[plantId]; return next; });
 
-    const oversized = allFiles.filter((f) => f.size > 5 * 1024 * 1024);
-    const files = allFiles.filter((f) => f.size <= 5 * 1024 * 1024);
+    // スマホ写真は大きくても自動圧縮して登録できるように。30MB超のみスキップ（通常のスマホ写真には該当しない）
+    const MAX_RAW = 30 * 1024 * 1024;
+    const tooHuge = allFiles.filter((f) => f.size > MAX_RAW);
+    const files = allFiles.filter((f) => f.size <= MAX_RAW);
 
     if (files.length === 0) {
-      setUploadErrors((prev) => ({ ...prev, [plantId]: `画像サイズが大きすぎます（5MB以内にしてください）` }));
+      setUploadErrors((prev) => ({ ...prev, [plantId]: "写真が大きすぎて処理できませんでした。別の写真でお試しください。" }));
       e.target.value = "";
       return;
     }
-    if (oversized.length > 0) {
-      setUploadErrors((prev) => ({ ...prev, [plantId]: `${oversized.length}枚は5MBを超えたためスキップします` }));
+    if (tooHuge.length > 0) {
+      setUploadErrors((prev) => ({ ...prev, [plantId]: `${tooHuge.length}枚は処理できなかったためスキップします` }));
     }
 
     // 最初の1枚をプレビュー表示
@@ -322,6 +334,7 @@ export function PlantColumn({
 
     let successCount = 0;
     let failCount = 0;
+    let compressedTooLarge = false;
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
@@ -340,15 +353,22 @@ export function PlantColumn({
 
       try {
         const compressed = await compressImage(file);
-        const fd = new FormData();
-        fd.set("plant_id", plantId);
-        fd.set("photo", new File([compressed], file.name.replace(/\.[^/.]+$/, "") + ".jpg", { type: "image/jpeg" }));
-        const result = await uploadPhotoAction(fd);
-        if (result.success) {
-          successCount++;
-        } else {
+        // 圧縮後も4MBを超える場合は登録できない（通常のスマホ写真では発生しない）
+        if (compressed.size > 4 * 1024 * 1024) {
           failCount++;
-          console.error(`[Upload] 失敗 file=${file.name}`, result.error);
+          compressedTooLarge = true;
+          console.warn(`[Upload] 圧縮後もサイズ超過 file=${file.name} size=${compressed.size}`);
+        } else {
+          const fd = new FormData();
+          fd.set("plant_id", plantId);
+          fd.set("photo", new File([compressed], file.name.replace(/\.[^/.]+$/, "") + ".jpg", { type: "image/jpeg" }));
+          const result = await uploadPhotoAction(fd);
+          if (result.success) {
+            successCount++;
+          } else {
+            failCount++;
+            console.error(`[Upload] 失敗 file=${file.name}`, result.error);
+          }
         }
       } catch {
         failCount++;
@@ -361,9 +381,12 @@ export function PlantColumn({
     e.target.value = "";
 
     if (failCount > 0 && successCount === 0) {
-      setUploadErrors((prev) => ({ ...prev, [plantId]: "アップロードに失敗しました。通信状態を確認してください。" }));
+      const msg = compressedTooLarge
+        ? "写真を小さくしてみましたが、まだ登録できませんでした。少し軽い写真で試してみてください。"
+        : "写真の登録に失敗しました。通信状態を確認してみてください。";
+      setUploadErrors((prev) => ({ ...prev, [plantId]: msg }));
     } else if (failCount > 0) {
-      setUploadErrors((prev) => ({ ...prev, [plantId]: `${failCount}枚のアップロードに失敗しました（${successCount}枚は成功）` }));
+      setUploadErrors((prev) => ({ ...prev, [plantId]: `${failCount}枚の登録に失敗しました（${successCount}枚は成功）` }));
     }
     if (successCount > 0) {
       router.refresh();
@@ -451,15 +474,17 @@ export function PlantColumn({
     e.target.value = "";
     if (allFiles.length === 0) return;
 
-    const oversized = allFiles.filter((f) => f.size > 5 * 1024 * 1024);
-    const files = allFiles.filter((f) => f.size <= 5 * 1024 * 1024);
+    // 大きな写真は保存時に自動圧縮するため、30MB超のみ除外
+    const MAX_RAW = 30 * 1024 * 1024;
+    const tooHuge = allFiles.filter((f) => f.size > MAX_RAW);
+    const files = allFiles.filter((f) => f.size <= MAX_RAW);
 
     if (files.length === 0) {
-      setBatchWarning("選択した画像がすべて5MBを超えています");
+      setBatchWarning("写真が大きすぎて処理できませんでした。別の写真でお試しください。");
       return;
     }
 
-    const warning = oversized.length > 0 ? `${oversized.length}枚は5MBを超えたためスキップします` : null;
+    const warning = tooHuge.length > 0 ? `${tooHuge.length}枚は処理できなかったためスキップします` : null;
     await initBatchModal(files, warning);
   }
 
@@ -468,7 +493,7 @@ export function PlantColumn({
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) return; // silently skip oversized
+    if (file.size > 30 * 1024 * 1024) return; // 30MB超のみスキップ（通常のスマホ写真はすべて受け付ける）
     setCaptureSession((prev) => [...prev, file]);
   }
 
@@ -489,6 +514,13 @@ export function PlantColumn({
       try {
         const item = items[i];
         const compressed = await compressImage(item.file);
+        // 圧縮後も4MBを超える場合は登録不可（通常のスマホ写真では発生しない）
+        if (compressed.size > 4 * 1024 * 1024) {
+          const errMsg = "写真を小さくしても大きすぎました。別の写真でお試しください。";
+          results[i] = { ...results[i], status: "error", errorMsg: errMsg };
+          setBatchItems((prev) => prev.map((it, idx) => idx === i ? { ...it, status: "error" as const, errorMsg: errMsg } : it));
+          continue;
+        }
         const fd = new FormData();
         fd.set("plant_id", item.plantId);
         fd.set("photo", new File([compressed], item.file.name.replace(/\.[^/.]+$/, "") + ".jpg", { type: "image/jpeg" }));
