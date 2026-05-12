@@ -4,9 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { BackgroundLayer } from "./BackgroundLayer";
 import { PlantColumn } from "./PlantColumn";
-import { getCarePriority, type CareRule } from "@/lib/dailyCareMessage";
-import { buildPlantCareCards, type PlantAdviceInput } from "@/lib/buildPlantCareAdvice";
-import { getPlantTrivia } from "@/lib/plantTrivias";
+import { fetchHouseholdData, todayStringJst, getPlantLabel } from "@/lib/fetchHouseholdData";
+import { ShareLinkCard } from "./ShareLinkCard";
 
 // DB migration required (run once):
 // alter table plants add column if not exists sort_order integer;
@@ -24,27 +23,6 @@ import { getPlantTrivia } from "@/lib/plantTrivias";
 // alter table plants add column if not exists fertilizer_enabled boolean default true;
 // alter table plants add column if not exists fertilizer_interval_days integer default 14;
 // alter table plants add column if not exists last_fertilized_at date;
-
-function todayString() {
-  // JST 4:00 AM で日付を切り替える（UTC+5h してから UTC 日付を取ると JST 4:00 AM = UTC 19:00 が境界になる）
-  return new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString().slice(0, 10);
-}
-
-const plantLabelMap: Record<string, string> = {
-  tomato: "トマト",
-  coriander: "コリアンダー",
-  makrut_lime: "コブミカン",
-  mint: "ミント",
-  everbearing_strawberry: "四季成りイチゴ",
-  italian_parsley: "イタリアンパセリ",
-  shiso: "大葉",
-  perilla: "えごま",
-};
-
-function getPlantLabel(plantType: string | null | undefined) {
-  if (!plantType) return "植物";
-  return plantLabelMap[plantType] ?? plantType;
-}
 
 function getAppBaseUrl() {
   if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
@@ -66,15 +44,16 @@ async function addPlant(formData: FormData) {
 
   if (!name) return;
 
-  // Phase 1: ログインユーザーの household_id を取得
   const householdId = await getAuthedHouseholdId();
   if (!householdId) return;
+
+  const today = todayStringJst();
 
   const { data: plant, error: plantError } = await supabase
     .from("plants")
     .insert({
       plant_type: name,
-      planted_at: startedAt ?? todayString(),
+      planted_at: startedAt ?? today,
       started_at: startedAt || null,
       species,
       location,
@@ -133,10 +112,13 @@ async function archivePlant(formData: FormData) {
   "use server";
   const plantId = String(formData.get("plant_id") || "");
   if (!plantId) return;
+  const householdId = await getAuthedHouseholdId();
+  if (!householdId) return;
   await supabase
     .from("plants")
     .update({ archived_at: new Date().toISOString() })
-    .eq("id", plantId);
+    .eq("id", plantId)
+    .eq("household_id", householdId);
   revalidatePath("/");
 }
 
@@ -144,7 +126,13 @@ async function restorePlant(formData: FormData) {
   "use server";
   const plantId = String(formData.get("plant_id") || "");
   if (!plantId) return;
-  await supabase.from("plants").update({ archived_at: null }).eq("id", plantId);
+  const householdId = await getAuthedHouseholdId();
+  if (!householdId) return;
+  await supabase
+    .from("plants")
+    .update({ archived_at: null })
+    .eq("id", plantId)
+    .eq("household_id", householdId);
   revalidatePath("/");
 }
 
@@ -159,6 +147,18 @@ async function uploadPlantPhoto(
 
     if (!plantId || !file || file.size === 0)
       return { success: false, error: "必要なデータが不足しています" };
+
+    const householdId = await getAuthedHouseholdId();
+    if (!householdId) return { success: false, error: "認証エラーです。再ログインしてください。" };
+
+    // Verify the plant belongs to this household
+    const { data: plant } = await supabase
+      .from("plants")
+      .select("id")
+      .eq("id", plantId)
+      .eq("household_id", householdId)
+      .single();
+    if (!plant) return { success: false, error: "植物が見つかりません。" };
 
     const storagePath = `plants/${plantId}/${Date.now()}-${file.name}`;
     const bytes = await file.arrayBuffer();
@@ -193,24 +193,81 @@ async function uploadPlantPhoto(
 
 async function reorderPlants(orderedIds: string[]) {
   "use server";
+  const householdId = await getAuthedHouseholdId();
+  if (!householdId) return;
   await Promise.all(
     orderedIds.map((id, index) =>
-      supabase.from("plants").update({ sort_order: index }).eq("id", id)
+      supabase
+        .from("plants")
+        .update({ sort_order: index })
+        .eq("id", id)
+        .eq("household_id", householdId)
     )
   );
   revalidatePath("/");
+}
+
+// ── Share link actions ─────────────────────────────────────────────────────────
+
+async function createShareLink(): Promise<string | null> {
+  "use server";
+  const householdId = await getAuthedHouseholdId();
+  if (!householdId) return null;
+
+  const token = crypto.randomUUID();
+  const { error } = await supabase.from("household_share_links").insert({
+    household_id: householdId,
+    token,
+    enabled: true,
+  });
+  if (error) {
+    console.error("createShareLink error:", error);
+    return null;
+  }
+  revalidatePath("/");
+  return token;
+}
+
+async function revokeShareLink(formData: FormData): Promise<void> {
+  "use server";
+  const householdId = await getAuthedHouseholdId();
+  if (!householdId) return;
+  const linkId = String(formData.get("link_id") || "");
+  if (!linkId) return;
+  await supabase
+    .from("household_share_links")
+    .update({ enabled: false })
+    .eq("id", linkId)
+    .eq("household_id", householdId);
+  revalidatePath("/");
+}
+
+async function regenerateShareLink(formData: FormData): Promise<string | null> {
+  "use server";
+  const householdId = await getAuthedHouseholdId();
+  if (!householdId) return null;
+  const linkId = String(formData.get("link_id") || "");
+  if (!linkId) return null;
+
+  const newToken = crypto.randomUUID();
+  const { error } = await supabase
+    .from("household_share_links")
+    .update({ token: newToken, enabled: true })
+    .eq("id", linkId)
+    .eq("household_id", householdId);
+  if (error) {
+    console.error("regenerateShareLink error:", error);
+    return null;
+  }
+  revalidatePath("/");
+  return newToken;
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function Home() {
   const pageStart = Date.now();
-  const today = todayString();
 
-  // Run all independent DB queries in parallel (was sequential → ~10s, now parallel → ~2-3s)
-  const dbStart = Date.now();
-
-  // Phase 1: ログインユーザーの household_id を取得。未ログインは middleware が /login にリダイレクト済み。
   const householdId = await getAuthedHouseholdId();
   if (!householdId) {
     return (
@@ -235,140 +292,39 @@ export default async function Home() {
     );
   }
 
-  const [
-    { data: allPlantsRaw, error: plantsError },
-    { data: photosRaw, error: photosError },
-    { data: careRulesRaw },
-  ] = await Promise.all([
+  const dbStart = Date.now();
+  const [data, shareLinkResult] = await Promise.all([
+    fetchHouseholdData(householdId),
     supabase
-      .from("plants")
-      .select("*")
+      .from("household_share_links")
+      .select("id, token, enabled, created_at")
       .eq("household_id", householdId)
-      .order("created_at", { ascending: false }),
-    // Limit to 500 most recent photos; histories beyond this load on demand
-    supabase
-      .from("plant_photos")
-      .select("id, plant_id, image_url, taken_at")
-      .order("taken_at", { ascending: false })
-      .limit(500),
-    supabase
-      .from("care_rules")
-      .select("id, plant_id, task_type, task_detail, interval_days, title, message, confidence, is_active")
-      .eq("is_active", true),
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
-  console.log(`[Page] db queries ${Date.now() - dbStart}ms (plants=${allPlantsRaw?.length ?? 0} photos=${photosRaw?.length ?? 0} careRules=${careRulesRaw?.length ?? 0} plantsErr=${plantsError?.message ?? "-"} photosErr=${photosError?.message ?? "-"}`);
+  console.log(`[Page] db queries ${Date.now() - dbStart}ms (plants=${data.plants.length} hasError=${data.hasError})`);
 
-  // Sort in JS so the query never fails when sort_order column doesn't exist yet.
-  // Plants with sort_order set appear first (ascending), NULLs fall back to created_at order.
-  const allPlants = (allPlantsRaw ?? []).sort((a, b) => {
-    const aOrd: number | null = a.sort_order ?? null;
-    const bOrd: number | null = b.sort_order ?? null;
-    if (aOrd !== null && bOrd !== null) return aOrd - bOrd;
-    if (aOrd !== null) return -1;
-    if (bOrd !== null) return 1;
-    return 0;
-  });
-  const plants = allPlants.filter((p) => !p.archived_at);
-  const archivedPlants = allPlants.filter((p) => !!p.archived_at);
+  const {
+    plants,
+    archivedPlants,
+    today,
+    latestPhotos,
+    photoHistories,
+    plantHasTodayEventRecord,
+    careCardMap,
+    plantCareCards,
+    spotlightCard,
+    spotlightTrivia,
+    summaryStats,
+    hasError,
+  } = data;
 
-  const photos = photosRaw ?? [];
-  const latestPhotos: Record<string, string> = {};
-  const photoHistories: Record<
-    string,
-    { id: string; url: string; takenAt: string }[]
-  > = {};
-
-  for (const photo of photos) {
-    const url: string = photo.image_url ?? "";
-    if (!url) continue;
-    if (!latestPhotos[photo.plant_id]) latestPhotos[photo.plant_id] = url;
-    if (!photoHistories[photo.plant_id]) photoHistories[photo.plant_id] = [];
-    photoHistories[photo.plant_id].push({
-      id: photo.id,
-      url,
-      takenAt: String(photo.taken_at ?? "").slice(0, 10),
-    });
-  }
-
-  // Badge record: derived from photo recency (urgent/attention → 要対応)
-  const todayMs = new Date(today).getTime();
-  const plantHasTodayEventRecord = Object.fromEntries(
-    plants.map((plant) => {
-      const latestPhoto = photoHistories[plant.id]?.[0];
-      const daysSince = latestPhoto
-        ? Math.floor((todayMs - new Date(latestPhoto.takenAt).getTime()) / (1000 * 60 * 60 * 24))
-        : null;
-      const priority = getCarePriority(daysSince);
-      return [plant.id, priority === "urgent" || priority === "attention"];
-    })
-  );
-
-  // care_rules を plant_id でグループ化
-  const careRulesMap = new Map<string, CareRule[]>();
-  for (const rule of careRulesRaw ?? []) {
-    if (!careRulesMap.has(rule.plant_id)) careRulesMap.set(rule.plant_id, []);
-    careRulesMap.get(rule.plant_id)!.push(rule as CareRule);
-  }
-
-  // 植物ごとのケアアドバイスカード生成
-  const plantAdviceInputs: PlantAdviceInput[] = plants.map((plant) => {
-    const latestPhoto = photoHistories[plant.id]?.[0];
-    const daysSinceLastPhoto = latestPhoto
-      ? Math.floor((todayMs - new Date(latestPhoto.takenAt).getTime()) / (1000 * 60 * 60 * 24))
-      : null;
-    const fertilizerBaseDate =
-      (plant.last_fertilized_at as string | null) ??
-      (plant.created_at as string | null) ??
-      today;
-    const daysSinceLastFertilized = Math.floor(
-      (todayMs - new Date(String(fertilizerBaseDate).slice(0, 10)).getTime()) /
-        (1000 * 60 * 60 * 24)
-    );
-    return {
-      id: plant.id,
-      display_name: getPlantLabel(plant.plant_type),
-      plantType: plant.plant_type ?? null,
-      daysSinceLastPhoto,
-      fertilizerEnabled: plant.fertilizer_enabled !== false,
-      fertilizerIntervalDays: (plant.fertilizer_interval_days as number | null) ?? 14,
-      daysSinceLastFertilized,
-      latestPhotoUrl: latestPhotos[plant.id] ?? null,
-    };
-  });
-
-  const plantCareCards = buildPlantCareCards(plantAdviceInputs, careRulesMap, today);
-
-  // PlantColumn に渡すケアカードマップ（plant_id → advice/tags/priority）
-  const careCardMap = Object.fromEntries(
-    plantCareCards.map(c => [c.plantId, { advice: c.advice, tags: c.tags, priority: c.priority }])
-  );
-
-  // 今日の1枚: urgent/attention 優先プールから日付ハッシュで日替わり選択
-  const spotlightCard = (() => {
-    const withPhoto = plantCareCards.filter(c => !!c.latestPhotoUrl);
-    if (withPhoto.length === 0) return null;
-    const priorityPool = withPhoto.filter(c => c.priority === "urgent" || c.priority === "attention");
-    const pool = priorityPool.length > 0 ? priorityPool : withPhoto;
-    const seed = today + ":spotlight";
-    let h = 0;
-    for (const ch of seed) h = (Math.imul(31, h) + ch.charCodeAt(0)) | 0;
-    return pool[Math.abs(h) % pool.length];
-  })();
-  const spotlightTrivia = spotlightCard
-    ? getPlantTrivia(spotlightCard.plantType ?? null, today)
+  const shareLink = shareLinkResult.data;
+  const appBaseUrl = getAppBaseUrl();
+  const shareUrl = shareLink?.enabled
+    ? `${appBaseUrl}/share/${shareLink.token}`
     : null;
-
-  // 全体サマリー集計
-  const summaryStats = {
-    waterCount: plantCareCards.filter(c => c.tags.includes("水やり")).length,
-    fertilizerCount: plantCareCards.filter(c => c.tags.includes("液体肥料")).length,
-    // 観察・環境確認は同じ「見守り」カテゴリ。植物単位で重複カウントしない
-    observationCount: plantCareCards.filter(c =>
-      c.tags.some(t => t === "観察" || t === "環境確認")
-    ).length,
-    photoCount: plantCareCards.filter(c => c.tags.includes("写真記録")).length,
-    total: plantCareCards.length,
-  };
 
   console.log(`[Page] total render ${Date.now() - pageStart}ms`);
 
@@ -639,7 +595,7 @@ export default async function Home() {
               archivedPlants={archivedPlants}
               today={today}
               plantHasTodayEventRecord={plantHasTodayEventRecord}
-              hasError={!!plantsError}
+              hasError={hasError}
               addPlantAction={addPlant}
               archivePlantAction={archivePlant}
               restorePlantAction={restorePlant}
@@ -719,7 +675,6 @@ export default async function Home() {
             let line2 = "";
             let line3 = "";
             let isFertilizerBatch = false;
-            // 対象植物を絞り込む（優先順：液体肥料 → 水やり → 観察）
             const targetPlants: typeof plantCareCards = (() => {
               if (fertilizerCount >= 2) {
                 line1 = "そろそろ液肥を考えてもよさそうです";
@@ -770,7 +725,7 @@ export default async function Home() {
           })()}
           </div>{/* /spotlight-section */}
 
-          {/* ── サイドバー: 全体サマリー・LINE（モバイルでは植物カードの下） ── */}
+          {/* ── サイドバー: 全体サマリー・共有リンク・LINE（モバイルでは植物カードの下） ── */}
           <div className="sidebar-section">
 
           {/* ── 全体サマリー ── */}
@@ -778,7 +733,6 @@ export default async function Home() {
             <div className="col-board">
               <h2 className="col-heading">Care summary</h2>
 
-              {/* 🌿 今日の主なお世話：水やり・液体肥料 */}
               {(summaryStats.waterCount > 0 || summaryStats.fertilizerCount > 0) && (
                 <div style={{ marginBottom: 10 }}>
                   <p style={{ fontSize: 11, fontWeight: 700, color: "#3d6b3d", margin: "0 0 4px 0" }}>
@@ -799,7 +753,6 @@ export default async function Home() {
                 </div>
               )}
 
-              {/* 👀 見守りポイント：観察・環境確認 */}
               {summaryStats.observationCount > 0 && (
                 <div style={{ marginBottom: 10 }}>
                   <p style={{ fontSize: 11, fontWeight: 700, color: "#0369a1", margin: "0 0 4px 0" }}>
@@ -812,7 +765,6 @@ export default async function Home() {
                 </div>
               )}
 
-              {/* 📸 写真記録のおすすめ */}
               {summaryStats.photoCount > 0 && (
                 <div style={{ marginBottom: 10 }}>
                   <p style={{ fontSize: 11, fontWeight: 700, color: "#7c3aed", margin: "0 0 4px 0" }}>
@@ -825,7 +777,6 @@ export default async function Home() {
                 </div>
               )}
 
-              {/* 全て問題なし */}
               {summaryStats.waterCount === 0 && summaryStats.fertilizerCount === 0 &&
                summaryStats.observationCount === 0 && summaryStats.photoCount === 0 && (
                 <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 10px", lineHeight: 1.75 }}>
@@ -839,12 +790,20 @@ export default async function Home() {
             </div>
           )}
 
+          {/* ── 家族共有リンク ── */}
+          <ShareLinkCard
+            shareUrl={shareUrl}
+            linkId={shareLink?.id ?? null}
+            createShareLinkAction={createShareLink}
+            revokeShareLinkAction={revokeShareLink}
+            regenerateShareLinkAction={regenerateShareLink}
+          />
+
           {/* ── LINE通知を受け取る ── */}
           <div className="col-board">
             <h2 className="col-heading">LINE reminders</h2>
 
             <div className="line-card" style={{ marginBottom: 0 }}>
-              {/* QR + ボタン */}
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, marginBottom: 14 }}>
                 <img
                   src="/images/line-qr.png"
@@ -876,7 +835,6 @@ export default async function Home() {
                 </a>
               </div>
 
-              {/* 使い方説明 */}
               <p
                 style={{
                   fontSize: 11,

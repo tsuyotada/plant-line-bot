@@ -4,7 +4,6 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
-  // Session-aware client for middleware (uses request/response cookies, NOT next/headers)
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -13,8 +12,7 @@ export async function middleware(request: NextRequest) {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(cookiesToSet, headers) {
-          // Write updated session cookies back to both request and response
+        setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
@@ -22,17 +20,12 @@ export async function middleware(request: NextRequest) {
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
           );
-          // Write cache-control headers required by @supabase/ssr when auth cookies are set
-          Object.entries(headers ?? {}).forEach(([key, value]) =>
-            supabaseResponse.headers.set(key, value)
-          );
         },
       },
     }
   );
 
-  // getUser() triggers session refresh if the access token is expired.
-  // Must be called before any response is committed.
+  // Refresh session if expired — must run before any response is committed.
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -42,7 +35,8 @@ export async function middleware(request: NextRequest) {
   const isPublic =
     pathname === "/login" ||
     pathname.startsWith("/auth/") ||
-    pathname.startsWith("/api/");
+    pathname.startsWith("/api/") ||
+    pathname.startsWith("/share/");
 
   if (!user && !isPublic) {
     const loginUrl = request.nextUrl.clone();
@@ -55,7 +49,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Protect all routes except Next.js internals and static assets
     "/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
