@@ -41,6 +41,7 @@ export async function buildDailyNotificationMessage(): Promise<{
     { data: plantsRaw },
     { data: photosRaw },
     { data: careRulesRaw },
+    { data: shareLinkData },
   ] = await Promise.all([
     supabase
       .from("plants")
@@ -57,6 +58,14 @@ export async function buildDailyNotificationMessage(): Promise<{
       .from("care_rules")
       .select("id, plant_id, task_type, task_detail, interval_days, title, message, confidence, is_active")
       .eq("is_active", true),
+    supabase
+      .from("household_share_links")
+      .select("token")
+      .eq("household_id", householdId)
+      .eq("enabled", true)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   const plants = plantsRaw ?? [];
@@ -163,5 +172,13 @@ export async function buildDailyNotificationMessage(): Promise<{
     }
   }
 
-  return { message, today, plantCount: plants.length, spotlightPhotoUrl };
+  const appBaseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ??
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+  const shareToken = (shareLinkData as { token: string } | null)?.token ?? null;
+  const finalMessage = shareToken
+    ? `${message}\n\n家族の植物ページ：\n${appBaseUrl}/share/${shareToken}`
+    : message;
+
+  return { message: finalMessage, today, plantCount: plants.length, spotlightPhotoUrl };
 }
