@@ -110,15 +110,26 @@ export function buildPlantCareCards(
 
     const needsPhoto = (plant.daysSinceLastPhoto ?? 999) >= 3;
 
-    // タグ（該当するケア項目を付与）
+    // タグ（最大3件、観察は他に何もない場合のみ）
     const tags: CareTag[] = [];
+    // 1. 具体的なアクション
     if (needsWater) tags.push("水やり");
     if (needsFertilizer) tags.push("液体肥料");
-    if (rules.some(r => r.is_active && r.task_type === "observation")) tags.push("観察");
-    if (needsPhoto) tags.push("写真記録");
-    if (rules.some(r => r.is_active && r.task_type === "pruning")) tags.push("剪定");
-    if (rules.some(r => r.is_active && r.task_type === "harvesting")) tags.push("収穫");
-    if (rules.some(r => r.is_active && r.task_type === "environment")) tags.push("環境確認");
+    // 2. 最も具体的なルールベースのタグ（収穫 > 剪定 > 環境確認）
+    const specificRuleTagMap: Partial<Record<string, CareTag>> = {
+      harvesting: "収穫",
+      pruning: "剪定",
+      environment: "環境確認",
+    };
+    const specificRuleRank: Record<string, number> = { harvesting: 1, pruning: 2, environment: 3 };
+    const bestSpecificRule = rules
+      .filter(r => r.is_active && r.task_type in specificRuleTagMap)
+      .sort((a, b) => (specificRuleRank[a.task_type] ?? 9) - (specificRuleRank[b.task_type] ?? 9))[0] ?? null;
+    if (bestSpecificRule && tags.length < 3) tags.push(specificRuleTagMap[bestSpecificRule.task_type]!);
+    // 3. 写真記録：他に具体的なタグがない場合のみ
+    if (needsPhoto && tags.length === 0) tags.push("写真記録");
+    // 4. 観察：他に何もない最終手段のみ
+    if (tags.length === 0 && rules.some(r => r.is_active && r.task_type === "observation")) tags.push("観察");
 
     // アドバイステキスト: care_rule.message → 水やり/肥料 → フォールバック の順
     const parts: string[] = [];
