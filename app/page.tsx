@@ -24,7 +24,8 @@ import { getPlantTrivia } from "@/lib/plantTrivias";
 // alter table plants add column if not exists last_fertilized_at date;
 
 function todayString() {
-  return new Date().toISOString().slice(0, 10);
+  // JST 4:00 AM で日付を切り替える（UTC+5h してから UTC 日付を取ると JST 4:00 AM = UTC 19:00 が境界になる）
+  return new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
 const plantLabelMap: Record<string, string> = {
