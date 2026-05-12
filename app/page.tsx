@@ -1,5 +1,7 @@
 import { supabaseServer as supabase } from "../src/lib/supabase-server";
+import { getAuthedHouseholdId } from "../src/lib/supabase-ssr";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { BackgroundLayer } from "./BackgroundLayer";
 import { PlantColumn } from "./PlantColumn";
 import { getCarePriority, type CareRule } from "@/lib/dailyCareMessage";
@@ -50,12 +52,6 @@ function getAppBaseUrl() {
   return "http://localhost:3000";
 }
 
-// ── Household ─────────────────────────────────────────────────────────────────
-
-// Phase 0: 1ユーザー = 1 household。将来の家族共有・マルチ household に備えて
-// household_id を明示的な変数として扱う。
-const DEFAULT_HOUSEHOLD_ID = process.env.DEFAULT_HOUSEHOLD_ID!;
-
 // ── Server actions ────────────────────────────────────────────────────────────
 
 async function addPlant(formData: FormData) {
@@ -70,7 +66,9 @@ async function addPlant(formData: FormData) {
 
   if (!name) return;
 
-  const householdId = DEFAULT_HOUSEHOLD_ID;
+  // Phase 1: ログインユーザーの household_id を取得
+  const householdId = await getAuthedHouseholdId();
+  if (!householdId) return;
 
   const { data: plant, error: plantError } = await supabase
     .from("plants")
@@ -211,7 +209,31 @@ export default async function Home() {
 
   // Run all independent DB queries in parallel (was sequential → ~10s, now parallel → ~2-3s)
   const dbStart = Date.now();
-  const householdId = DEFAULT_HOUSEHOLD_ID;
+
+  // Phase 1: ログインユーザーの household_id を取得。未ログインは middleware が /login にリダイレクト済み。
+  const householdId = await getAuthedHouseholdId();
+  if (!householdId) {
+    return (
+      <main
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "32px",
+          fontFamily: "sans-serif",
+          color: "#555",
+          textAlign: "center",
+        }}
+      >
+        <p>
+          このユーザーに紐づく household がありません。
+          <br />
+          管理者にお問い合わせください。
+        </p>
+      </main>
+    );
+  }
 
   const [
     { data: allPlantsRaw, error: plantsError },
