@@ -684,12 +684,13 @@ export default async function Home() {
             let line1 = "";
             let line2 = "";
             let line3 = "";
+            let isFertilizerBatch = false;
             // 対象植物を絞り込む（優先順：液体肥料 → 水やり → 観察）
             const targetPlants: typeof plantCareCards = (() => {
               if (fertilizerCount >= 2) {
-                line1 = `液体肥料の対象が${fertilizerCount}件あります。`;
-                line2 = "今日は液肥をまとめてあげるとよさそうです。";
-                line3 = "余裕があれば、気になる植物から見てみましょう。";
+                line1 = "そろそろ液肥を考えてもよさそうです";
+                line2 = "春から育っている植物や、実・葉を育てている植物を見てみましょう。";
+                isFertilizerBatch = true;
                 return plantCareCards.filter(c => c.tags.includes("液体肥料"));
               }
               if (waterCount >= 2) {
@@ -719,9 +720,9 @@ export default async function Home() {
                     {line3 && <p style={{ margin: "0 0 8px", color: "#6b7280" }}>{line3}</p>}
                     {shownPlants.length > 0 && (
                       <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #f0ebe2", fontSize: 11, color: "#6b7280", lineHeight: 1.7 }}>
-                        <span style={{ fontWeight: 600, color: "#4b7a5a" }}>今日見る植物：</span>
+                        <span style={{ fontWeight: 600, color: "#4b7a5a" }}>{isFertilizerBatch ? "見てみるなら：" : "今日見る植物："}</span>
                         {shownPlants.map(c => c.plantName).join("・")}
-                        {restCount > 0 && <span style={{ color: "#9ca3af" }}> ほか{restCount}件</span>}
+                        {restCount > 0 && <span style={{ color: "#9ca3af" }}>{isFertilizerBatch ? " など" : ` ほか${restCount}件`}</span>}
                       </div>
                     )}
                   </div>
