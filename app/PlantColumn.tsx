@@ -912,6 +912,7 @@ export function PlantColumn({
           </div>
         ) : (
           <DndContext
+            id="plant-column"
             sensors={sensors}
             collisionDetection={closestCenter}
             onDragEnd={handleDragEnd}
