@@ -308,11 +308,16 @@ export default async function Home() {
     plantCareCards.map(c => [c.plantId, { advice: c.advice, tags: c.tags, priority: c.priority }])
   );
 
-  // 今日の1枚: 写真あり・urgent/attention 優先、なければ先頭
+  // 今日の1枚: urgent/attention 優先プールから日付ハッシュで日替わり選択
   const spotlightCard = (() => {
     const withPhoto = plantCareCards.filter(c => !!c.latestPhotoUrl);
     if (withPhoto.length === 0) return null;
-    return withPhoto.find(c => c.priority === "urgent" || c.priority === "attention") ?? withPhoto[0];
+    const priorityPool = withPhoto.filter(c => c.priority === "urgent" || c.priority === "attention");
+    const pool = priorityPool.length > 0 ? priorityPool : withPhoto;
+    const seed = today + ":spotlight";
+    let h = 0;
+    for (const ch of seed) h = (Math.imul(31, h) + ch.charCodeAt(0)) | 0;
+    return pool[Math.abs(h) % pool.length];
   })();
   const spotlightTrivia = spotlightCard
     ? getPlantTrivia(spotlightCard.plantType ?? null, today)
