@@ -30,6 +30,36 @@ export type PlantCareCard = {
   latestPhotoUrl: string | null;
 };
 
+// 液体肥料リマインダーをインターバル経過後に表示し続ける日数
+// 例: interval=14 → 14日目〜16日目に表示、17日目に消える。28日目にまた表示。
+const FERTILIZER_REMINDER_DAYS = 3;
+
+// 日付+plantId をシードにした決定論的選択（同じ日は同じ結果、翌日は変わる）
+function datePick<T>(items: T[], seed: string): T {
+  let h = 0;
+  for (const c of seed) h = (Math.imul(31, h) + c.charCodeAt(0)) | 0;
+  return items[Math.abs(h) % items.length];
+}
+
+const WATER_URGENT_PHRASES = [
+  "土が乾いている可能性があります。水やりを確認しましょう。",
+  "水切れのサインがないか、葉と土を確認してください。",
+  "そろそろ水やりの頃合いです。土の乾きを確認してみてください。",
+];
+
+const WATER_ATTENTION_PHRASES = [
+  "そろそろ水やりのタイミングかもしれません。",
+  "土の表面が乾いてきたら、水やりしてあげましょう。",
+  "水やりのタイミングに近づいています。土を確認してみてください。",
+];
+
+const FALLBACK_PHRASES = [
+  "今日は葉や土の様子を軽く見てあげてください。",
+  "葉の色や張りをざっと確認してみましょう。",
+  "茎の状態や新芽の様子をチェックしてみてください。",
+  "今日は土の乾き具合を確認してみてください。",
+];
+
 // タスク種別の優先順位: 観察・環境系を優先してアドバイスに反映
 const TASK_TYPE_RANK: Record<string, number> = {
   observation: 1, environment: 2, soil: 3, support: 4,
@@ -52,19 +82,26 @@ function bestAdviceRule(rules: CareRule[]): CareRule | null {
 
 /**
  * 植物ごとのケアアドバイスカードを生成する（APP表示用）。
- * care_rules → 水やり/液体肥料判定 → フォールバック の順で助言テキストを構築する。
+ * today を渡すと、水やり文とフォールバック文が日付+plantId ベースで日替わりになる。
  */
 export function buildPlantCareCards(
   plants: PlantAdviceInput[],
   careRulesMap: Map<string, CareRule[]>,
+  today = "",
 ): PlantCareCard[] {
   return plants.map(plant => {
     const rules = careRulesMap.get(plant.id) ?? [];
     const priority = getCarePriority(plant.daysSinceLastPhoto);
     const needsWater = priority === "urgent" || priority === "attention";
+
+    // 液体肥料: インターバル経過後 FERTILIZER_REMINDER_DAYS 日間のみ表示し、以後は次のサイクルまで非表示。
+    // last_fertilized_at が記録されない場合も created_at 起点で周期的にリマインドする。
+    const daysPastInterval = plant.daysSinceLastFertilized - plant.fertilizerIntervalDays;
     const needsFertilizer =
       plant.fertilizerEnabled &&
-      plant.daysSinceLastFertilized >= plant.fertilizerIntervalDays;
+      daysPastInterval >= 0 &&
+      daysPastInterval % plant.fertilizerIntervalDays < FERTILIZER_REMINDER_DAYS;
+
     const needsPhoto = (plant.daysSinceLastPhoto ?? 999) >= 3;
 
     // タグ（該当するケア項目を付与）
@@ -79,6 +116,7 @@ export function buildPlantCareCards(
 
     // アドバイステキスト: care_rule.message → 水やり/肥料 → フォールバック の順
     const parts: string[] = [];
+    const seed = `${today}:${plant.id}`;
 
     const rule = bestAdviceRule(rules);
     if (rule) parts.push(rule.message);
@@ -86,17 +124,14 @@ export function buildPlantCareCards(
     if (needsWater && needsFertilizer) {
       parts.push("水やりと液体肥料のタイミングです。");
     } else if (needsWater) {
-      parts.push(
-        priority === "urgent"
-          ? "土が乾いている可能性があります。水やりを確認しましょう。"
-          : "そろそろ水やりのタイミングかもしれません。"
-      );
+      const phrases = priority === "urgent" ? WATER_URGENT_PHRASES : WATER_ATTENTION_PHRASES;
+      parts.push(datePick(phrases, seed + ":water"));
     } else if (needsFertilizer) {
       parts.push("液体肥料をあげるタイミングです。");
     }
 
     if (parts.length === 0) {
-      parts.push("今日は観察中心で、葉や土の様子を軽く見てあげてください。");
+      parts.push(datePick(FALLBACK_PHRASES, seed + ":fallback"));
     }
 
     return {

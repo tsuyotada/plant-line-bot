@@ -301,7 +301,7 @@ export default async function Home() {
     };
   });
 
-  const plantCareCards = buildPlantCareCards(plantAdviceInputs, careRulesMap);
+  const plantCareCards = buildPlantCareCards(plantAdviceInputs, careRulesMap, today);
 
   // PlantColumn に渡すケアカードマップ（plant_id → advice/tags/priority）
   const careCardMap = Object.fromEntries(
