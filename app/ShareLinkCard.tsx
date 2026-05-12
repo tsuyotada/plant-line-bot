@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { QRCodeSVG } from "qrcode.react";
 
 type Props = {
   shareUrl: string | null;
@@ -147,6 +148,11 @@ export function ShareLinkCard({
             >
               {copied ? "コピー済み" : "コピー"}
             </button>
+          </div>
+          <div
+            style={{ display: "flex", justifyContent: "center", margin: "14px 0 10px" }}
+          >
+            <QRCodeSVG value={shareUrl} size={160} />
           </div>
           <div style={{ display: "flex", gap: 6 }}>
             <button
