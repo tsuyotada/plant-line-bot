@@ -1,5 +1,5 @@
 import { supabaseServer as supabase } from "../src/lib/supabase-server";
-import { getAuthedHouseholdId } from "../src/lib/supabase-ssr";
+import { getAuthedHouseholdId, createSupabaseServerClient } from "../src/lib/supabase-ssr";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { BackgroundLayer } from "./BackgroundLayer";
@@ -207,6 +207,34 @@ async function reorderPlants(orderedIds: string[]) {
   revalidatePath("/");
 }
 
+// ── Setup action ──────────────────────────────────────────────────────────────
+
+async function createHousehold(formData: FormData) {
+  "use server";
+  const name = String(formData.get("name") || "").trim();
+  if (!name) {
+    redirect("/?setup_error=1");
+    return;
+  }
+
+  const authClient = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await authClient.auth.getUser();
+  if (!user) {
+    redirect("/login");
+    return;
+  }
+
+  const { error } = await supabase
+    .from("households")
+    .insert({ owner_id: user.id, name });
+
+  if (error) console.error("createHousehold error:", error);
+
+  redirect("/");
+}
+
 // ── Share link actions ─────────────────────────────────────────────────────────
 
 async function createShareLink(): Promise<string | null> {
@@ -265,11 +293,16 @@ async function regenerateShareLink(formData: FormData): Promise<string | null> {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ setup_error?: string }>;
+}) {
   const pageStart = Date.now();
 
   const householdId = await getAuthedHouseholdId();
   if (!householdId) {
+    const { setup_error } = await searchParams;
     return (
       <main
         style={{
@@ -277,17 +310,96 @@ export default async function Home() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          padding: "32px",
-          fontFamily: "sans-serif",
-          color: "#555",
-          textAlign: "center",
+          background: "linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%)",
+          padding: "24px",
+          fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
         }}
       >
-        <p>
-          このユーザーに紐づく household がありません。
-          <br />
-          管理者にお問い合わせください。
-        </p>
+        <div
+          style={{
+            background: "#fff",
+            borderRadius: 16,
+            padding: "40px 32px",
+            maxWidth: 400,
+            width: "100%",
+            boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
+            textAlign: "center",
+          }}
+        >
+          <div style={{ fontSize: 40, marginBottom: 12 }}>🌱</div>
+          <h1
+            style={{
+              fontSize: 20,
+              fontWeight: 700,
+              color: "#1f3a2a",
+              margin: "0 0 10px",
+            }}
+          >
+            家庭の植物ページを作りましょう
+          </h1>
+          <p
+            style={{
+              fontSize: 14,
+              color: "#555",
+              lineHeight: 1.6,
+              margin: "0 0 24px",
+            }}
+          >
+            家族みんなで植物を管理できるページを作ります。
+            <br />
+            ページ名を入力してはじめましょう。
+          </p>
+          <form action={createHousehold}>
+            {setup_error && (
+              <p
+                style={{
+                  fontSize: 13,
+                  color: "#b91c1c",
+                  background: "#fef2f2",
+                  border: "1px solid #fecaca",
+                  borderRadius: 8,
+                  padding: "8px 12px",
+                  margin: "0 0 14px",
+                }}
+              >
+                ページ名を入力してください。
+              </p>
+            )}
+            <input
+              type="text"
+              name="name"
+              placeholder="例：田中家のガーデン"
+              maxLength={50}
+              style={{
+                width: "100%",
+                padding: "12px 14px",
+                border: "1.5px solid #d1e8d8",
+                borderRadius: 10,
+                fontSize: 15,
+                outline: "none",
+                boxSizing: "border-box",
+                marginBottom: 14,
+                fontFamily: "inherit",
+              }}
+            />
+            <button
+              type="submit"
+              style={{
+                width: "100%",
+                padding: "12px",
+                background: "#4b7a5a",
+                color: "#fff",
+                border: "none",
+                borderRadius: 10,
+                fontSize: 15,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              はじめる
+            </button>
+          </form>
+        </div>
       </main>
     );
   }
