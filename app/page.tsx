@@ -50,6 +50,12 @@ function getAppBaseUrl() {
   return "http://localhost:3000";
 }
 
+// ── Household ─────────────────────────────────────────────────────────────────
+
+// Phase 0: 1ユーザー = 1 household。将来の家族共有・マルチ household に備えて
+// household_id を明示的な変数として扱う。
+const DEFAULT_HOUSEHOLD_ID = process.env.DEFAULT_HOUSEHOLD_ID!;
+
 // ── Server actions ────────────────────────────────────────────────────────────
 
 async function addPlant(formData: FormData) {
@@ -64,6 +70,8 @@ async function addPlant(formData: FormData) {
 
   if (!name) return;
 
+  const householdId = DEFAULT_HOUSEHOLD_ID;
+
   const { data: plant, error: plantError } = await supabase
     .from("plants")
     .insert({
@@ -73,6 +81,7 @@ async function addPlant(formData: FormData) {
       species,
       location,
       memo,
+      household_id: householdId,
     })
     .select()
     .single();
@@ -202,6 +211,8 @@ export default async function Home() {
 
   // Run all independent DB queries in parallel (was sequential → ~10s, now parallel → ~2-3s)
   const dbStart = Date.now();
+  const householdId = DEFAULT_HOUSEHOLD_ID;
+
   const [
     { data: allPlantsRaw, error: plantsError },
     { data: photosRaw, error: photosError },
@@ -210,6 +221,7 @@ export default async function Home() {
     supabase
       .from("plants")
       .select("*")
+      .eq("household_id", householdId)
       .order("created_at", { ascending: false }),
     // Limit to 500 most recent photos; histories beyond this load on demand
     supabase

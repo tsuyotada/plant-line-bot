@@ -29,9 +29,13 @@ const PLANT_PAGE_SIZE = 11;
 const CONFIDENCE_THRESHOLD = 0.6;
 
 async function fetchActivePlants(supabase: ReturnType<typeof getSupabase>) {
+  // Phase 0: 1 household 固定。将来の家族共有・マルチ household 対応に備えて明示的な変数として扱う。
+  const householdId = process.env.DEFAULT_HOUSEHOLD_ID!;
+
   const { data: raw } = await supabase
     .from("plants")
     .select("id, plant_type, sort_order, species, memo")
+    .eq("household_id", householdId)
     .is("archived_at", null)
     .order("created_at", { ascending: true });
 

@@ -32,6 +32,9 @@ export async function buildDailyNotificationMessage(): Promise<{
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
+  // Phase 0: 1 household 固定。将来の家族共有・マルチ household 対応に備えて明示的な変数として扱う。
+  const householdId = process.env.DEFAULT_HOUSEHOLD_ID!;
+
   const today = getTodayJst();
 
   const [
@@ -42,6 +45,7 @@ export async function buildDailyNotificationMessage(): Promise<{
     supabase
       .from("plants")
       .select("*")
+      .eq("household_id", householdId)
       .is("archived_at", null)
       .order("sort_order", { ascending: true, nullsFirst: false })
       .order("created_at", { ascending: false }),
