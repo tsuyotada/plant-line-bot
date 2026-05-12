@@ -53,6 +53,12 @@ const WATER_ATTENTION_PHRASES = [
   "水やりのタイミングに近づいています。土を確認してみてください。",
 ];
 
+const FERTILIZER_PHRASES = [
+  "液体肥料をあげるタイミングです。",
+  "そろそろ液体肥料の頃合いです。",
+  "液体肥料を忘れずにあげてみてください。",
+];
+
 const FALLBACK_PHRASES = [
   "今日は葉や土の様子を軽く見てあげてください。",
   "葉の色や張りをざっと確認してみましょう。",
@@ -127,7 +133,7 @@ export function buildPlantCareCards(
       const phrases = priority === "urgent" ? WATER_URGENT_PHRASES : WATER_ATTENTION_PHRASES;
       parts.push(datePick(phrases, seed + ":water"));
     } else if (needsFertilizer) {
-      parts.push("液体肥料をあげるタイミングです。");
+      parts.push(datePick(FERTILIZER_PHRASES, seed + ":fert"));
     }
 
     if (parts.length === 0) {
