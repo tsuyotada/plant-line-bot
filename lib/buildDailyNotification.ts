@@ -21,7 +21,7 @@ function getTodayJst(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo" }).format(new Date());
 }
 
-export async function buildDailyNotificationMessage(): Promise<{
+export async function buildDailyNotificationMessage(householdId: string): Promise<{
   message: string;
   today: string;
   plantCount: number;
@@ -31,9 +31,6 @@ export async function buildDailyNotificationMessage(): Promise<{
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
-
-  // Phase 0: 1 household 固定。将来の家族共有・マルチ household 対応に備えて明示的な変数として扱う。
-  const householdId = process.env.DEFAULT_HOUSEHOLD_ID!;
 
   const today = getTodayJst();
 
@@ -173,8 +170,7 @@ export async function buildDailyNotificationMessage(): Promise<{
   }
 
   const appBaseUrl =
-    process.env.NEXT_PUBLIC_APP_URL ??
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+    process.env.NEXT_PUBLIC_APP_URL ?? "https://plant-line-bot-forme.vercel.app";
   const shareToken = (shareLinkData as { token: string } | null)?.token ?? null;
   const finalMessage = shareToken
     ? `${message}\n\n家族の植物ページ：\n${appBaseUrl}/share/${shareToken}`

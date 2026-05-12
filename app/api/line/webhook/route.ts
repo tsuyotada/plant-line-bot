@@ -1115,13 +1115,16 @@ export async function POST(req: Request) {
     if (userMessage === "通知テスト") {
       const { data: regRecord } = await supabase
         .from("line_notification_users")
-        .select("is_active, has_tested_notification")
+        .select("is_active, has_tested_notification, household_id")
         .eq("line_user_id", lineUserId)
         .maybeSingle();
 
       const isRegistered = regRecord?.is_active === true;
       const wasTested = regRecord?.has_tested_notification === true;
-      console.log(`[LINE] notification test requested userId=${lineUserId} registered=${isRegistered} has_tested_notification=${wasTested}`);
+      const testHouseholdId: string =
+        (regRecord as { household_id?: string | null } | null)?.household_id ??
+        process.env.DEFAULT_HOUSEHOLD_ID!;
+      console.log(`[LINE] notification test requested userId=${lineUserId} registered=${isRegistered} has_tested_notification=${wasTested} household=${testHouseholdId}`);
 
       // テスト履歴を記録（is_active は変えない）
       if (regRecord) {
@@ -1137,7 +1140,7 @@ export async function POST(req: Request) {
           .insert({ line_user_id: lineUserId, is_active: false, has_tested_notification: true });
       }
 
-      const { message, spotlightPhotoUrl } = await buildDailyNotificationMessage();
+      const { message, spotlightPhotoUrl } = await buildDailyNotificationMessage(testHouseholdId);
       console.log(`[LINE] 通知テスト message生成完了 spotlightPhotoUrl=${spotlightPhotoUrl ?? "なし"}`);
 
       // Build message array: image (if available) + text, up to LINE's 5-message limit

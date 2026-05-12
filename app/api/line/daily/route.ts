@@ -22,105 +22,120 @@ export async function GET() {
     );
   }
 
-  // 1. 通知メッセージ（テキスト＋スポットライト画像URL）を生成
-  const { message, today, plantCount, spotlightPhotoUrl } = await buildDailyNotificationMessage();
-  console.log(`[Daily] 生成メッセージ:\n${message}`);
-  console.log(`[Daily] spotlightPhotoUrl=${spotlightPhotoUrl ?? "なし"}`);
-
-  // 2. 通知先ユーザーをDBから取得
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  // メッセージ本文をDBに保存（今日やること表示に使用）
-  const { error: logError } = await supabase
-    .from("daily_notification_logs")
-    .upsert({ date: today, message_body: message }, { onConflict: "date" });
-  if (logError) {
-    console.error("[Daily] daily_notification_logs保存失敗:", logError.message);
-  }
-
+  // 通知先ユーザーを household_id 付きで取得
   const { data: users, error: usersError } = await supabase
     .from("line_notification_users")
-    .select("line_user_id")
+    .select("line_user_id, household_id")
     .eq("is_active", true);
 
   if (usersError) {
     console.error("[Daily] line_notification_users取得失敗:", usersError.message);
   }
 
+  const fallbackHouseholdId = process.env.DEFAULT_HOUSEHOLD_ID!;
+
   // DBに誰も登録されていなければ環境変数にフォールバック
-  let recipients: string[] = (users ?? []).map((u) => u.line_user_id);
-  if (recipients.length === 0) {
-    const fallbackId = process.env.LINE_USER_ID;
-    if (fallbackId) {
-      console.log("[Daily] DBに通知ユーザーなし → LINE_USER_ID環境変数にフォールバック");
-      recipients = [fallbackId];
+  let byHousehold: Map<string, string[]>;
+  if (!users || users.length === 0) {
+    const fallbackUserId = process.env.LINE_USER_ID;
+    if (fallbackUserId) {
+      console.log("[Daily] DBに通知ユーザーなし → LINE_USER_ID/DEFAULT_HOUSEHOLD_ID環境変数にフォールバック");
+      byHousehold = new Map([[fallbackHouseholdId, [fallbackUserId]]]);
     } else {
       console.log("[Daily] 通知先ユーザーなし（DBも環境変数もなし）");
-      return NextResponse.json({ ok: true, today, count: plantCount, sent: 0 });
+      return NextResponse.json({ ok: true, sent: 0 });
+    }
+  } else {
+    // household_id ごとにグループ化（null は DEFAULT_HOUSEHOLD_ID にフォールバック）
+    byHousehold = new Map<string, string[]>();
+    for (const u of users) {
+      const hid = u.household_id ?? fallbackHouseholdId;
+      if (!byHousehold.has(hid)) byHousehold.set(hid, []);
+      byHousehold.get(hid)!.push(u.line_user_id);
     }
   }
 
-  console.log(`[Daily] 通知送信先=${recipients.length}人`);
+  console.log(`[Daily] 対象 household 数=${byHousehold.size} 合計ユーザー数=${[...byHousehold.values()].reduce((s, r) => s + r.length, 0)}`);
 
-  // 3. 全員に送信（1人失敗しても続行）
-  let successCount = 0;
-  let failCount = 0;
-  let imageFailCount = 0;
+  let totalSuccess = 0;
+  let totalFail = 0;
+  let totalImageFail = 0;
 
-  for (const userId of recipients) {
-    // 3a. 今日の1枚 画像メッセージを先送り（失敗してもテキストは送る）
-    if (spotlightPhotoUrl) {
+  for (const [householdId, recipients] of byHousehold) {
+    console.log(`[Daily] household=${householdId} recipients=${recipients.length}人`);
+
+    const { message, today, plantCount, spotlightPhotoUrl } =
+      await buildDailyNotificationMessage(householdId);
+    console.log(`[Daily] household=${householdId} plantCount=${plantCount}`);
+    console.log(`[Daily] 生成メッセージ:\n${message}`);
+    console.log(`[Daily] spotlightPhotoUrl=${spotlightPhotoUrl ?? "なし"}`);
+
+    // daily_notification_logs は household が1つの場合のみ保存
+    // 複数 household 対応時のログは次フェーズで household_id カラム追加後に対応
+    if (byHousehold.size === 1) {
+      const { error: logError } = await supabase
+        .from("daily_notification_logs")
+        .upsert({ date: today, message_body: message }, { onConflict: "date" });
+      if (logError) {
+        console.error("[Daily] daily_notification_logs保存失敗:", logError.message);
+      }
+    }
+
+    for (const userId of recipients) {
+      // 画像メッセージ（失敗してもテキストは送る）
+      if (spotlightPhotoUrl) {
+        try {
+          const imgRes = await sendLineMessages(lineToken, userId, [
+            {
+              type: "image",
+              originalContentUrl: spotlightPhotoUrl,
+              previewImageUrl: spotlightPhotoUrl,
+            },
+          ]);
+          if (!imgRes.ok) {
+            totalImageFail++;
+            const errBody = await imgRes.text().catch(() => "");
+            console.warn(`[Daily] 画像送信失敗 userId=${userId} status=${imgRes.status} body=${errBody}`);
+          } else {
+            console.log(`[Daily] 画像送信成功 userId=${userId}`);
+          }
+        } catch (err) {
+          totalImageFail++;
+          console.warn(`[Daily] 画像送信例外 userId=${userId}`, err);
+        }
+      }
+
+      // テキストメッセージ（必ず実行）
       try {
-        const imgRes = await sendLineMessages(lineToken, userId, [
-          {
-            type: "image",
-            originalContentUrl: spotlightPhotoUrl,
-            previewImageUrl: spotlightPhotoUrl,
-          },
+        const res = await sendLineMessages(lineToken, userId, [
+          { type: "text", text: message },
         ]);
-        if (!imgRes.ok) {
-          imageFailCount++;
-          const errBody = await imgRes.text().catch(() => "");
-          console.warn(`[Daily] 画像送信失敗 userId=${userId} status=${imgRes.status} url=${spotlightPhotoUrl} body=${errBody}`);
+        if (res.ok) {
+          totalSuccess++;
+          console.log(`[Daily] テキスト送信成功 userId=${userId}`);
         } else {
-          console.log(`[Daily] 画像送信成功 userId=${userId} url=${spotlightPhotoUrl}`);
+          totalFail++;
+          const errorText = await res.text();
+          console.error(`[Daily] テキスト送信失敗 userId=${userId} status=${res.status} body=${errorText}`);
         }
       } catch (err) {
-        imageFailCount++;
-        console.warn(`[Daily] 画像送信例外 userId=${userId}`, err);
+        totalFail++;
+        console.error(`[Daily] テキスト送信例外 userId=${userId}`, err);
       }
-    }
-
-    // 3b. テキストメッセージ送信（必ず実行）
-    try {
-      const res = await sendLineMessages(lineToken, userId, [
-        { type: "text", text: message },
-      ]);
-      if (res.ok) {
-        successCount++;
-        console.log(`[Daily] テキスト送信成功 userId=${userId}`);
-      } else {
-        failCount++;
-        const errorText = await res.text();
-        console.error(`[Daily] テキスト送信失敗 userId=${userId} status=${res.status} body=${errorText}`);
-      }
-    } catch (err) {
-      failCount++;
-      console.error(`[Daily] テキスト送信例外 userId=${userId}`, err);
     }
   }
 
-  console.log(`[Daily] 送信完了 成功=${successCount} 失敗=${failCount} 画像失敗=${imageFailCount} 合計=${recipients.length}`);
+  console.log(`[Daily] 送信完了 成功=${totalSuccess} 失敗=${totalFail} 画像失敗=${totalImageFail}`);
   return NextResponse.json({
     ok: true,
-    today,
-    count: plantCount,
-    sent: successCount,
-    failed: failCount,
-    imageFailed: imageFailCount,
-    spotlightSent: !!spotlightPhotoUrl && imageFailCount < recipients.length,
+    sent: totalSuccess,
+    failed: totalFail,
+    imageFailed: totalImageFail,
+    householdCount: byHousehold.size,
   });
 }
