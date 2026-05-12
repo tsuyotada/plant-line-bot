@@ -144,7 +144,12 @@ export async function buildDailyNotificationMessage(householdId: string): Promis
     };
   });
 
-  const { message, spotlightPhotoUrl: rawSpotlightUrl } = buildDailyCareMessage(today, plantsWithRecency, careRulesMap);
+  const appBaseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ?? "https://plant-line-bot-forme.vercel.app";
+  const shareToken = (shareLinkData as { token: string } | null)?.token ?? null;
+  const shareUrl = shareToken ? `${appBaseUrl}/share/${shareToken}` : null;
+
+  const { message, spotlightPhotoUrl: rawSpotlightUrl } = buildDailyCareMessage(today, plantsWithRecency, careRulesMap, shareUrl);
 
   // Upgrade spotlight to a signed URL (1h validity) so LINE servers can fetch the image
   // regardless of whether the Supabase Storage bucket is public or private.
@@ -169,12 +174,5 @@ export async function buildDailyNotificationMessage(householdId: string): Promis
     }
   }
 
-  const appBaseUrl =
-    process.env.NEXT_PUBLIC_APP_URL ?? "https://plant-line-bot-forme.vercel.app";
-  const shareToken = (shareLinkData as { token: string } | null)?.token ?? null;
-  const finalMessage = shareToken
-    ? `${message}\n\n家族の植物ページ：\n${appBaseUrl}/share/${shareToken}`
-    : message;
-
-  return { message: finalMessage, today, plantCount: plants.length, spotlightPhotoUrl };
+  return { message, today, plantCount: plants.length, spotlightPhotoUrl };
 }
