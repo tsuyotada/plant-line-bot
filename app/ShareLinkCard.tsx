@@ -20,6 +20,7 @@ export function ShareLinkCard({
 }: Props) {
   const [shareUrl, setShareUrl] = useState(initialShareUrl);
   const [copied, setCopied] = useState(false);
+  const [showQr, setShowQr] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   function handleCopy() {
@@ -47,6 +48,7 @@ export function ShareLinkCard({
       fd.set("link_id", linkId);
       await revokeShareLinkAction(fd);
       setShareUrl(null);
+      setShowQr(false);
     });
   }
 
@@ -59,6 +61,7 @@ export function ShareLinkCard({
       if (token) {
         const base = window.location.origin;
         setShareUrl(`${base}/share/${token}`);
+        setShowQr(false);
       }
     });
   }
@@ -149,10 +152,26 @@ export function ShareLinkCard({
               {copied ? "コピー済み" : "コピー"}
             </button>
           </div>
-          <div
-            style={{ display: "flex", justifyContent: "center", margin: "14px 0 10px" }}
-          >
-            <QRCodeSVG value={shareUrl} size={160} />
+          <div style={{ margin: "10px 0" }}>
+            <button
+              onClick={() => setShowQr((v) => !v)}
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                fontSize: 11,
+                color: "#4b7a5a",
+                cursor: "pointer",
+                textDecoration: "underline",
+              }}
+            >
+              {showQr ? "QRを隠す" : "QRを表示"}
+            </button>
+            {showQr && (
+              <div style={{ display: "flex", justifyContent: "center", marginTop: 10 }}>
+                <QRCodeSVG value={shareUrl} size={160} />
+              </div>
+            )}
           </div>
           <div style={{ display: "flex", gap: 6 }}>
             <button
