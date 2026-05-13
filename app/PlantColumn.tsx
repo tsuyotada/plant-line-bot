@@ -51,6 +51,7 @@ type Props = {
   restorePlantAction: (formData: FormData) => Promise<void>;
   reorderPlantAction: (orderedIds: string[]) => Promise<void>;
   uploadPhotoAction: (formData: FormData) => Promise<{ success: boolean; error?: string }>;
+  deletePhotoAction?: (formData: FormData) => Promise<void>;
   latestPhotos: Record<string, string>;
   photoHistories: Record<string, PhotoHistoryItem[]>;
   careCardMap: Record<string, CareCardInfo>;
@@ -221,6 +222,7 @@ export function PlantColumn({
   restorePlantAction,
   reorderPlantAction,
   uploadPhotoAction,
+  deletePhotoAction,
   latestPhotos,
   photoHistories,
   careCardMap,
@@ -286,6 +288,16 @@ export function PlantColumn({
       const reordered = arrayMove(prev, oldIndex, newIndex);
       reorderPlantAction(reordered.map((p) => p.id)).catch(console.error);
       return reordered;
+    });
+  }
+
+  async function handleDeletePhoto(photoId: string) {
+    if (!deletePhotoAction) return;
+    if (!window.confirm("この写真を削除しますか？")) return;
+    const fd = new FormData();
+    fd.set("photo_id", photoId);
+    startTransition(async () => {
+      await deletePhotoAction(fd);
     });
   }
 
@@ -1317,7 +1329,7 @@ export function PlantColumn({
               return (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(90px, 1fr))", gap: 8, marginBottom: 20 }}>
                   {history.map((photo, photoIdx) => (
-                    <div key={photo.id}>
+                    <div key={photo.id} style={{ position: "relative" }}>
                       <img
                         src={photo.url}
                         alt={photo.takenAt}
@@ -1326,6 +1338,31 @@ export function PlantColumn({
                         style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 8, display: "block", cursor: "zoom-in" }}
                         onClick={() => setLightbox({ urls, index: photoIdx })}
                       />
+                      {deletePhotoAction && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeletePhoto(photo.id)}
+                          aria-label="写真を削除"
+                          style={{
+                            position: "absolute",
+                            top: 4,
+                            right: 4,
+                            width: 22,
+                            height: 22,
+                            borderRadius: "50%",
+                            background: "rgba(0,0,0,0.55)",
+                            border: "none",
+                            color: "#fff",
+                            fontSize: 14,
+                            lineHeight: 1,
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            padding: 0,
+                          }}
+                        >×</button>
+                      )}
                       <div style={{ fontSize: 10, color: "#a0a8a2", textAlign: "center", marginTop: 4, fontFamily }}>{photo.takenAt}</div>
                     </div>
                   ))}

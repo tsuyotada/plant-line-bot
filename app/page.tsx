@@ -210,6 +210,34 @@ async function reorderPlants(orderedIds: string[]) {
 
 // ── Setup action ──────────────────────────────────────────────────────────────
 
+async function deletePhoto(formData: FormData): Promise<void> {
+  "use server";
+  const photoId = String(formData.get("photo_id") || "");
+  if (!photoId) return;
+
+  const householdId = await getAuthedHouseholdId();
+  if (!householdId) return;
+
+  // Verify photo belongs to this household, and fetch storage_path from DB
+  const { data: photo } = await supabase
+    .from("plant_photos")
+    .select("id, storage_path, plants!inner(household_id)")
+    .eq("id", photoId)
+    .eq("plants.household_id", householdId)
+    .single();
+  if (!photo) return;
+
+  const { error: dbError } = await supabase.from("plant_photos").delete().eq("id", photoId);
+  if (dbError) { console.error("deletePhoto DB削除失敗:", dbError.message); return; }
+
+  const storagePath = (photo as any).storage_path as string | null;
+  if (storagePath) {
+    const { error: storageError } = await supabase.storage.from("plant-photos").remove([storagePath]);
+    if (storageError) console.warn("deletePhoto Storage削除失敗:", storageError.message);
+  }
+  revalidatePath("/");
+}
+
 async function createHousehold(formData: FormData) {
   "use server";
   const name = String(formData.get("name") || "").trim();
@@ -782,6 +810,7 @@ export default async function Home({
               restorePlantAction={restorePlant}
               reorderPlantAction={reorderPlants}
               uploadPhotoAction={uploadPlantPhoto}
+              deletePhotoAction={deletePhoto}
               latestPhotos={latestPhotos}
               photoHistories={photoHistories}
               careCardMap={careCardMap}
