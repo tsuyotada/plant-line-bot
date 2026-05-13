@@ -110,48 +110,45 @@ export function AppHeader(props: Props) {
         }
       />
 
-      {/* Header bar — normal document flow (not fixed/sticky) */}
+      {/* Header bar — solid, normal document flow */}
       <header
         style={{
-          height: 44,
+          height: 52,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           padding: "0 20px",
-          background: "rgba(255, 255, 255, 0.32)",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
-          borderBottom: "1px solid rgba(255, 255, 255, 0.28)",
+          background: "#fdfaf4",
+          borderBottom: "1px solid rgba(200, 190, 170, 0.30)",
+          boxShadow: "0 1px 3px rgba(60, 50, 30, 0.07)",
           fontFamily: ff,
         }}
       >
-        {/* Left: garden name — no icon */}
-        <div>
+        {/* Left: garden name + status (two-line) */}
+        <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 2 }}>
           {props.mode === "owner" ? (
             <GardenTitleEditor
               name={props.householdName}
               updateAction={props.updateNameAction}
             />
           ) : (
-            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-              <span
-                style={{
-                  fontSize: 14,
-                  fontWeight: 800,
-                  color: "#1a3320",
-                  letterSpacing: -0.2,
-                }}
-              >
-                {props.householdName}
-              </span>
-              <span style={{ fontSize: 10, color: "#6b7280", fontWeight: 500 }}>
-                わが家の植物ページ
-              </span>
-              <span style={{ fontSize: 10, color: "#9ca3af" }}>
-                共有リンクで表示中
-              </span>
-            </div>
+            <span
+              style={{
+                fontSize: 17,
+                fontWeight: 800,
+                color: "#1a3320",
+                letterSpacing: -0.3,
+                lineHeight: 1.2,
+              }}
+            >
+              {props.householdName}
+            </span>
           )}
+          <span style={{ fontSize: 10, color: "#6b7280", lineHeight: 1, letterSpacing: 0 }}>
+            {props.mode === "owner"
+              ? "オーナーとして管理中"
+              : "わが家の植物ページ · 共有リンクで表示中"}
+          </span>
         </div>
 
         {/* Right: owner controls — all same height via inline-flex */}
@@ -208,7 +205,7 @@ export function AppHeader(props: Props) {
   );
 }
 
-// Shared button style: inline-flex + explicit height keeps all buttons identical
+// Shared style for all right-side control buttons
 const ctrlBtn: React.CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
@@ -277,22 +274,19 @@ function GardenTitleEditor({
         onBlur={save}
         onKeyDown={handleKeyDown}
         style={{
-          display: "inline-flex",
-          alignItems: "center",
-          height: 28,
-          padding: "0 8px",
-          fontSize: 14,
+          fontSize: 17,
           fontWeight: 800,
           color: "#1a3320",
-          background: "rgba(255, 255, 255, 0.80)",
+          background: "rgba(255, 255, 255, 0.90)",
           border: "1.5px solid rgba(163, 196, 160, 0.9)",
           borderRadius: 6,
+          padding: "1px 8px",
           outline: "none",
-          width: 200,
-          letterSpacing: -0.2,
+          width: 220,
+          letterSpacing: -0.3,
+          lineHeight: 1.2,
           fontFamily: ff,
           boxSizing: "border-box",
-          lineHeight: 1,
         }}
       />
     );
@@ -308,19 +302,18 @@ function GardenTitleEditor({
       style={{
         display: "inline-flex",
         alignItems: "center",
-        height: 28,
-        padding: "0 6px",
-        fontSize: 14,
+        fontSize: 17,
         fontWeight: 800,
         color: "#1a3320",
         background: "transparent",
         border: "none",
         cursor: "pointer",
+        padding: "1px 6px",
         borderRadius: 6,
-        letterSpacing: -0.2,
+        letterSpacing: -0.3,
+        lineHeight: 1.2,
         fontFamily: ff,
         opacity: isPending ? 0.6 : 1,
-        lineHeight: 1,
       }}
     >
       {name}
