@@ -110,8 +110,74 @@ export function AppHeader(props: Props) {
         }
       />
 
+      {/* ── Control bar — owner only, top edge, blends into bg ── */}
+      {props.mode === "owner" && (
+        <div
+          style={{
+            height: 32,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "0 20px",
+            background: "transparent",
+            fontFamily: ff,
+          }}
+        >
+          <span style={{ fontSize: 10, color: "rgba(255,255,255,0.55)", letterSpacing: 0.3, textShadow: "0 1px 4px rgba(0,0,0,0.40)" }}>
+            オーナーとして管理中
+          </span>
+
+          <div
+            className="app-header-actions"
+            style={{ display: "flex", alignItems: "center", gap: 2 }}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={handleFileChange}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              style={ctrlBtn}
+            >
+              背景を変更
+            </button>
+            {bgImage && (
+              <button
+                type="button"
+                onClick={handleReset}
+                style={ctrlBtn}
+              >
+                リセット
+              </button>
+            )}
+            <span
+              style={{
+                display: "inline-block",
+                width: 1,
+                height: 12,
+                background: "rgba(255,255,255,0.25)",
+                margin: "0 6px",
+                flexShrink: 0,
+              }}
+            />
+            <form
+              action={props.signOutAction}
+              style={{ display: "inline-flex", alignItems: "center" }}
+            >
+              <button type="submit" style={ctrlBtn}>
+                ログアウト
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ── Hero — directly over bg photo ── */}
-      <div style={{ padding: "40px 20px 20px", fontFamily: ff }}>
+      <div style={{ padding: "12px 20px 20px", fontFamily: ff }}>
         {props.mode === "owner" ? (
           <GardenTitleEditor
             name={props.householdName}
@@ -150,73 +216,6 @@ export function AppHeader(props: Props) {
             : "わが家の植物ページ · 共有リンクで表示中"}
         </p>
       </div>
-
-      {/* ── Control bar — owner only ── */}
-      {props.mode === "owner" && (
-        <div
-          style={{
-            height: 36,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "0 20px",
-            background: "rgba(253, 250, 244, 0.92)",
-            borderBottom: "1px solid rgba(200, 190, 170, 0.25)",
-            fontFamily: ff,
-          }}
-        >
-          <span style={{ fontSize: 10, color: "#9ca3af", letterSpacing: 0.3 }}>
-            オーナーとして管理中
-          </span>
-
-          <div
-            className="app-header-actions"
-            style={{ display: "flex", alignItems: "center", gap: 2 }}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              style={{ display: "none" }}
-              onChange={handleFileChange}
-            />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              style={ctrlBtn}
-            >
-              背景を変更
-            </button>
-            {bgImage && (
-              <button
-                type="button"
-                onClick={handleReset}
-                style={{ ...ctrlBtn, color: "#9ca3af" }}
-              >
-                リセット
-              </button>
-            )}
-            <span
-              style={{
-                display: "inline-block",
-                width: 1,
-                height: 14,
-                background: "rgba(0,0,0,0.10)",
-                margin: "0 6px",
-                flexShrink: 0,
-              }}
-            />
-            <form
-              action={props.signOutAction}
-              style={{ display: "inline-flex", alignItems: "center" }}
-            >
-              <button type="submit" style={{ ...ctrlBtn, color: "#9ca3af" }}>
-                ログアウト
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
     </>
   );
 }
@@ -232,7 +231,8 @@ const ctrlBtn: React.CSSProperties = {
   fontSize: 11,
   fontWeight: 500,
   cursor: "pointer",
-  color: "rgba(60, 90, 60, 0.70)",
+  color: "rgba(255, 255, 255, 0.60)",
+  textShadow: "0 1px 4px rgba(0,0,0,0.40)",
   fontFamily: ff,
   lineHeight: 1,
   flexShrink: 0,
