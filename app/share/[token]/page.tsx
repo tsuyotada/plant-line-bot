@@ -331,7 +331,7 @@ export default async function SharePage({
 
       <AppHeader mode="share" householdName={householdName} />
 
-      <main style={{ minHeight: "100vh", padding: "58px 20px 48px", fontFamily }}>
+      <main style={{ minHeight: "100vh", padding: "14px 20px 48px", fontFamily }}>
         <div className="board-grid" style={{ maxWidth: 1440, margin: "0 auto" }}>
           {/* ── Column 1: 育てている植物 (2/3幅) ── */}
           <div className="col-plants">

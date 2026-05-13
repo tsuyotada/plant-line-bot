@@ -79,6 +79,12 @@ export function AppHeader(props: Props) {
           .app-bg-photo { background-image: none !important; }
           .app-header-actions { display: none !important; }
         }
+        .garden-title-btn {
+          transition: background 0.15s ease;
+        }
+        .garden-title-btn:hover:not(:disabled) {
+          background: rgba(0, 0, 0, 0.07) !important;
+        }
       `}</style>
 
       {/* Fixed full-screen background */}
@@ -104,28 +110,23 @@ export function AppHeader(props: Props) {
         }
       />
 
-      {/* Fixed header bar */}
+      {/* Header bar — normal document flow (not fixed/sticky) */}
       <header
         style={{
-          position: "fixed",
-          top: 0, left: 0, right: 0,
           height: 44,
-          zIndex: 200,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           padding: "0 20px",
-          background: "rgba(253, 250, 244, 0.88)",
-          backdropFilter: "blur(14px)",
-          WebkitBackdropFilter: "blur(14px)",
-          borderBottom: "1px solid rgba(255, 255, 255, 0.70)",
-          boxShadow: "0 1px 8px rgba(60, 50, 30, 0.08)",
+          background: "rgba(255, 255, 255, 0.32)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          borderBottom: "1px solid rgba(255, 255, 255, 0.28)",
           fontFamily: ff,
         }}
       >
-        {/* Left: garden name */}
-        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-          <span style={{ fontSize: 16, lineHeight: 1 }}>🌱</span>
+        {/* Left: garden name — no icon */}
+        <div>
           {props.mode === "owner" ? (
             <GardenTitleEditor
               name={props.householdName}
@@ -143,21 +144,21 @@ export function AppHeader(props: Props) {
               >
                 {props.householdName}
               </span>
-              <span style={{ fontSize: 10, color: "#9ca3af", fontWeight: 500 }}>
+              <span style={{ fontSize: 10, color: "#6b7280", fontWeight: 500 }}>
                 わが家の植物ページ
               </span>
-              <span style={{ fontSize: 10, color: "#c4b89a" }}>
+              <span style={{ fontSize: 10, color: "#9ca3af" }}>
                 共有リンクで表示中
               </span>
             </div>
           )}
         </div>
 
-        {/* Right: owner controls */}
+        {/* Right: owner controls — all same height via inline-flex */}
         {props.mode === "owner" && (
           <div
             className="app-header-actions"
-            style={{ display: "flex", alignItems: "center", gap: 4 }}
+            style={{ display: "flex", alignItems: "center", gap: 2 }}
           >
             <input
               ref={fileInputRef}
@@ -187,11 +188,15 @@ export function AppHeader(props: Props) {
                 display: "inline-block",
                 width: 1,
                 height: 14,
-                background: "rgba(0,0,0,0.12)",
+                background: "rgba(0,0,0,0.10)",
                 margin: "0 6px",
+                flexShrink: 0,
               }}
             />
-            <form action={props.signOutAction} style={{ margin: 0 }}>
+            <form
+              action={props.signOutAction}
+              style={{ display: "inline-flex", alignItems: "center" }}
+            >
               <button type="submit" style={{ ...ctrlBtn, color: "#9ca3af" }}>
                 ログアウト
               </button>
@@ -203,17 +208,22 @@ export function AppHeader(props: Props) {
   );
 }
 
+// Shared button style: inline-flex + explicit height keeps all buttons identical
 const ctrlBtn: React.CSSProperties = {
-  padding: "4px 8px",
+  display: "inline-flex",
+  alignItems: "center",
+  height: 28,
+  padding: "0 8px",
   background: "transparent",
   border: "none",
   borderRadius: 6,
   fontSize: 11,
   fontWeight: 500,
   cursor: "pointer",
-  color: "rgba(60, 90, 60, 0.65)",
+  color: "rgba(60, 90, 60, 0.70)",
   fontFamily: ff,
   lineHeight: 1,
+  flexShrink: 0,
 };
 
 function GardenTitleEditor({
@@ -267,17 +277,22 @@ function GardenTitleEditor({
         onBlur={save}
         onKeyDown={handleKeyDown}
         style={{
+          display: "inline-flex",
+          alignItems: "center",
+          height: 28,
+          padding: "0 8px",
           fontSize: 14,
           fontWeight: 800,
           color: "#1a3320",
-          background: "rgba(255, 255, 255, 0.85)",
-          border: "1.5px solid #a3c4a0",
+          background: "rgba(255, 255, 255, 0.80)",
+          border: "1.5px solid rgba(163, 196, 160, 0.9)",
           borderRadius: 6,
-          padding: "2px 8px",
           outline: "none",
           width: 200,
           letterSpacing: -0.2,
           fontFamily: ff,
+          boxSizing: "border-box",
+          lineHeight: 1,
         }}
       />
     );
@@ -286,21 +301,26 @@ function GardenTitleEditor({
   return (
     <button
       type="button"
+      className="garden-title-btn"
       onClick={startEdit}
       disabled={isPending}
       title="クリックしてガーデン名を変更"
       style={{
+        display: "inline-flex",
+        alignItems: "center",
+        height: 28,
+        padding: "0 6px",
         fontSize: 14,
         fontWeight: 800,
         color: "#1a3320",
-        background: "none",
+        background: "transparent",
         border: "none",
-        cursor: "text",
-        padding: "2px 4px",
-        borderRadius: 4,
+        cursor: "pointer",
+        borderRadius: 6,
         letterSpacing: -0.2,
         fontFamily: ff,
         opacity: isPending ? 0.6 : 1,
+        lineHeight: 1,
       }}
     >
       {name}
