@@ -1175,6 +1175,64 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true });
     }
 
+    // ── コマンド：参加 <コード> ────────────────────────────────────
+    const joinMatch = userMessage.match(/^参加[\s　]+(\S+)/);
+    if (joinMatch) {
+      const code = joinMatch[1].trim().toUpperCase();
+      console.log(`[LINE] join code attempt userId=${lineUserId} code=${code}`);
+
+      const { data: joinCodeRow } = await supabase
+        .from("household_line_join_codes")
+        .select("household_id")
+        .eq("code", code)
+        .eq("enabled", true)
+        .maybeSingle();
+
+      if (!joinCodeRow) {
+        await replyToLine(lineToken, replyToken, [
+          {
+            type: "text",
+            text: "参加コードが見つかりませんでした。オーナーに最新のコードを確認してください。",
+          },
+        ]);
+        return NextResponse.json({ ok: true });
+      }
+
+      const { data: existing } = await supabase
+        .from("line_notification_users")
+        .select("id, has_tested_notification")
+        .eq("line_user_id", lineUserId)
+        .maybeSingle();
+
+      if (existing) {
+        await supabase
+          .from("line_notification_users")
+          .update({
+            household_id: joinCodeRow.household_id,
+            is_active: true,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("line_user_id", lineUserId);
+      } else {
+        await supabase
+          .from("line_notification_users")
+          .insert({
+            line_user_id: lineUserId,
+            household_id: joinCodeRow.household_id,
+            is_active: true,
+          });
+      }
+
+      console.log(`[LINE] join success userId=${lineUserId} household=${joinCodeRow.household_id}`);
+      await replyToLine(lineToken, replyToken, [
+        {
+          type: "text",
+          text: "この家庭のLINE通知に参加しました。明日の朝から植物メモをお届けします🌱",
+        },
+      ]);
+      return NextResponse.json({ ok: true });
+    }
+
     // ── AI チャット（会話履歴付き） ────────────────────────────────
     // 案A: 保存前に過去履歴を取得 → 今回メッセージは末尾に一度だけ渡す
     // messages 順: system → 古い履歴 → 新しい履歴 → 今回の user

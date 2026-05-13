@@ -6,6 +6,7 @@ import { BackgroundLayer } from "./BackgroundLayer";
 import { PlantColumn } from "./PlantColumn";
 import { fetchHouseholdData, todayStringJst, getPlantLabel } from "@/lib/fetchHouseholdData";
 import { ShareLinkCard } from "./ShareLinkCard";
+import { LineJoinCard } from "./LineJoinCard";
 
 // DB migration required (run once):
 // alter table plants add column if not exists sort_order integer;
@@ -291,6 +292,65 @@ async function regenerateShareLink(formData: FormData): Promise<string | null> {
   return newToken;
 }
 
+const JOIN_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+function generateJoinCode(): string {
+  return Array.from({ length: 6 }, () =>
+    JOIN_CODE_CHARS[Math.floor(Math.random() * JOIN_CODE_CHARS.length)]
+  ).join("");
+}
+
+async function createJoinCode(): Promise<string | null> {
+  "use server";
+  const householdId = await getAuthedHouseholdId();
+  if (!householdId) return null;
+
+  for (let i = 0; i < 5; i++) {
+    const code = generateJoinCode();
+    const { error } = await supabase
+      .from("household_line_join_codes")
+      .insert({ household_id: householdId, code, enabled: true });
+    if (!error) { revalidatePath("/"); return code; }
+    if (!error.message?.includes("unique")) break;
+  }
+  console.error("createJoinCode: unique constraint exceeded");
+  return null;
+}
+
+async function revokeJoinCode(): Promise<void> {
+  "use server";
+  const householdId = await getAuthedHouseholdId();
+  if (!householdId) return;
+  await supabase
+    .from("household_line_join_codes")
+    .update({ enabled: false })
+    .eq("household_id", householdId)
+    .eq("enabled", true);
+  revalidatePath("/");
+}
+
+async function regenerateJoinCode(): Promise<string | null> {
+  "use server";
+  const householdId = await getAuthedHouseholdId();
+  if (!householdId) return null;
+
+  await supabase
+    .from("household_line_join_codes")
+    .update({ enabled: false })
+    .eq("household_id", householdId)
+    .eq("enabled", true);
+
+  for (let i = 0; i < 5; i++) {
+    const code = generateJoinCode();
+    const { error } = await supabase
+      .from("household_line_join_codes")
+      .insert({ household_id: householdId, code, enabled: true });
+    if (!error) { revalidatePath("/"); return code; }
+    if (!error.message?.includes("unique")) break;
+  }
+  console.error("regenerateJoinCode: unique constraint exceeded");
+  return null;
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function Home({
@@ -405,12 +465,20 @@ export default async function Home({
   }
 
   const dbStart = Date.now();
-  const [data, shareLinkResult] = await Promise.all([
+  const [data, shareLinkResult, joinCodeResult] = await Promise.all([
     fetchHouseholdData(householdId),
     supabase
       .from("household_share_links")
       .select("id, token, enabled, created_at")
       .eq("household_id", householdId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("household_line_join_codes")
+      .select("code")
+      .eq("household_id", householdId)
+      .eq("enabled", true)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
@@ -437,6 +505,7 @@ export default async function Home({
   const shareUrl = shareLink?.enabled
     ? `${appBaseUrl}/share/${shareLink.token}`
     : null;
+  const joinCode = joinCodeResult.data?.code ?? null;
 
   console.log(`[Page] total render ${Date.now() - pageStart}ms`);
 
@@ -911,57 +980,13 @@ export default async function Home({
             regenerateShareLinkAction={regenerateShareLink}
           />
 
-          {/* ── LINE通知を受け取る ── */}
-          <div className="col-board">
-            <h2 className="col-heading">LINE reminders</h2>
-
-            <div className="line-card" style={{ marginBottom: 0 }}>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, marginBottom: 14 }}>
-                <img
-                  src="/images/line-qr.png"
-                  alt="LINE友だち追加QRコード"
-                  style={{ width: 180, height: 180, borderRadius: 10, border: "1px solid #e8e4dc", display: "block" }}
-                />
-                <div style={{ fontSize: 11, color: "#7a8a7a", textAlign: "center", lineHeight: 1.5 }}>
-                  QRを読み取るか、下のリンクから追加できます
-                </div>
-                <a
-                  href="https://line.me/R/ti/p/@100ukedv"
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{
-                    display: "block",
-                    width: "100%",
-                    maxWidth: 240,
-                    padding: "8px 20px",
-                    background: "#06c755",
-                    color: "#ffffff",
-                    textDecoration: "none",
-                    borderRadius: 8,
-                    fontWeight: 700,
-                    fontSize: 13,
-                    textAlign: "center",
-                  }}
-                >
-                  LINEで友だち追加
-                </a>
-              </div>
-
-              <p
-                style={{
-                  fontSize: 11,
-                  color: "#7a8a7a",
-                  margin: 0,
-                  lineHeight: 1.75,
-                  padding: "10px 0 0",
-                  borderTop: "1px solid #f0ebe2",
-                }}
-              >
-                友だち追加後に「登録」と送ると、毎朝の植物通知が届きます🌱<br />
-                停止したいときは「解除」と送ってください。
-              </p>
-            </div>
-          </div>
+          {/* ── LINE 家族参加 ── */}
+          <LineJoinCard
+            code={joinCode}
+            createJoinCodeAction={createJoinCode}
+            revokeJoinCodeAction={revokeJoinCode}
+            regenerateJoinCodeAction={regenerateJoinCode}
+          />
           </div>{/* /sidebar-section */}
           </div>{/* /col-right */}
         </div>
