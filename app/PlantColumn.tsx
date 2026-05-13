@@ -46,11 +46,12 @@ type Props = {
   today: string;
   plantHasTodayEventRecord: Record<string, boolean>;
   hasError: boolean;
-  addPlantAction: (formData: FormData) => Promise<void>;
-  archivePlantAction: (formData: FormData) => Promise<void>;
-  restorePlantAction: (formData: FormData) => Promise<void>;
-  reorderPlantAction: (orderedIds: string[]) => Promise<void>;
-  uploadPhotoAction: (formData: FormData) => Promise<{ success: boolean; error?: string }>;
+  readOnly?: boolean;
+  addPlantAction?: (formData: FormData) => Promise<void>;
+  archivePlantAction?: (formData: FormData) => Promise<void>;
+  restorePlantAction?: (formData: FormData) => Promise<void>;
+  reorderPlantAction?: (orderedIds: string[]) => Promise<void>;
+  uploadPhotoAction?: (formData: FormData) => Promise<{ success: boolean; error?: string }>;
   deletePhotoAction?: (formData: FormData) => Promise<void>;
   latestPhotos: Record<string, string>;
   photoHistories: Record<string, PhotoHistoryItem[]>;
@@ -217,6 +218,7 @@ export function PlantColumn({
   today,
   plantHasTodayEventRecord,
   hasError,
+  readOnly = false,
   addPlantAction,
   archivePlantAction,
   restorePlantAction,
@@ -279,6 +281,7 @@ export function PlantColumn({
   );
 
   function handleDragEnd(event: DragEndEvent) {
+    if (!reorderPlantAction) return;
     const { active, over } = event;
     if (!active || !over || active.id === over.id) return;
 
@@ -302,6 +305,7 @@ export function PlantColumn({
   }
 
   async function handlePhotoChange(plantId: string, e: React.ChangeEvent<HTMLInputElement>) {
+    if (!uploadPhotoAction) return;
     const allFiles = Array.from(e.target.files ?? []);
     if (allFiles.length === 0) return;
 
@@ -490,6 +494,7 @@ export function PlantColumn({
   }
 
   async function handleBatchSave() {
+    if (!uploadPhotoAction) return;
     const items = [...batchItems];
     setBatchSaving(true);
     const results = [...items];
@@ -552,6 +557,7 @@ export function PlantColumn({
   }
 
   function handleFormAction(formData: FormData) {
+    if (!addPlantAction) return;
     startTransition(async () => {
       const rawFile = formData.get("photo") as File | null;
       if (rawFile && rawFile.size > 0) {
@@ -978,7 +984,7 @@ export function PlantColumn({
       <div className="col-board">
         <div className="plants-heading-row">
           <h2 className="col-heading" style={{ margin: 0 }}>My plants</h2>
-          {localPlants.length > 0 && (
+          {!readOnly && localPlants.length > 0 && (
             <button
               type="button"
               className="btn-batch-upload"
@@ -988,14 +994,16 @@ export function PlantColumn({
             </button>
           )}
         </div>
-        <input
-          ref={batchInputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          style={{ display: "none" }}
-          onChange={handleBatchFileSelect}
-        />
+        {!readOnly && (
+          <input
+            ref={batchInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            style={{ display: "none" }}
+            onChange={handleBatchFileSelect}
+          />
+        )}
 
         {hasError ? (
           <div className="todo-card">
@@ -1006,276 +1014,305 @@ export function PlantColumn({
             <p style={{ color: "#9ca3af", margin: 0, fontSize: 13 }}>まだ植物は登録されていません</p>
           </div>
         ) : (
-          <DndContext
-            id="plant-column"
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext items={localPlants.map((p) => p.id)} strategy={rectSortingStrategy}>
-              <div className="plants-grid">
-                {localPlants.map((plant) => {
-                  const preview = photoPreviews[plant.id];
-                  const displayPhoto = preview ?? latestPhotos[plant.id] ?? null;
-                  const hasTodayEvent = plantHasTodayEventRecord[plant.id] ?? false;
-                  const stateLabel = getInitialStateLabel(plant.initial_state_type);
-                  const isMenuOpen = openMenuId === plant.id;
-                  const careCard = careCardMap[plant.id] ?? null;
+          (() => {
+            const cards = localPlants.map((plant) => {
+              const preview = photoPreviews[plant.id];
+              const displayPhoto = preview ?? latestPhotos[plant.id] ?? null;
+              const hasTodayEvent = plantHasTodayEventRecord[plant.id] ?? false;
+              const stateLabel = getInitialStateLabel(plant.initial_state_type);
+              const isMenuOpen = openMenuId === plant.id;
+              const careCard = careCardMap[plant.id] ?? null;
 
-                  return (
-                    <SortablePlantCard key={plant.id} id={plant.id}>
-                      {/* Photo area */}
-                      <div
+              const cardInner = (
+                <>
+                  {/* Photo area */}
+                  <div
+                    style={{
+                      position: "relative",
+                      width: "100%",
+                      aspectRatio: "5/2",
+                      overflow: "hidden",
+                      background: "linear-gradient(135deg, #d4edda 0%, #b8dfbf 55%, #93c9a0 100%)",
+                      cursor: uploadingIds[plant.id] ? "not-allowed" : displayPhoto ? "zoom-in" : "default",
+                    }}
+                    onClick={() => {
+                      if (uploadingIds[plant.id]) return;
+                      if (!displayPhoto) return;
+                      if (preview) {
+                        setLightbox({ urls: [displayPhoto], index: 0 });
+                      } else {
+                        const history = photoHistories[plant.id] ?? [];
+                        const urls = history.length > 0 ? history.map((p) => p.url) : [displayPhoto];
+                        setLightbox({ urls, index: 0 });
+                      }
+                    }}
+                  >
+                    {displayPhoto ? (
+                      <img
+                        src={displayPhoto}
+                        alt={getPlantLabel(plant.plant_type)}
+                        loading="lazy"
+                        decoding="async"
+                        style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                      />
+                    ) : (
+                      <span
                         style={{
-                          position: "relative",
-                          width: "100%",
-                          aspectRatio: "5/2",
-                          overflow: "hidden",
-                          background: "linear-gradient(135deg, #d4edda 0%, #b8dfbf 55%, #93c9a0 100%)",
-                          cursor: uploadingIds[plant.id] ? "not-allowed" : displayPhoto ? "zoom-in" : "default",
-                        }}
-                        onClick={() => {
-                          if (uploadingIds[plant.id]) return;
-                          if (!displayPhoto) return;
-                          if (preview) {
-                            setLightbox({ urls: [displayPhoto], index: 0 });
-                          } else {
-                            const history = photoHistories[plant.id] ?? [];
-                            const urls = history.length > 0 ? history.map((p) => p.url) : [displayPhoto];
-                            setLightbox({ urls, index: 0 });
-                          }
+                          position: "absolute",
+                          top: "50%",
+                          left: "50%",
+                          transform: "translate(-50%, -50%)",
+                          fontSize: 10,
+                          fontWeight: 600,
+                          color: "rgba(147, 201, 160, 0.9)",
+                          letterSpacing: "1.2px",
+                          textTransform: "uppercase",
+                          userSelect: "none",
+                          pointerEvents: "none",
                         }}
                       >
-                        {displayPhoto ? (
-                          <img
-                            src={displayPhoto}
-                            alt={getPlantLabel(plant.plant_type)}
-                            loading="lazy"
-                            decoding="async"
-                            style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" }}
-                          />
-                        ) : (
-                          <span
-                            style={{
-                              position: "absolute",
-                              top: "50%",
-                              left: "50%",
-                              transform: "translate(-50%, -50%)",
-                              fontSize: 10,
-                              fontWeight: 600,
-                              color: "rgba(147, 201, 160, 0.9)",
-                              letterSpacing: "1.2px",
-                              textTransform: "uppercase",
-                              userSelect: "none",
-                              pointerEvents: "none",
-                            }}
-                          >
-                            photo
-                          </span>
-                        )}
-                        {uploadingIds[plant.id] ? (
-                          <div className="photo-upload-loading-hint">
-                            {(() => {
-                              const prog = uploadProgress[plant.id];
-                              if (prog && prog.total > 1) return `${prog.current}/${prog.total}枚 アップロード中…`;
-                              return "アップロード中…";
-                            })()}
-                          </div>
-                        ) : displayPhoto ? (
-                          <div className="photo-hover-hint">クリックして拡大</div>
-                        ) : null}
-                        {!uploadingIds[plant.id] && (
-                          <button
-                            type="button"
-                            className="photo-camera-btn"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              photoInputRefs.current[plant.id]?.click();
-                            }}
-                            aria-label="写真を追加"
-                          >
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                              <circle cx="12" cy="13" r="4" />
-                            </svg>
-                          </button>
-                        )}
-                        {/* 優先度インジケーター（urgent=赤/attention=オレンジ） */}
-                        {careCard && (careCard.priority === "urgent" || careCard.priority === "attention") && (
-                          <div style={{
-                            position: "absolute", bottom: 0, left: 0, right: 0, height: 3, zIndex: 3,
-                            background: careCard.priority === "urgent" ? "#ef4444" : "#f59e0b",
-                          }} />
-                        )}
+                        photo
+                      </span>
+                    )}
+                    {uploadingIds[plant.id] ? (
+                      <div className="photo-upload-loading-hint">
+                        {(() => {
+                          const prog = uploadProgress[plant.id];
+                          if (prog && prog.total > 1) return `${prog.current}/${prog.total}枚 アップロード中…`;
+                          return "アップロード中…";
+                        })()}
                       </div>
+                    ) : displayPhoto ? (
+                      <div className="photo-hover-hint">クリックして拡大</div>
+                    ) : null}
+                    {/* カメラボタン: オーナーのみ */}
+                    {!readOnly && !uploadingIds[plant.id] && (
+                      <button
+                        type="button"
+                        className="photo-camera-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          photoInputRefs.current[plant.id]?.click();
+                        }}
+                        aria-label="写真を追加"
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                          <circle cx="12" cy="13" r="4" />
+                        </svg>
+                      </button>
+                    )}
+                    {/* 優先度インジケーター */}
+                    {careCard && (careCard.priority === "urgent" || careCard.priority === "attention") && (
+                      <div style={{
+                        position: "absolute", bottom: 0, left: 0, right: 0, height: 3, zIndex: 3,
+                        background: careCard.priority === "urgent" ? "#ef4444" : "#f59e0b",
+                      }} />
+                    )}
+                  </div>
 
-                      <input
-                        ref={(el) => { photoInputRefs.current[plant.id] = el; }}
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        style={{ display: "none" }}
-                        onChange={(e) => handlePhotoChange(plant.id, e)}
-                      />
+                  {/* 写真アップロード用 hidden input: オーナーのみ */}
+                  {!readOnly && (
+                    <input
+                      ref={(el) => { photoInputRefs.current[plant.id] = el; }}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      style={{ display: "none" }}
+                      onChange={(e) => handlePhotoChange(plant.id, e)}
+                    />
+                  )}
 
-                      {/* Info area */}
-                      <div className="plant-info-wrap">
-                        <div style={{ fontWeight: 700, fontSize: 13, color: "#2d4a3e", marginBottom: 1, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {getPlantLabel(plant.plant_type)}
-                        </div>
+                  {/* Info area */}
+                  <div className="plant-info-wrap">
+                    <div style={{ fontWeight: 700, fontSize: 13, color: "#2d4a3e", marginBottom: 1, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {getPlantLabel(plant.plant_type)}
+                    </div>
 
-                        {plant.species && (
-                          <div style={{ fontSize: 10, color: "#7a8a7a", marginBottom: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {plant.species}
-                          </div>
-                        )}
+                    {plant.species && (
+                      <div style={{ fontSize: 10, color: "#7a8a7a", marginBottom: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {plant.species}
+                      </div>
+                    )}
 
-                        <div style={{ color: "#b0b8b0", fontSize: 10, marginBottom: 3 }}>
-                          {plant.location ? `📍 ${plant.location}` : (plant.started_at ?? plant.planted_at ?? "")}
-                        </div>
+                    <div style={{ color: "#b0b8b0", fontSize: 10, marginBottom: 3 }}>
+                      {plant.location ? `📍 ${plant.location}` : (plant.started_at ?? plant.planted_at ?? "")}
+                    </div>
 
-                        {plant.location && (
-                          <div style={{ color: "#b0b8b0", fontSize: 10, marginBottom: 3 }}>
-                            {plant.started_at ?? plant.planted_at ?? ""}
-                          </div>
-                        )}
+                    {plant.location && (
+                      <div style={{ color: "#b0b8b0", fontSize: 10, marginBottom: 3 }}>
+                        {plant.started_at ?? plant.planted_at ?? ""}
+                      </div>
+                    )}
 
-                        {plant.memo && (
-                          <div style={{ fontSize: 10, color: "#a0a8a2", marginBottom: 3, lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {plant.memo}
-                          </div>
-                        )}
+                    {plant.memo && (
+                      <div style={{ fontSize: 10, color: "#a0a8a2", marginBottom: 3, lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {plant.memo}
+                      </div>
+                    )}
 
-                        {stateLabel && !plant.species && !plant.location && (
-                          <div style={{ fontSize: 10, color: "#7a9a7a", marginBottom: 4, lineHeight: 1.4 }}>
-                            植えたとき：{stateLabel}
-                          </div>
-                        )}
+                    {stateLabel && !plant.species && !plant.location && (
+                      <div style={{ fontSize: 10, color: "#7a9a7a", marginBottom: 4, lineHeight: 1.4 }}>
+                        植えたとき：{stateLabel}
+                      </div>
+                    )}
 
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
-                          <span className={hasTodayEvent ? "badge-alert" : "badge-ok"}>
-                            {hasTodayEvent ? "要対応" : "見守り"}
-                          </span>
-                          <div style={{ position: "relative" }}>
-                            <button type="button" className="plant-menu-trigger" onClick={(e) => handleMenuToggle(plant.id, e)} aria-label="操作メニューを開く">
-                              ···
-                            </button>
-                            {isMenuOpen && (
-                              <div className="plant-menu-dropdown">
-                                <button type="button" className="plant-menu-item" onClick={() => handleHistoryOpen(plant.id)}>
-                                  写真履歴を見る
-                                </button>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+                      <span className={hasTodayEvent ? "badge-alert" : "badge-ok"}>
+                        {hasTodayEvent ? "要対応" : "見守り"}
+                      </span>
+                      {/* ···メニュー: オーナーのみ */}
+                      {!readOnly && (
+                        <div style={{ position: "relative" }}>
+                          <button type="button" className="plant-menu-trigger" onClick={(e) => handleMenuToggle(plant.id, e)} aria-label="操作メニューを開く">
+                            ···
+                          </button>
+                          {isMenuOpen && (
+                            <div className="plant-menu-dropdown">
+                              <button type="button" className="plant-menu-item" onClick={() => handleHistoryOpen(plant.id)}>
+                                写真履歴を見る
+                              </button>
+                              {archivePlantAction && (
                                 <form action={archivePlantAction} style={{ display: "contents" }}>
                                   <input type="hidden" name="plant_id" value={plant.id} />
                                   <button type="submit" className="plant-menu-item-danger" onClick={() => setOpenMenuId(null)}>
                                     アーカイブ
                                   </button>
                                 </form>
-                              </div>
-                            )}
-                          </div>
+                              )}
+                            </div>
+                          )}
                         </div>
+                      )}
+                    </div>
 
-                        <button
-                          type="button"
-                          onClick={() => handleHistoryOpen(plant.id)}
-                          style={{ display: "block", marginTop: 5, background: "none", border: "none", padding: 0, fontSize: 10, color: "#6db07b", cursor: "pointer", fontFamily, fontWeight: 600 }}
-                        >
-                          {(photoHistories[plant.id]?.length ?? 0) > 0
-                            ? `過去写真（${photoHistories[plant.id].length}枚）`
-                            : "過去写真を見る"}
-                        </button>
+                    {/* 過去写真リンク: 常に表示 */}
+                    <button
+                      type="button"
+                      onClick={() => handleHistoryOpen(plant.id)}
+                      style={{ display: "block", marginTop: 5, background: "none", border: "none", padding: 0, fontSize: 10, color: "#6db07b", cursor: "pointer", fontFamily, fontWeight: 600 }}
+                    >
+                      {(photoHistories[plant.id]?.length ?? 0) > 0
+                        ? `過去写真（${photoHistories[plant.id].length}枚）`
+                        : "過去写真を見る"}
+                    </button>
 
-                        {uploadErrors[plant.id] && (
-                          <div style={{ fontSize: 10, color: "#b91c1c", marginTop: 5, lineHeight: 1.5 }}>
-                            {uploadErrors[plant.id]}
-                          </div>
-                        )}
+                    {!readOnly && uploadErrors[plant.id] && (
+                      <div style={{ fontSize: 10, color: "#b91c1c", marginTop: 5, lineHeight: 1.5 }}>
+                        {uploadErrors[plant.id]}
+                      </div>
+                    )}
 
-                        {/* ── ケアメモ ── */}
-                        {careCard && (() => {
-                          const isExpanded = expandedCareIds.has(plant.id);
-                          const priorityTodos = TAG_PRIORITY_ORDER
-                            .filter(tag => careCard.tags.includes(tag))
-                            .map(tag => ({ tag, todo: TAG_TODO[tag] ?? tag }));
-                          const showToggle = priorityTodos.length > 2 || careCard.advice.length > 60;
-                          const visibleTodos = isExpanded ? priorityTodos : priorityTodos.slice(0, 2);
+                    {/* ── ケアメモ ── */}
+                    {careCard && (() => {
+                      const isExpanded = expandedCareIds.has(plant.id);
+                      const priorityTodos = TAG_PRIORITY_ORDER
+                        .filter(tag => careCard.tags.includes(tag))
+                        .map(tag => ({ tag, todo: TAG_TODO[tag] ?? tag }));
+                      const showToggle = priorityTodos.length > 2 || careCard.advice.length > 60;
+                      const visibleTodos = isExpanded ? priorityTodos : priorityTodos.slice(0, 2);
 
-                          return (
-                            <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #f0ebe2" }}>
-                              {visibleTodos.length > 0 ? (
-                                <ul style={{ margin: 0, paddingLeft: 14, fontSize: 11, color: "#374151", lineHeight: 1.7 }}>
-                                  {visibleTodos.map(({ tag, todo }) => (
-                                    <li key={tag}>{todo}</li>
-                                  ))}
-                                </ul>
-                              ) : (
-                                <div style={{
-                                  fontSize: 11, color: "#374151", lineHeight: 1.6,
-                                  ...(!isExpanded ? {
-                                    overflow: "hidden",
-                                    display: "-webkit-box",
-                                    WebkitLineClamp: 2,
-                                    WebkitBoxOrient: "vertical",
-                                  } : {}),
-                                }}>
+                      return (
+                        <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #f0ebe2" }}>
+                          {visibleTodos.length > 0 ? (
+                            <ul style={{ margin: 0, paddingLeft: 14, fontSize: 11, color: "#374151", lineHeight: 1.7 }}>
+                              {visibleTodos.map(({ tag, todo }) => (
+                                <li key={tag}>{todo}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <div style={{
+                              fontSize: 11, color: "#374151", lineHeight: 1.6,
+                              ...(!isExpanded ? {
+                                overflow: "hidden",
+                                display: "-webkit-box",
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: "vertical",
+                              } : {}),
+                            }}>
+                              {careCard.advice}
+                            </div>
+                          )}
+
+                          {isExpanded && (
+                            <>
+                              {careCard.advice.length > 0 && (
+                                <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.6, marginTop: 5 }}>
                                   {careCard.advice}
                                 </div>
                               )}
-
-                              {isExpanded && (
-                                <>
-                                  {careCard.advice.length > 0 && (
-                                    <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.6, marginTop: 5 }}>
-                                      {careCard.advice}
-                                    </div>
-                                  )}
-                                  {careCard.tags.length > 0 && (
-                                    <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 5 }}>
-                                      {careCard.tags.map((tag) => {
-                                        const c = TAG_COLORS[tag] ?? { bg: "#f1f5f9", color: "#475569" };
-                                        return (
-                                          <span key={tag} style={{ fontSize: 9, padding: "1px 5px", borderRadius: 8, fontWeight: 600, background: c.bg, color: c.color }}>
-                                            {tag}
-                                          </span>
-                                        );
-                                      })}
-                                    </div>
-                                  )}
-                                </>
+                              {careCard.tags.length > 0 && (
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 5 }}>
+                                  {careCard.tags.map((tag) => {
+                                    const c = TAG_COLORS[tag] ?? { bg: "#f1f5f9", color: "#475569" };
+                                    return (
+                                      <span key={tag} style={{ fontSize: 9, padding: "1px 5px", borderRadius: 8, fontWeight: 600, background: c.bg, color: c.color }}>
+                                        {tag}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
                               )}
+                            </>
+                          )}
 
-                              {showToggle && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setExpandedCareIds((prev) => {
-                                      const next = new Set(prev);
-                                      if (next.has(plant.id)) next.delete(plant.id); else next.add(plant.id);
-                                      return next;
-                                    });
-                                  }}
-                                  style={{ background: "none", border: "none", padding: 0, marginTop: 4, fontSize: 10, color: "#6db07b", cursor: "pointer", fontFamily, fontWeight: 600, display: "block" }}
-                                >
-                                  {isExpanded ? "閉じる ▲" : "続きを読む ▼"}
-                                </button>
-                              )}
-                            </div>
-                          );
-                        })()}
-                      </div>
+                          {showToggle && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setExpandedCareIds((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(plant.id)) next.delete(plant.id); else next.add(plant.id);
+                                  return next;
+                                });
+                              }}
+                              style={{ background: "none", border: "none", padding: 0, marginTop: 4, fontSize: 10, color: "#6db07b", cursor: "pointer", fontFamily, fontWeight: 600, display: "block" }}
+                            >
+                              {isExpanded ? "閉じる ▲" : "続きを読む ▼"}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </>
+              );
 
-                    </SortablePlantCard>
-                  );
-                })}
-              </div>
-            </SortableContext>
-          </DndContext>
+              if (readOnly) {
+                return (
+                  <div key={plant.id} className="plant-card-sortable" style={{ position: "relative" }}>
+                    {cardInner}
+                  </div>
+                );
+              }
+              return (
+                <SortablePlantCard key={plant.id} id={plant.id}>
+                  {cardInner}
+                </SortablePlantCard>
+              );
+            });
+
+            const grid = <div className="plants-grid">{cards}</div>;
+
+            if (readOnly) return grid;
+            return (
+              <DndContext
+                id="plant-column"
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext items={localPlants.map((p) => p.id)} strategy={rectSortingStrategy}>
+                  {grid}
+                </SortableContext>
+              </DndContext>
+            );
+          })()
         )}
 
-        {/* Add plant form */}
-        {!isFormOpen ? (
+        {/* Add plant form: オーナーのみ */}
+        {!readOnly && (!isFormOpen ? (
           <button type="button" className="btn-add-plant-toggle" onClick={() => setIsFormOpen(true)}>
             ＋ 植物を追加する
           </button>
@@ -1350,7 +1387,7 @@ export function PlantColumn({
               </button>
             </form>
           </div>
-        )}
+        ))}
 
         {/* Archived plants */}
         {archivedPlants.length > 0 && (
@@ -1368,10 +1405,12 @@ export function PlantColumn({
                       {plant.species && <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 1 }}>{plant.species}</div>}
                       <div style={{ fontSize: 10, color: "#c8c0b4", marginTop: 1 }}>{plant.started_at ?? plant.planted_at ?? ""}</div>
                     </div>
-                    <form action={restorePlantAction}>
-                      <input type="hidden" name="plant_id" value={plant.id} />
-                      <button type="submit" className="btn-restore">復元</button>
-                    </form>
+                    {!readOnly && restorePlantAction && (
+                      <form action={restorePlantAction}>
+                        <input type="hidden" name="plant_id" value={plant.id} />
+                        <button type="submit" className="btn-restore">復元</button>
+                      </form>
+                    )}
                   </div>
                 ))}
               </div>

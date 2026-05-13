@@ -107,7 +107,7 @@ export function ShareLinkCard({
       {shareUrl ? (
         <div>
           <p style={{ fontSize: 12, color: "#555", margin: "0 0 10px", lineHeight: 1.6 }}>
-            このリンクを家族に送ると、同じ植物ページを一緒に見たり編集できます。
+            このリンクを家族に送ると、ログインなしでわが家の植物ページを見ることができます。
           </p>
           <div
             style={{
@@ -213,7 +213,7 @@ export function ShareLinkCard({
       ) : (
         <div>
           <p style={{ fontSize: 12, color: "#555", margin: "0 0 12px", lineHeight: 1.6 }}>
-            家族に共有リンクを送ると、一緒に植物を管理できます。
+            家族に共有リンクを送ると、ログインなしでわが家の植物ページを見せることができます。
           </p>
           <button
             onClick={handleCreate}

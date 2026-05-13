@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
-import { revalidatePath } from "next/cache";
 import { supabaseServer as supabase } from "@/src/lib/supabase-server";
-import { fetchHouseholdData, todayStringJst } from "@/lib/fetchHouseholdData";
+import { fetchHouseholdData } from "@/lib/fetchHouseholdData";
 import { AppHeader } from "@/app/AppHeader";
 import { PlantColumn } from "@/app/PlantColumn";
 
@@ -15,12 +14,6 @@ async function verifyShareToken(token: string): Promise<string | null> {
   return data?.household_id ?? null;
 }
 
-function getAppBaseUrl() {
-  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  return "http://localhost:3000";
-}
-
 export default async function SharePage({
   params,
 }: {
@@ -29,195 +22,6 @@ export default async function SharePage({
   const { token } = await params;
   const householdId = await verifyShareToken(token);
   if (!householdId) notFound();
-
-  // ── Server Actions (token captured via closure) ───────────────────────────
-
-  async function addPlant(formData: FormData): Promise<void> {
-    "use server";
-    const hid = await verifyShareToken(token);
-    if (!hid) return;
-
-    const name = String(formData.get("name") || "").trim();
-    if (!name) return;
-    const species = String(formData.get("species") || "").trim() || null;
-    const location = String(formData.get("location") || "").trim() || null;
-    const startedAt = String(formData.get("started_at") || "").trim() || null;
-    const memo = String(formData.get("memo") || "").trim() || null;
-    const photo = formData.get("photo") as File | null;
-
-    const todayStr = todayStringJst();
-    const { data: plant, error: plantError } = await supabase
-      .from("plants")
-      .insert({
-        plant_type: name,
-        planted_at: startedAt ?? todayStr,
-        started_at: startedAt || null,
-        species,
-        location,
-        memo,
-        household_id: hid,
-      })
-      .select()
-      .single();
-
-    if (plantError || !plant) return;
-
-    if (photo && photo.size > 0) {
-      try {
-        const storagePath = `plants/${plant.id}/${Date.now()}-${photo.name}`;
-        const bytes = await photo.arrayBuffer();
-        const { error: uploadError } = await supabase.storage
-          .from("plant-photos")
-          .upload(storagePath, bytes, { contentType: photo.type || "image/jpeg" });
-        if (!uploadError) {
-          const { data: urlData } = supabase.storage
-            .from("plant-photos")
-            .getPublicUrl(storagePath);
-          await supabase.from("plant_photos").insert({
-            plant_id: plant.id,
-            image_url: urlData.publicUrl,
-            storage_path: storagePath,
-            taken_at: new Date().toISOString(),
-          });
-        }
-      } catch (err) {
-        console.error("share:addPlant photo upload error:", err);
-      }
-    }
-
-    try {
-      const baseUrl = getAppBaseUrl();
-      await fetch(`${baseUrl}/api/generate-care-rules`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plantId: plant.id }),
-        cache: "no-store",
-      });
-    } catch (err) {
-      console.error("share:generate-care-rules fetch error:", err);
-    }
-
-    revalidatePath(`/share/${token}`);
-  }
-
-  async function archivePlant(formData: FormData): Promise<void> {
-    "use server";
-    const hid = await verifyShareToken(token);
-    if (!hid) return;
-    const plantId = String(formData.get("plant_id") || "");
-    if (!plantId) return;
-    await supabase
-      .from("plants")
-      .update({ archived_at: new Date().toISOString() })
-      .eq("id", plantId)
-      .eq("household_id", hid);
-    revalidatePath(`/share/${token}`);
-  }
-
-  async function restorePlant(formData: FormData): Promise<void> {
-    "use server";
-    const hid = await verifyShareToken(token);
-    if (!hid) return;
-    const plantId = String(formData.get("plant_id") || "");
-    if (!plantId) return;
-    await supabase
-      .from("plants")
-      .update({ archived_at: null })
-      .eq("id", plantId)
-      .eq("household_id", hid);
-    revalidatePath(`/share/${token}`);
-  }
-
-  async function uploadPlantPhoto(
-    formData: FormData
-  ): Promise<{ success: boolean; error?: string }> {
-    "use server";
-    try {
-      const hid = await verifyShareToken(token);
-      if (!hid) return { success: false, error: "共有リンクが無効です。" };
-
-      const plantId = String(formData.get("plant_id") || "");
-      const file = formData.get("photo") as File | null;
-      if (!plantId || !file || file.size === 0)
-        return { success: false, error: "必要なデータが不足しています" };
-
-      const { data: plant } = await supabase
-        .from("plants")
-        .select("id")
-        .eq("id", plantId)
-        .eq("household_id", hid)
-        .single();
-      if (!plant) return { success: false, error: "植物が見つかりません。" };
-
-      const storagePath = `plants/${plantId}/${Date.now()}-${file.name}`;
-      const bytes = await file.arrayBuffer();
-      const { error: uploadError } = await supabase.storage
-        .from("plant-photos")
-        .upload(storagePath, bytes, { contentType: file.type || "image/jpeg" });
-      if (uploadError)
-        return { success: false, error: "アップロードに失敗しました。" };
-
-      const { data: urlData } = supabase.storage
-        .from("plant-photos")
-        .getPublicUrl(storagePath);
-      const { error: dbError } = await supabase.from("plant_photos").insert([{
-        plant_id: plantId,
-        image_url: urlData.publicUrl,
-        storage_path: storagePath,
-        taken_at: new Date().toISOString(),
-      }]);
-      if (dbError) return { success: false, error: "データの保存に失敗しました。" };
-
-      revalidatePath(`/share/${token}`);
-      return { success: true };
-    } catch {
-      return { success: false, error: "予期しないエラーが発生しました。" };
-    }
-  }
-
-  async function deletePhoto(formData: FormData): Promise<void> {
-    "use server";
-    const hid = await verifyShareToken(token);
-    if (!hid) return;
-
-    const photoId = String(formData.get("photo_id") || "");
-    if (!photoId) return;
-
-    // Verify photo belongs to this household, and fetch storage_path from DB
-    const { data: photo } = await supabase
-      .from("plant_photos")
-      .select("id, storage_path, plants!inner(household_id)")
-      .eq("id", photoId)
-      .eq("plants.household_id", hid)
-      .single();
-    if (!photo) return;
-
-    const { error: dbError } = await supabase.from("plant_photos").delete().eq("id", photoId);
-    if (dbError) { console.error("deletePhoto DB削除失敗:", dbError.message); return; }
-
-    const storagePath = (photo as any).storage_path as string | null;
-    if (storagePath) {
-      const { error: storageError } = await supabase.storage.from("plant-photos").remove([storagePath]);
-      if (storageError) console.warn("deletePhoto Storage削除失敗:", storageError.message);
-    }
-    revalidatePath(`/share/${token}`);
-  }
-
-  async function reorderPlants(orderedIds: string[]): Promise<void> {
-    "use server";
-    const hid = await verifyShareToken(token);
-    if (!hid) return;
-    await Promise.all(
-      orderedIds.map((id, index) =>
-        supabase
-          .from("plants")
-          .update({ sort_order: index })
-          .eq("id", id)
-          .eq("household_id", hid)
-      )
-    );
-    revalidatePath(`/share/${token}`);
-  }
 
   // ── Household name ────────────────────────────────────────────────────────
 
@@ -336,17 +140,12 @@ export default async function SharePage({
           {/* ── Column 1: 育てている植物 (2/3幅) ── */}
           <div className="col-plants">
             <PlantColumn
+              readOnly={true}
               plants={plants}
               archivedPlants={archivedPlants}
               today={today}
               plantHasTodayEventRecord={plantHasTodayEventRecord}
               hasError={hasError}
-              addPlantAction={addPlant}
-              archivePlantAction={archivePlant}
-              restorePlantAction={restorePlant}
-              reorderPlantAction={reorderPlants}
-              uploadPhotoAction={uploadPlantPhoto}
-              deletePhotoAction={deletePhoto}
               latestPhotos={latestPhotos}
               photoHistories={photoHistories}
               careCardMap={careCardMap}
