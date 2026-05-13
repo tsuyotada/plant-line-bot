@@ -883,16 +883,6 @@ export function PlantColumn({
           color: #b91c1c;
           margin-top: 3px;
         }
-        /* ─── Plants grid ─── */
-        .plants-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-          gap: 8px;
-          margin-bottom: 12px;
-        }
-        @media (max-width: 480px) {
-          .plants-grid { grid-template-columns: 1fr; }
-        }
         /* ─── Generic white cards ─── */
         .todo-card,
         .form-card {
