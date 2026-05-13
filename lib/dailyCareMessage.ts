@@ -171,7 +171,7 @@ export function buildDailyCareMessage(
   plants: PlantWithRecency[],
   careRulesMap: Map<string, CareRule[]> = new Map(),
   shareUrl?: string | null,
-): { message: string; spotlightPhotoUrl: string | null } {
+): { message: string; messageBody: string; spotlightPhotoUrl: string | null; appLinkPhrase: string; appUrl: string } {
   const appLinkPhrase = datePick(APP_LINK_PHRASES, today, 200);
   const appUrl =
     process.env.NEXT_PUBLIC_APP_URL ??
@@ -277,11 +277,13 @@ export function buildDailyCareMessage(
     lines.push("", `💡 ${trivia}`);
   }
 
+  const messageBody = lines.join("\n");
+
   if (shareUrl) {
     lines.push("", appLinkPhrase, "家族の植物ページ：", shareUrl);
   } else {
     lines.push("", appLinkPhrase, appUrl);
   }
 
-  return { message: lines.join("\n"), spotlightPhotoUrl };
+  return { message: lines.join("\n"), messageBody, spotlightPhotoUrl, appLinkPhrase, appUrl };
 }

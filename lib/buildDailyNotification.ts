@@ -1,6 +1,22 @@
 import { createClient } from "@supabase/supabase-js";
 import { buildDailyCareMessage, PlantWithRecency, CareRule } from "./dailyCareMessage";
 
+export function buildFinalMessage(
+  messageBody: string,
+  appLinkPhrase: string,
+  role: "owner" | "family",
+  shareUrl: string | null,
+  ownerUrl: string
+): string {
+  if (role === "owner") {
+    return `${messageBody}\n\n${appLinkPhrase}\n${ownerUrl}`;
+  }
+  if (shareUrl) {
+    return `${messageBody}\n\n${appLinkPhrase}\n家族の植物ページ：\n${shareUrl}`;
+  }
+  return messageBody;
+}
+
 const plantLabelMap: Record<string, string> = {
   tomato: "トマト",
   coriander: "コリアンダー",
@@ -23,6 +39,10 @@ function getTodayJst(): string {
 
 export async function buildDailyNotificationMessage(householdId: string): Promise<{
   message: string;
+  messageBody: string;
+  shareUrl: string | null;
+  ownerUrl: string;
+  appLinkPhrase: string;
   today: string;
   plantCount: number;
   spotlightPhotoUrl: string | null;
@@ -69,8 +89,16 @@ export async function buildDailyNotificationMessage(householdId: string): Promis
   console.log(`[Daily] 通知対象植物数=${plants.length} care_rules=${careRulesRaw?.length ?? 0}`);
 
   if (plants.length === 0) {
+    const earlyBase = process.env.NEXT_PUBLIC_APP_URL ?? "https://plant-line-bot-forme.vercel.app";
+    const earlyShareToken = (shareLinkData as { token: string } | null)?.token ?? null;
+    const earlyShareUrl = earlyShareToken ? `${earlyBase}/share/${earlyShareToken}` : null;
+    const earlyMsg = `【${today} のお世話メモ🌱】\n登録されている植物がありません🌿`;
     return {
-      message: `【${today} のお世話メモ🌱】\n登録されている植物がありません🌿`,
+      message: earlyMsg,
+      messageBody: earlyMsg,
+      shareUrl: earlyShareUrl,
+      ownerUrl: earlyBase,
+      appLinkPhrase: "今日のお世話をアプリで確認する👇",
       today,
       plantCount: 0,
       spotlightPhotoUrl: null,
@@ -149,7 +177,7 @@ export async function buildDailyNotificationMessage(householdId: string): Promis
   const shareToken = (shareLinkData as { token: string } | null)?.token ?? null;
   const shareUrl = shareToken ? `${appBaseUrl}/share/${shareToken}` : null;
 
-  const { message, spotlightPhotoUrl: rawSpotlightUrl } = buildDailyCareMessage(today, plantsWithRecency, careRulesMap, shareUrl);
+  const { message, messageBody, spotlightPhotoUrl: rawSpotlightUrl, appLinkPhrase, appUrl } = buildDailyCareMessage(today, plantsWithRecency, careRulesMap, shareUrl);
 
   // Upgrade spotlight to a signed URL (1h validity) so LINE servers can fetch the image
   // regardless of whether the Supabase Storage bucket is public or private.
@@ -174,5 +202,5 @@ export async function buildDailyNotificationMessage(householdId: string): Promis
     }
   }
 
-  return { message, today, plantCount: plants.length, spotlightPhotoUrl };
+  return { message, messageBody, shareUrl, ownerUrl: appUrl, appLinkPhrase, today, plantCount: plants.length, spotlightPhotoUrl };
 }

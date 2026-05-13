@@ -5,7 +5,7 @@ import { getPlantTrivia } from "@/lib/plantTrivias";
 import { fetchLineImage, replyToLine, pushToLine } from "@/lib/linePhotoUtils";
 import { generatePhotoAdvice } from "@/lib/aiPhotoAdvice";
 import { identifyPlantFromPhoto } from "@/lib/aiPlantIdentify";
-import { buildDailyNotificationMessage } from "@/lib/buildDailyNotification";
+import { buildDailyNotificationMessage, buildFinalMessage } from "@/lib/buildDailyNotification";
 import { createClient } from "@supabase/supabase-js";
 
 const PLANT_LABEL_MAP: Record<string, string> = {
@@ -1115,7 +1115,7 @@ export async function POST(req: Request) {
     if (userMessage === "通知テスト") {
       const { data: regRecord } = await supabase
         .from("line_notification_users")
-        .select("is_active, has_tested_notification, household_id")
+        .select("is_active, has_tested_notification, household_id, recipient_role")
         .eq("line_user_id", lineUserId)
         .maybeSingle();
 
@@ -1140,8 +1140,10 @@ export async function POST(req: Request) {
           .insert({ line_user_id: lineUserId, is_active: false, has_tested_notification: true });
       }
 
-      const { message, spotlightPhotoUrl } = await buildDailyNotificationMessage(testHouseholdId);
-      console.log(`[LINE] 通知テスト message生成完了 spotlightPhotoUrl=${spotlightPhotoUrl ?? "なし"}`);
+      const { messageBody, shareUrl, ownerUrl, appLinkPhrase, spotlightPhotoUrl } = await buildDailyNotificationMessage(testHouseholdId);
+      const testRole = ((regRecord as { recipient_role?: string } | null)?.recipient_role as "owner" | "family") ?? "family";
+      const message = buildFinalMessage(messageBody, appLinkPhrase, testRole, shareUrl, ownerUrl);
+      console.log(`[LINE] 通知テスト message生成完了 role=${testRole} spotlightPhotoUrl=${spotlightPhotoUrl ?? "なし"}`);
 
       // Build message array: image (if available) + text, up to LINE's 5-message limit
       const testMessages: object[] = [];
@@ -1210,6 +1212,7 @@ export async function POST(req: Request) {
           .update({
             household_id: joinCodeRow.household_id,
             is_active: true,
+            recipient_role: "family",
             updated_at: new Date().toISOString(),
           })
           .eq("line_user_id", lineUserId);
@@ -1220,6 +1223,7 @@ export async function POST(req: Request) {
             line_user_id: lineUserId,
             household_id: joinCodeRow.household_id,
             is_active: true,
+            recipient_role: "family",
           });
       }
 
