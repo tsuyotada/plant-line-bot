@@ -379,6 +379,15 @@ async function regenerateJoinCode(): Promise<string | null> {
   return null;
 }
 
+// ── Logout action ─────────────────────────────────────────────────────────────
+
+async function signOut() {
+  "use server";
+  const supabase = await createSupabaseServerClient();
+  await supabase.auth.signOut();
+  redirect("/");
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function Home({
@@ -388,8 +397,83 @@ export default async function Home({
 }) {
   const pageStart = Date.now();
 
-  const householdId = await getAuthedHouseholdId();
-  if (!householdId) {
+  const fontFamily =
+    'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+
+  // ── 未ログイン → 玄関ページ ────────────────────────────────────────────────
+  const authClient = await createSupabaseServerClient();
+  const { data: { user } } = await authClient.auth.getUser();
+
+  if (!user) {
+    return (
+      <>
+        <BackgroundLayer />
+        <main
+          style={{
+            minHeight: "100vh",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "24px",
+            fontFamily,
+          }}
+        >
+          <div
+            style={{
+              background: "rgba(253, 250, 244, 0.96)",
+              backdropFilter: "blur(12px)",
+              WebkitBackdropFilter: "blur(12px)",
+              border: "1px solid rgba(255,255,255,0.95)",
+              borderRadius: 20,
+              padding: "48px 36px",
+              maxWidth: 400,
+              width: "100%",
+              boxShadow: "0 4px 32px rgba(60,50,30,0.12)",
+              textAlign: "center",
+            }}
+          >
+            <div style={{ fontSize: 44, marginBottom: 14 }}>🌱</div>
+            <h1 style={{ fontSize: 22, fontWeight: 800, color: "#1a3320", margin: "0 0 10px", letterSpacing: -0.3 }}>
+              My Garden
+            </h1>
+            <p style={{ fontSize: 14, color: "#4b6b5a", lineHeight: 1.75, margin: "0 0 28px" }}>
+              わが家の植物ページを、家族で見守る。
+            </p>
+            <a
+              href="/login"
+              style={{
+                display: "block",
+                padding: "13px 0",
+                background: "#4b7a5a",
+                color: "#fff",
+                borderRadius: 10,
+                fontSize: 15,
+                fontWeight: 700,
+                textDecoration: "none",
+                marginBottom: 20,
+              }}
+            >
+              あなたのガーデンを開く
+            </a>
+            <p style={{ fontSize: 12, color: "#9ca3af", lineHeight: 1.7, margin: 0 }}>
+              家族から共有リンクを受け取った方は、
+              <br />
+              そのリンクから開けます。ログインは不要です。
+            </p>
+          </div>
+        </main>
+      </>
+    );
+  }
+
+  // ── ログイン済み + household なし → セットアップ ──────────────────────────
+  const { data: household } = await supabase
+    .from("households")
+    .select("id, name")
+    .eq("owner_id", user.id)
+    .single();
+
+  if (!household) {
     const { setup_error } = await searchParams;
     return (
       <main
@@ -400,7 +484,7 @@ export default async function Home({
           justifyContent: "center",
           background: "linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%)",
           padding: "24px",
-          fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
+          fontFamily,
         }}
       >
         <div
@@ -487,10 +571,16 @@ export default async function Home({
               はじめる
             </button>
           </form>
+          <p style={{ fontSize: 12, color: "#9ca3af", margin: "20px 0 0", lineHeight: 1.5 }}>
+            ログイン中: {user.email}
+          </p>
         </div>
       </main>
     );
   }
+
+  const householdId = household.id;
+  const householdName = household.name ?? "My Garden";
 
   const dbStart = Date.now();
   const [data, shareLinkResult, joinCodeResult] = await Promise.all([
@@ -536,9 +626,6 @@ export default async function Home({
   const joinCode = joinCodeResult.data?.code ?? null;
 
   console.log(`[Page] total render ${Date.now() - pageStart}ms`);
-
-  const fontFamily =
-    'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 
   return (
     <>
@@ -636,10 +723,18 @@ export default async function Home({
       <BackgroundLayer />
 
       <main style={{ minHeight: "100vh", padding: "14px 20px 48px", fontFamily }}>
-        <div style={{ maxWidth: 1440, margin: "0 auto 14px", paddingRight: 200 }}>
-          <span style={{ fontSize: 12, color: "#8a9a8a", fontWeight: 500, letterSpacing: 0.2 }}>
-            Keep every balcony plant healthy.
+        <div style={{ maxWidth: 1440, margin: "0 auto 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span style={{ fontSize: 15, fontWeight: 800, color: "#1a3320", letterSpacing: -0.2 }}>
+            {householdName}
           </span>
+          <form action={signOut} style={{ display: "inline" }}>
+            <button
+              type="submit"
+              style={{ fontSize: 11, color: "#9ca3af", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", padding: 0 }}
+            >
+              ログアウト
+            </button>
+          </form>
         </div>
 
         <div className="board-grid" style={{ maxWidth: 1440, margin: "0 auto" }}>

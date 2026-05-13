@@ -54,7 +54,7 @@ export default async function LoginPage({
             margin: "0 0 8px",
           }}
         >
-          Plant Care
+          メールでガーデンを開く
         </h1>
 
         {params.sent ? (
@@ -69,7 +69,7 @@ export default async function LoginPage({
             >
               メールを送信しました。
               <br />
-              受信トレイのリンクをクリックしてログインしてください。
+              リンクを開くとガーデンに入れます。
             </p>
           </div>
         ) : (
@@ -81,9 +81,9 @@ export default async function LoginPage({
                 marginBottom: "20px",
               }}
             >
-              登録済みのメールアドレスを入力してください。
+              パスワードは不要です。
               <br />
-              ログイン用リンクをお送りします。
+              届いたリンクを開くと、あなたのガーデンに入れます。
             </p>
             <input
               type="email"
@@ -119,6 +119,12 @@ export default async function LoginPage({
             </button>
           </form>
         )}
+
+        <p style={{ fontSize: "12px", color: "#9ca3af", margin: "24px 0 0", lineHeight: 1.6 }}>
+          共有リンクを受け取った方は、ログイン不要です。
+          <br />
+          共有リンクから開いてください。
+        </p>
       </div>
     </div>
   );

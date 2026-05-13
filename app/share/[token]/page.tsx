@@ -219,6 +219,15 @@ export default async function SharePage({
     revalidatePath(`/share/${token}`);
   }
 
+  // ── Household name ────────────────────────────────────────────────────────
+
+  const { data: householdRow } = await supabase
+    .from("households")
+    .select("name")
+    .eq("id", householdId)
+    .single();
+  const householdName = householdRow?.name ?? "My Garden";
+
   // ── Data ──────────────────────────────────────────────────────────────────
 
   const {
@@ -323,9 +332,15 @@ export default async function SharePage({
       <BackgroundLayer />
 
       <main style={{ minHeight: "100vh", padding: "14px 20px 48px", fontFamily }}>
-        <div style={{ maxWidth: 1440, margin: "0 auto 14px", paddingRight: 200 }}>
-          <span style={{ fontSize: 12, color: "#8a9a8a", fontWeight: 500, letterSpacing: 0.2 }}>
-            Keep every balcony plant healthy.
+        <div style={{ maxWidth: 1440, margin: "0 auto 14px" }}>
+          <span style={{ fontSize: 15, fontWeight: 800, color: "#1a3320", letterSpacing: -0.2 }}>
+            {householdName}
+          </span>
+          <span style={{ fontSize: 11, color: "#9ca3af", marginLeft: 10, fontWeight: 500 }}>
+            わが家の植物ページ
+          </span>
+          <span style={{ fontSize: 10, color: "#d1d5db", marginLeft: 8 }}>
+            共有リンクで表示中
           </span>
         </div>
 

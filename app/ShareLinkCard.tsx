@@ -101,13 +101,13 @@ export function ShareLinkCard({
             flexShrink: 0,
           }}
         />
-        Family sharing
+        わが家の植物ページ
       </h2>
 
       {shareUrl ? (
         <div>
           <p style={{ fontSize: 12, color: "#555", margin: "0 0 10px", lineHeight: 1.6 }}>
-            このリンクを持つ人は、植物の追加・編集・写真アップロードができます。
+            このリンクを家族に送ると、同じ植物ページを一緒に見たり編集できます。
           </p>
           <div
             style={{
@@ -213,8 +213,7 @@ export function ShareLinkCard({
       ) : (
         <div>
           <p style={{ fontSize: 12, color: "#555", margin: "0 0 12px", lineHeight: 1.6 }}>
-            家族や同居人と植物を一緒に管理できます。共有リンクを発行すると、
-            リンクを持つ人が植物の追加・編集・写真アップロードを行えます。
+            家族に共有リンクを送ると、一緒に植物を管理できます。
           </p>
           <button
             onClick={handleCreate}
@@ -231,7 +230,7 @@ export function ShareLinkCard({
               cursor: "pointer",
             }}
           >
-            {isPending ? "発行中..." : "共有リンクを発行"}
+            {isPending ? "発行中..." : "リンクを発行する"}
           </button>
         </div>
       )}
