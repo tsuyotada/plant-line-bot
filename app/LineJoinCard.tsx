@@ -88,66 +88,86 @@ export function LineJoinCard({
 
       {code ? (
         <div>
-          <p style={{ fontSize: 12, color: "#555", margin: "0 0 10px", lineHeight: 1.7 }}>
-            家族に以下の手順を伝えてください：
+          <p style={{ fontSize: 12, color: "#555", margin: "0 0 12px", lineHeight: 1.7 }}>
+            家族に以下の手順を伝えてください。
           </p>
-          <ol
-            style={{
-              fontSize: 12,
-              color: "#374151",
-              margin: "0 0 12px",
-              paddingLeft: 18,
-              lineHeight: 1.8,
-            }}
-          >
-            <li>Plant Care Bot を友だち追加</li>
-            <li>
-              LINEで次のメッセージを送る：
-            </li>
-          </ol>
 
-          {/* コードブロック */}
-          <div
-            style={{
-              display: "flex",
-              gap: 6,
-              alignItems: "center",
-              background: "#f0fdf4",
-              borderRadius: 8,
-              padding: "8px 10px",
-              marginBottom: 12,
-            }}
-          >
-            <span
+          {/* ── ステップ① ── */}
+          <div style={{ marginBottom: 12 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: "#4b7a5a", margin: "0 0 6px" }}>
+              ステップ① 友だち追加
+            </p>
+            {process.env.NEXT_PUBLIC_LINE_ADD_FRIEND_URL ? (
+              <a
+                href={process.env.NEXT_PUBLIC_LINE_ADD_FRIEND_URL}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  display: "inline-block",
+                  padding: "7px 16px",
+                  background: "#06c755",
+                  color: "#fff",
+                  textDecoration: "none",
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontWeight: 700,
+                }}
+              >
+                Plant Care Bot を友だち追加する
+              </a>
+            ) : (
+              <p style={{ fontSize: 11, color: "#9ca3af", margin: 0 }}>
+                友だち追加URLが未設定です（NEXT_PUBLIC_LINE_ADD_FRIEND_URL）
+              </p>
+            )}
+          </div>
+
+          {/* ── ステップ② ── */}
+          <div style={{ marginBottom: 12 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: "#4b7a5a", margin: "0 0 6px" }}>
+              ステップ② LINEでメッセージを送る
+            </p>
+            <div
               style={{
-                flex: 1,
-                fontSize: 13,
-                fontWeight: 700,
-                color: "#1a3320",
-                fontFamily: "monospace",
-                letterSpacing: 1,
+                display: "flex",
+                gap: 6,
+                alignItems: "center",
+                background: "#f0fdf4",
+                borderRadius: 8,
+                padding: "8px 10px",
               }}
             >
-              参加 {code}
-            </span>
-            <button
-              onClick={handleCopy}
-              disabled={isPending}
-              style={{
-                flexShrink: 0,
-                padding: "4px 10px",
-                background: copied ? "#d1fae5" : "#06c755",
-                color: copied ? "#065f46" : "#fff",
-                border: "none",
-                borderRadius: 6,
-                fontSize: 11,
-                fontWeight: 700,
-                cursor: "pointer",
-                transition: "background 0.2s",
-              }}
-            >
-              {copied ? "コピー済み" : "コピー"}
-            </button>
+              <span
+                style={{
+                  flex: 1,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: "#1a3320",
+                  fontFamily: "monospace",
+                  letterSpacing: 1,
+                }}
+              >
+                参加 {code}
+              </span>
+              <button
+                onClick={handleCopy}
+                disabled={isPending}
+                style={{
+                  flexShrink: 0,
+                  padding: "4px 10px",
+                  background: copied ? "#d1fae5" : "#06c755",
+                  color: copied ? "#065f46" : "#fff",
+                  border: "none",
+                  borderRadius: 6,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  transition: "background 0.2s",
+                }}
+              >
+                {copied ? "コピー済み" : "コピー"}
+              </button>
+            </div>
           </div>
 
           <p style={{ fontSize: 11, color: "#7a8a7a", margin: "0 0 12px", lineHeight: 1.6 }}>
