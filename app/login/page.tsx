@@ -131,25 +131,26 @@ export default async function LoginPage({
         >
           <h1
             style={{
-              fontSize: 38,
+              fontSize: 72,
               fontWeight: 800,
               color: "#ffffff",
-              margin: "0 0 6px",
-              letterSpacing: -0.8,
-              lineHeight: 1.15,
-              textShadow: "0 1px 8px rgba(0,0,0,0.55), 0 0 24px rgba(0,0,0,0.30)",
+              margin: "0 0 8px",
+              letterSpacing: -2,
+              lineHeight: 1.0,
+              textShadow: "0 2px 12px rgba(0,0,0,0.55), 0 0 32px rgba(0,0,0,0.25)",
             }}
           >
             Plant Care
           </h1>
           <p
             style={{
-              fontSize: 14,
+              fontSize: 15,
               fontWeight: 500,
               color: "rgba(255,255,255,0.88)",
               margin: 0,
-              letterSpacing: 0.6,
+              letterSpacing: 1.2,
               textShadow: "0 1px 6px rgba(0,0,0,0.50)",
+              textTransform: "uppercase",
             }}
           >
             Keep every green healthy.
