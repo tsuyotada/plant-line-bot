@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { supabaseServer as supabase } from "@/src/lib/supabase-server";
 import { fetchHouseholdData, todayStringJst } from "@/lib/fetchHouseholdData";
-import { BackgroundLayer } from "@/app/BackgroundLayer";
+import { AppHeader } from "@/app/AppHeader";
 import { PlantColumn } from "@/app/PlantColumn";
 
 async function verifyShareToken(token: string): Promise<string | null> {
@@ -329,21 +329,9 @@ export default async function SharePage({
         }
       `}</style>
 
-      <BackgroundLayer />
+      <AppHeader mode="share" householdName={householdName} />
 
-      <main style={{ minHeight: "100vh", padding: "14px 20px 48px", fontFamily }}>
-        <div style={{ maxWidth: 1440, margin: "0 auto 14px" }}>
-          <span style={{ fontSize: 15, fontWeight: 800, color: "#1a3320", letterSpacing: -0.2 }}>
-            {householdName}
-          </span>
-          <span style={{ fontSize: 11, color: "#9ca3af", marginLeft: 10, fontWeight: 500 }}>
-            わが家の植物ページ
-          </span>
-          <span style={{ fontSize: 10, color: "#d1d5db", marginLeft: 8 }}>
-            共有リンクで表示中
-          </span>
-        </div>
-
+      <main style={{ minHeight: "100vh", padding: "58px 20px 48px", fontFamily }}>
         <div className="board-grid" style={{ maxWidth: 1440, margin: "0 auto" }}>
           {/* ── Column 1: 育てている植物 (2/3幅) ── */}
           <div className="col-plants">

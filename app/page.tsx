@@ -3,6 +3,7 @@ import { getAuthedHouseholdId, createSupabaseServerClient } from "../src/lib/sup
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { BackgroundLayer } from "./BackgroundLayer";
+import { AppHeader } from "./AppHeader";
 import { PlantColumn } from "./PlantColumn";
 import { fetchHouseholdData, todayStringJst, getPlantLabel } from "@/lib/fetchHouseholdData";
 import { ShareLinkCard } from "./ShareLinkCard";
@@ -379,13 +380,26 @@ async function regenerateJoinCode(): Promise<string | null> {
   return null;
 }
 
-// ── Logout action ─────────────────────────────────────────────────────────────
+// ── Auth actions ──────────────────────────────────────────────────────────────
 
 async function signOut() {
   "use server";
   const supabase = await createSupabaseServerClient();
   await supabase.auth.signOut();
   redirect("/");
+}
+
+async function updateHouseholdName(name: string): Promise<void> {
+  "use server";
+  const trimmed = name.trim();
+  if (!trimmed) return;
+  const householdId = await getAuthedHouseholdId();
+  if (!householdId) return;
+  await supabase
+    .from("households")
+    .update({ name: trimmed })
+    .eq("id", householdId);
+  revalidatePath("/");
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -720,23 +734,14 @@ export default async function Home({
 
       `}</style>
 
-      <BackgroundLayer />
+      <AppHeader
+        mode="owner"
+        householdName={householdName}
+        updateNameAction={updateHouseholdName}
+        signOutAction={signOut}
+      />
 
-      <main style={{ minHeight: "100vh", padding: "14px 20px 48px", fontFamily }}>
-        <div style={{ maxWidth: 1440, margin: "0 auto 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span style={{ fontSize: 15, fontWeight: 800, color: "#1a3320", letterSpacing: -0.2 }}>
-            {householdName}
-          </span>
-          <form action={signOut} style={{ display: "inline" }}>
-            <button
-              type="submit"
-              style={{ fontSize: 11, color: "#9ca3af", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", padding: 0 }}
-            >
-              ログアウト
-            </button>
-          </form>
-        </div>
-
+      <main style={{ minHeight: "100vh", padding: "58px 20px 48px", fontFamily }}>
         <div className="board-grid" style={{ maxWidth: 1440, margin: "0 auto" }}>
           {/* ── Column 1: 育てている植物 (2/3幅) ── */}
           <div className="col-plants">
