@@ -83,7 +83,7 @@ export function AppHeader(props: Props) {
           transition: background 0.15s ease;
         }
         .garden-title-btn:hover:not(:disabled) {
-          background: rgba(0, 0, 0, 0.07) !important;
+          background: rgba(255, 255, 255, 0.15) !important;
         }
       `}</style>
 
@@ -110,49 +110,65 @@ export function AppHeader(props: Props) {
         }
       />
 
-      {/* Header bar — solid, normal document flow */}
-      <header
-        style={{
-          height: 52,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0 20px",
-          background: "#fdfaf4",
-          borderBottom: "1px solid rgba(200, 190, 170, 0.30)",
-          boxShadow: "0 1px 3px rgba(60, 50, 30, 0.07)",
-          fontFamily: ff,
-        }}
-      >
-        {/* Left: garden name + status (two-line) */}
-        <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 2 }}>
-          {props.mode === "owner" ? (
-            <GardenTitleEditor
-              name={props.householdName}
-              updateAction={props.updateNameAction}
-            />
-          ) : (
-            <span
-              style={{
-                fontSize: 17,
-                fontWeight: 800,
-                color: "#1a3320",
-                letterSpacing: -0.3,
-                lineHeight: 1.2,
-              }}
-            >
-              {props.householdName}
-            </span>
-          )}
-          <span style={{ fontSize: 10, color: "#6b7280", lineHeight: 1, letterSpacing: 0 }}>
-            {props.mode === "owner"
-              ? "オーナーとして管理中"
-              : "わが家の植物ページ · 共有リンクで表示中"}
+      {/* ── Hero — directly over bg photo ── */}
+      <div style={{ padding: "40px 20px 20px", fontFamily: ff }}>
+        {props.mode === "owner" ? (
+          <GardenTitleEditor
+            name={props.householdName}
+            updateAction={props.updateNameAction}
+          />
+        ) : (
+          <span
+            style={{
+              display: "block",
+              fontSize: 52,
+              fontWeight: 800,
+              color: "#ffffff",
+              letterSpacing: -1.5,
+              lineHeight: 1.0,
+              textShadow: "0 2px 12px rgba(0,0,0,0.55), 0 0 32px rgba(0,0,0,0.25)",
+            }}
+          >
+            {props.householdName}
           </span>
-        </div>
+        )}
 
-        {/* Right: owner controls — all same height via inline-flex */}
-        {props.mode === "owner" && (
+        <p
+          style={{
+            fontSize: 11,
+            fontWeight: 500,
+            color: "rgba(255,255,255,0.82)",
+            margin: "6px 0 0",
+            letterSpacing: 2.5,
+            textTransform: "uppercase",
+            textShadow: "0 1px 6px rgba(0,0,0,0.45)",
+            lineHeight: 1,
+          }}
+        >
+          {props.mode === "owner"
+            ? "Home Plant Journal"
+            : "わが家の植物ページ · 共有リンクで表示中"}
+        </p>
+      </div>
+
+      {/* ── Control bar — owner only ── */}
+      {props.mode === "owner" && (
+        <div
+          style={{
+            height: 36,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "0 20px",
+            background: "rgba(253, 250, 244, 0.92)",
+            borderBottom: "1px solid rgba(200, 190, 170, 0.25)",
+            fontFamily: ff,
+          }}
+        >
+          <span style={{ fontSize: 10, color: "#9ca3af", letterSpacing: 0.3 }}>
+            オーナーとして管理中
+          </span>
+
           <div
             className="app-header-actions"
             style={{ display: "flex", alignItems: "center", gap: 2 }}
@@ -199,13 +215,12 @@ export function AppHeader(props: Props) {
               </button>
             </form>
           </div>
-        )}
-      </header>
+        </div>
+      )}
     </>
   );
 }
 
-// Shared style for all right-side control buttons
 const ctrlBtn: React.CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
@@ -274,19 +289,22 @@ function GardenTitleEditor({
         onBlur={save}
         onKeyDown={handleKeyDown}
         style={{
-          fontSize: 17,
+          display: "block",
+          fontSize: 52,
           fontWeight: 800,
-          color: "#1a3320",
-          background: "rgba(255, 255, 255, 0.90)",
-          border: "1.5px solid rgba(163, 196, 160, 0.9)",
-          borderRadius: 6,
-          padding: "1px 8px",
+          color: "#ffffff",
+          background: "rgba(255, 255, 255, 0.15)",
+          border: "1.5px solid rgba(255, 255, 255, 0.60)",
+          borderRadius: 8,
+          padding: "0 10px",
           outline: "none",
-          width: 220,
-          letterSpacing: -0.3,
-          lineHeight: 1.2,
+          width: 400,
+          maxWidth: "100%",
+          letterSpacing: -1.5,
+          lineHeight: 1.15,
           fontFamily: ff,
           boxSizing: "border-box",
+          textShadow: "0 2px 12px rgba(0,0,0,0.55)",
         }}
       />
     );
@@ -302,18 +320,19 @@ function GardenTitleEditor({
       style={{
         display: "inline-flex",
         alignItems: "center",
-        fontSize: 17,
+        fontSize: 52,
         fontWeight: 800,
-        color: "#1a3320",
+        color: "#ffffff",
         background: "transparent",
         border: "none",
         cursor: "pointer",
-        padding: "1px 6px",
-        borderRadius: 6,
-        letterSpacing: -0.3,
-        lineHeight: 1.2,
+        padding: "0 6px",
+        borderRadius: 8,
+        letterSpacing: -1.5,
+        lineHeight: 1.0,
         fontFamily: ff,
-        opacity: isPending ? 0.6 : 1,
+        opacity: isPending ? 0.7 : 1,
+        textShadow: "0 2px 12px rgba(0,0,0,0.55), 0 0 32px rgba(0,0,0,0.25)",
       }}
     >
       {name}
