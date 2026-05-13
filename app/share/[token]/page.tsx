@@ -323,9 +323,9 @@ export default async function SharePage({
       <BackgroundLayer />
 
       <main style={{ minHeight: "100vh", padding: "14px 20px 48px", fontFamily }}>
-        <div style={{ maxWidth: 1440, margin: "0 auto 14px" }}>
+        <div style={{ maxWidth: 1440, margin: "0 auto 14px", paddingRight: 200 }}>
           <span style={{ fontSize: 12, color: "#8a9a8a", fontWeight: 500, letterSpacing: 0.2 }}>
-            Plant Care — 共有ビュー
+            Keep every balcony plant healthy.
           </span>
         </div>
 
@@ -412,6 +412,7 @@ export default async function SharePage({
 
                 let line1 = "";
                 let line2 = "";
+                let line3 = "";
                 let isFertilizerBatch = false;
                 const targetPlants = (() => {
                   if (fertilizerCount >= 2) {
@@ -444,6 +445,7 @@ export default async function SharePage({
                       <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.8 }}>
                         <p style={{ margin: "0 0 4px", fontWeight: 700, color: "#2d4a3e" }}>{line1}</p>
                         <p style={{ margin: "0 0 4px" }}>{line2}</p>
+                        {line3 && <p style={{ margin: "0 0 8px", color: "#6b7280" }}>{line3}</p>}
                         {shownPlants.length > 0 && (
                           <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #f0ebe2", fontSize: 11, color: "#6b7280", lineHeight: 1.7 }}>
                             <span style={{ fontWeight: 600, color: "#4b7a5a" }}>{isFertilizerBatch ? "見てみるなら：" : "今日見る植物："}</span>
@@ -480,6 +482,9 @@ export default async function SharePage({
                         ) : (
                           <>液体肥料のタイミングが<b>{summaryStats.fertilizerCount}件</b>あります。</>
                         )}
+                        {(summaryStats.waterCount + summaryStats.fertilizerCount) >= 5 && (
+                          <><br /><span style={{ color: "#6b7280" }}>対象が多めなので、まずはよく育っている植物や最近元気のない植物から確認しましょう。</span></>
+                        )}
                       </div>
                     </div>
                   )}
@@ -491,6 +496,7 @@ export default async function SharePage({
                       </p>
                       <div style={{ background: "#f0f9ff", borderRadius: 8, padding: "8px 10px", fontSize: 12, color: "#374151", lineHeight: 1.75 }}>
                         <b>{summaryStats.observationCount}件</b>は通常の観察対象です。
+                        <br /><span style={{ color: "#6b7280" }}>葉色・虫食い・土の乾き具合を軽く見ておくと安心です。</span>
                       </div>
                     </div>
                   )}
@@ -502,8 +508,16 @@ export default async function SharePage({
                       </p>
                       <div style={{ background: "#faf5ff", borderRadius: 8, padding: "8px 10px", fontSize: 12, color: "#374151", lineHeight: 1.75 }}>
                         <b>{summaryStats.photoCount}件</b>の植物がしばらく写真のない状態です。
+                        <br /><span style={{ color: "#6b7280" }}>余力があれば、お世話のついでに1枚記録しておくと変化に気づきやすいです。</span>
                       </div>
                     </div>
+                  )}
+
+                  {summaryStats.waterCount === 0 && summaryStats.fertilizerCount === 0 &&
+                   summaryStats.observationCount === 0 && summaryStats.photoCount === 0 && (
+                    <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 10px", lineHeight: 1.75 }}>
+                      今日は大きな作業は不要です。ゆっくり様子を見てあげてください。
+                    </p>
                   )}
 
                   <p style={{ margin: 0, fontSize: 11, color: "#9ca3af", lineHeight: 1.5 }}>
