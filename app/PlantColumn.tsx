@@ -883,6 +883,99 @@ export function PlantColumn({
           color: #b91c1c;
           margin-top: 3px;
         }
+        /* ─── Plants grid ─── */
+        .plants-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+          gap: 8px;
+          margin-bottom: 12px;
+        }
+        @media (max-width: 480px) {
+          .plants-grid { grid-template-columns: 1fr; }
+        }
+        /* ─── Generic white cards ─── */
+        .todo-card,
+        .form-card {
+          background: #ffffff;
+          border-radius: 10px;
+          padding: 14px;
+          margin-bottom: 8px;
+          box-shadow: 0 1px 3px rgba(60, 50, 30, 0.07);
+        }
+        /* ─── Badges ─── */
+        .badge-alert {
+          display: inline-block;
+          padding: 2px 7px;
+          border-radius: 4px;
+          font-size: 10px;
+          font-weight: 700;
+          background: #fef3c7;
+          color: #92400e;
+        }
+        .badge-ok {
+          display: inline-block;
+          padding: 2px 7px;
+          border-radius: 4px;
+          font-size: 10px;
+          font-weight: 700;
+          background: #dcf5e4;
+          color: #1a5c36;
+        }
+        /* ─── Form fields ─── */
+        .form-label {
+          display: block;
+          font-size: 11px;
+          font-weight: 600;
+          color: #7a8a7a;
+          margin-bottom: 5px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        .form-input {
+          width: 100%;
+          padding: 8px 10px;
+          border-radius: 8px;
+          border: 1px solid #ddd8cf;
+          background: #fdfcfa;
+          font-size: 13px;
+          box-sizing: border-box;
+          font-family: inherit;
+          color: #374151;
+        }
+        .form-input:focus {
+          outline: none;
+          border-color: #6db07b;
+          box-shadow: 0 0 0 2px rgba(109, 176, 123, 0.18);
+        }
+        .form-textarea {
+          width: 100%;
+          padding: 8px 10px;
+          border-radius: 8px;
+          border: 1px solid #ddd8cf;
+          background: #fdfcfa;
+          font-size: 13px;
+          box-sizing: border-box;
+          font-family: inherit;
+          color: #374151;
+          resize: vertical;
+          min-height: 60px;
+          line-height: 1.5;
+        }
+        .form-textarea:focus {
+          outline: none;
+          border-color: #6db07b;
+          box-shadow: 0 0 0 2px rgba(109, 176, 123, 0.18);
+        }
+        /* ─── Primary button ─── */
+        .btn-primary {
+          border: none;
+          border-radius: 8px;
+          cursor: pointer;
+          font-weight: 700;
+          font-family: inherit;
+          background: #06c755;
+          color: #ffffff;
+        }
       `}</style>
 
       {openMenuId !== null && (
