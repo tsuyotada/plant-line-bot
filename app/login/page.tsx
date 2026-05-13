@@ -42,24 +42,8 @@ const FEATURES = [
   },
 ];
 
-const PREVIEW_PLANTS = [
-  {
-    bg: "linear-gradient(135deg, #c8e6d0 0%, #a8d4b0 100%)",
-    emoji: "🌼",
-    name: "カレンジュラ",
-    badge: "水やり",
-    badgeColor: "#1e40af",
-    badgeBg: "#dbeafe",
-  },
-  {
-    bg: "linear-gradient(135deg, #d0e8c8 0%, #b4d4a0 100%)",
-    emoji: "🌿",
-    name: "ミント",
-    badge: "見守り",
-    badgeColor: "#1a5c36",
-    badgeBg: "#dcf5e4",
-  },
-];
+const SAMPLE_URL =
+  "https://plant-line-bot-forme.vercel.app/share/8f24ee1b-d5d1-47a3-be24-4a4ae1809ef0";
 
 export default async function LoginPage({
   searchParams,
@@ -73,36 +57,48 @@ export default async function LoginPage({
       <style>{`
         .login-grid {
           display: grid;
-          grid-template-columns: 1fr 1fr;
+          grid-template-columns: 5fr 7fr;
           gap: 28px;
           align-items: start;
           max-width: 960px;
           margin: 0 auto;
         }
         @media (max-width: 768px) {
-          .login-grid {
-            grid-template-columns: 1fr;
-          }
+          .login-grid { grid-template-columns: 1fr; }
           .login-intro-col { order: 2; }
           .login-form-col  { order: 1; }
         }
-        .login-card {
-          background: rgba(253, 250, 244, 0.97);
+        .login-card-intro {
+          background: rgba(253, 250, 244, 0.92);
           border-radius: 16px;
-          padding: 28px 28px 24px;
-          box-shadow: 0 2px 20px rgba(60, 50, 30, 0.10);
+          padding: 24px 24px 20px;
+          box-shadow: 0 2px 12px rgba(60, 50, 30, 0.07);
+          border: 1px solid rgba(255, 255, 255, 0.90);
+        }
+        .login-card-form {
+          background: #ffffff;
+          border-radius: 16px;
+          padding: 36px 32px 28px;
+          box-shadow: 0 4px 32px rgba(60, 50, 30, 0.16);
           border: 1px solid rgba(255, 255, 255, 0.95);
         }
         .feature-item {
           display: flex;
           gap: 10px;
           align-items: flex-start;
-          margin-bottom: 13px;
+          margin-bottom: 10px;
         }
         .feature-item:last-child { margin-bottom: 0; }
+        .sample-link-block {
+          margin-top: 18px;
+          background: #f0fdf4;
+          border: 1px solid #c8e6cc;
+          border-radius: 10px;
+          padding: 12px 14px;
+        }
         .login-input {
           width: 100%;
-          padding: 11px 13px;
+          padding: 13px 14px;
           border: 1.5px solid #d1e8d8;
           border-radius: 10px;
           font-size: 15px;
@@ -119,58 +115,18 @@ export default async function LoginPage({
         }
         .login-btn {
           width: 100%;
-          padding: 12px;
+          padding: 14px;
           background: #4b7a5a;
           color: #fff;
           border: none;
           border-radius: 10px;
-          font-size: 15px;
+          font-size: 16px;
           font-weight: 600;
           cursor: pointer;
           font-family: inherit;
           transition: background 0.15s;
         }
         .login-btn:hover { background: #3d6649; }
-        .preview-card {
-          background: rgba(253, 250, 244, 0.97);
-          border-radius: 12px;
-          overflow: hidden;
-          box-shadow: 0 2px 10px rgba(60, 50, 30, 0.08);
-          border: 1px solid rgba(200, 190, 170, 0.30);
-          margin-top: 20px;
-          font-size: 11px;
-          font-family: inherit;
-        }
-        .preview-header {
-          background: #fdfaf4;
-          border-bottom: 1px solid rgba(200, 190, 170, 0.25);
-          padding: 8px 13px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-        }
-        .preview-body { padding: 11px 13px; }
-        .preview-plant-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 7px;
-          margin-bottom: 10px;
-        }
-        .preview-plant-card {
-          background: #fff;
-          border-radius: 7px;
-          overflow: hidden;
-          box-shadow: 0 1px 2px rgba(60, 50, 30, 0.07);
-        }
-        .preview-plant-photo {
-          width: 100%;
-          aspect-ratio: 5/2;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 18px;
-        }
-        .preview-plant-info { padding: 5px 7px 6px; }
       `}</style>
 
       <BackgroundLayer />
@@ -180,17 +136,17 @@ export default async function LoginPage({
 
           {/* ── Left: service intro ── */}
           <div className="login-intro-col">
-            <div className="login-card">
+            <div className="login-card-intro">
 
               {/* Hero */}
-              <div style={{ marginBottom: 22 }}>
-                <h1 style={{ fontSize: 26, fontWeight: 800, color: "#1a3320", margin: "0 0 4px", letterSpacing: -0.5, lineHeight: 1.2 }}>
+              <div style={{ marginBottom: 18 }}>
+                <h1 style={{ fontSize: 22, fontWeight: 800, color: "#1a3320", margin: "0 0 4px", letterSpacing: -0.4, lineHeight: 1.2 }}>
                   Plant Care
                 </h1>
-                <p style={{ fontSize: 13, color: "#4b7a5a", fontWeight: 500, margin: "0 0 14px", letterSpacing: 0.3 }}>
+                <p style={{ fontSize: 12, color: "#4b7a5a", fontWeight: 500, margin: "0 0 12px", letterSpacing: 0.3 }}>
                   Keep every green healthy.
                 </p>
-                <p style={{ fontSize: 13, color: "#4b5563", lineHeight: 1.8, margin: 0 }}>
+                <p style={{ fontSize: 12, color: "#4b5563", lineHeight: 1.8, margin: 0 }}>
                   わが家の植物を、写真とメモで見守る。
                   <br />
                   家族と共有して、LINEでも今日の植物メモを受け取れます。
@@ -198,15 +154,15 @@ export default async function LoginPage({
               </div>
 
               {/* Features */}
-              <div style={{ marginBottom: 4 }}>
+              <div>
                 {FEATURES.map(({ icon, title, desc }) => (
                   <div key={title} className="feature-item">
-                    <span style={{ fontSize: 15, lineHeight: 1.5, flexShrink: 0, marginTop: 1 }}>{icon}</span>
+                    <span style={{ fontSize: 14, lineHeight: 1.5, flexShrink: 0, marginTop: 1 }}>{icon}</span>
                     <div>
                       <div style={{ fontSize: 12, fontWeight: 700, color: "#2d4a3e", marginBottom: 1, lineHeight: 1.4 }}>
                         {title}
                       </div>
-                      <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.65 }}>
+                      <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.6 }}>
                         {desc}
                       </div>
                     </div>
@@ -214,61 +170,43 @@ export default async function LoginPage({
                 ))}
               </div>
 
-              {/* Mini preview */}
-              <div className="preview-card">
-                <div className="preview-header">
-                  <span style={{ fontWeight: 800, fontSize: 12, color: "#1a3320", letterSpacing: -0.2 }}>
-                    My Garden
-                  </span>
-                  <span style={{ fontSize: 10, color: "#6b7280" }}>オーナーとして管理中</span>
+              {/* Sample link */}
+              <div className="sample-link-block">
+                <div style={{ fontSize: 11, color: "#4b7a5a", fontWeight: 600, marginBottom: 4 }}>
+                  共有ページの見え方を試す
                 </div>
-                <div className="preview-body">
-                  <div className="preview-plant-grid">
-                    {PREVIEW_PLANTS.map(({ bg, emoji, name, badge, badgeColor, badgeBg }) => (
-                      <div key={name} className="preview-plant-card">
-                        <div className="preview-plant-photo" style={{ background: bg }}>
-                          <span>{emoji}</span>
-                        </div>
-                        <div className="preview-plant-info">
-                          <div style={{ fontWeight: 700, color: "#2d4a3e", marginBottom: 3, fontSize: 11 }}>{name}</div>
-                          <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 3, fontWeight: 700, background: badgeBg, color: badgeColor }}>
-                            {badge}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Today's pick */}
-                  <div style={{ background: "#fff", borderRadius: 7, padding: "8px 10px", marginBottom: 8, boxShadow: "0 1px 2px rgba(60,50,30,0.06)" }}>
-                    <div style={{ fontSize: 9, fontWeight: 700, color: "#4b7a5a", marginBottom: 3, textTransform: "uppercase", letterSpacing: 0.5 }}>
-                      Today's pick
-                    </div>
-                    <div style={{ fontWeight: 700, color: "#2d4a3e", marginBottom: 2, fontSize: 11 }}>カレンジュラ</div>
-                    <div style={{ color: "#374151", lineHeight: 1.55, fontSize: 11 }}>
-                      水やりのタイミングです。土の表面が乾いたら、たっぷりと。
-                    </div>
-                  </div>
-
-                  {/* Footer badges */}
-                  <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 10, color: "#6b7280", background: "#f3f4f6", borderRadius: 5, padding: "2px 7px" }}>
-                      🔗 家族に共有済み
-                    </span>
-                    <span style={{ fontSize: 10, color: "#6b7280", background: "#f3f4f6", borderRadius: 5, padding: "2px 7px" }}>
-                      💬 LINE通知 ON
-                    </span>
-                  </div>
+                <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.6, marginBottom: 8 }}>
+                  実際の家族向けページがどう見えるか確認できます。
                 </div>
+                <a
+                  href={SAMPLE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#2d6a3f",
+                    textDecoration: "none",
+                    borderBottom: "1px solid #93c9a0",
+                    paddingBottom: 1,
+                    lineHeight: 1.4,
+                  }}
+                >
+                  サンプルの植物ページを開く
+                  <span style={{ fontSize: 10 }}>↗</span>
+                </a>
               </div>
 
             </div>
           </div>
 
-          {/* ── Right: login form ── */}
+          {/* ── Right: login form (主役) ── */}
           <div className="login-form-col">
-            <div className="login-card">
-              <h2 style={{ fontSize: 18, fontWeight: 800, color: "#1a3320", margin: "0 0 6px", letterSpacing: -0.2 }}>
+            <div className="login-card-form">
+              <h2 style={{ fontSize: 21, fontWeight: 800, color: "#1a3320", margin: "0 0 6px", letterSpacing: -0.3 }}>
                 メールでガーデンを開く
               </h2>
 
@@ -284,8 +222,8 @@ export default async function LoginPage({
                   </p>
                 </div>
               ) : (
-                <form action={sendMagicLink} style={{ marginTop: 16 }}>
-                  <p style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.75, margin: "0 0 16px" }}>
+                <form action={sendMagicLink} style={{ marginTop: 18 }}>
+                  <p style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.75, margin: "0 0 18px" }}>
                     パスワードは不要です。
                     <br />
                     届いたリンクを開くと、あなたのガーデンに入れます。
@@ -303,7 +241,7 @@ export default async function LoginPage({
                 </form>
               )}
 
-              <div style={{ marginTop: 22, paddingTop: 16, borderTop: "1px solid #f0ebe2" }}>
+              <div style={{ marginTop: 24, paddingTop: 18, borderTop: "1px solid #f0ebe2" }}>
                 <p style={{ fontSize: 11, color: "#9ca3af", margin: 0, lineHeight: 1.7 }}>
                   共有リンクを受け取った方は、ログイン不要です。
                   <br />
