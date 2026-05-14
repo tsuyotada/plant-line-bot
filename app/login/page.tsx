@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
 import { createSupabaseServerClient } from "@/src/lib/supabase-ssr";
 import { BackgroundLayer } from "@/app/BackgroundLayer";
+import { LineSignInButton } from "./LineSignInButton";
 import { GoogleSignInButton } from "./GoogleSignInButton";
 
 async function sendMagicLink(formData: FormData) {
@@ -31,20 +31,21 @@ const FEATURES = [
 const SAMPLE_URL =
   "https://plant-line-bot-forme.vercel.app/share/8f24ee1b-d5d1-47a3-be24-4a4ae1809ef0";
 
+const LINE_ERROR_MESSAGES: Record<string, string> = {
+  line_cancelled: "LINEログインがキャンセルされました。",
+  line_state_mismatch: "セキュリティエラーが発生しました。もう一度お試しください。",
+  line_token_failed: "LINEとの認証に失敗しました。もう一度お試しください。",
+  line_profile_failed: "LINEプロフィールの取得に失敗しました。",
+  line_signin_failed: "ログイン処理に失敗しました。もう一度お試しください。",
+};
+
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sent?: string }>;
+  searchParams: Promise<{ sent?: string; error?: string }>;
 }) {
-  // Block LINE's in-app browser before rendering any login form.
-  // Both Google OAuth and Magic Link fail inside LINE WebView, so redirect
-  // users to a relay page that instructs them to open in an external browser.
-  const ua = (await headers()).get("user-agent") ?? "";
-  if (/Line\/[\d.]+/i.test(ua)) {
-    redirect("/open-in-browser?next=/login");
-  }
-
   const params = await searchParams;
+  const lineError = params.error ? (LINE_ERROR_MESSAGES[params.error] ?? "ログインでエラーが発生しました。") : null;
 
   return (
     <>
@@ -94,6 +95,14 @@ export default async function LoginPage({
           border-radius: 10px;
           padding: 12px 14px;
         }
+        .login-divider {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin: 4px 0 14px;
+        }
+        .login-divider-line { flex: 1; height: 1px; background: #e5e7eb; }
+        .login-divider-label { font-size: 11px; color: #9ca3af; white-space: nowrap; }
         .login-input {
           width: 100%;
           padding: 13px 14px;
@@ -131,14 +140,8 @@ export default async function LoginPage({
 
       <main style={{ minHeight: "100vh", padding: "0 20px 60px", fontFamily: ff }}>
 
-        {/* ── Hero — outside any card, directly over bg photo ── */}
-        <div
-          style={{
-            maxWidth: 960,
-            margin: "0 auto",
-            padding: "52px 0 36px",
-          }}
-        >
+        {/* ── Hero ── */}
+        <div style={{ maxWidth: 960, margin: "0 auto", padding: "52px 0 36px" }}>
           <h1
             style={{
               fontSize: 72,
@@ -173,13 +176,11 @@ export default async function LoginPage({
           {/* ── Left: service intro ── */}
           <div className="login-intro-col">
             <div className="login-card-intro">
-
               <p style={{ fontSize: 12, color: "#4b5563", lineHeight: 1.85, margin: "0 0 16px" }}>
                 わが家の植物を、写真とメモで見守る。
                 <br />
                 家族と共有して、LINEでも今日の植物メモを受け取れます。
               </p>
-
               <div>
                 {FEATURES.map(({ icon, title, desc }) => (
                   <div key={title} className="feature-item">
@@ -195,7 +196,6 @@ export default async function LoginPage({
                   </div>
                 ))}
               </div>
-
               <div className="sample-link-block">
                 <div style={{ fontSize: 11, color: "#4b7a5a", fontWeight: 600, marginBottom: 4 }}>
                   共有ページの見え方を試す
@@ -224,16 +224,22 @@ export default async function LoginPage({
                   <span style={{ fontSize: 10 }}>↗</span>
                 </a>
               </div>
-
             </div>
           </div>
 
-          {/* ── Right: login form (主役) ── */}
+          {/* ── Right: login form ── */}
           <div className="login-form-col">
             <div className="login-card-form">
               <h2 style={{ fontSize: 21, fontWeight: 800, color: "#1a3320", margin: "0 0 6px", letterSpacing: -0.3 }}>
                 ガーデンを開く
               </h2>
+
+              {/* LINE login error */}
+              {lineError && (
+                <p style={{ fontSize: 13, color: "#dc2626", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "10px 12px", margin: "8px 0 0" }}>
+                  {lineError}
+                </p>
+              )}
 
               {params.sent ? (
                 <div style={{ paddingTop: 10 }}>
@@ -248,17 +254,28 @@ export default async function LoginPage({
                 </div>
               ) : (
                 <div style={{ marginTop: 18 }}>
-                  {/* Google — primary CTA */}
+
+                  {/* ── 1st: LINE Login (primary) ── */}
+                  <LineSignInButton />
+
+                  {/* Divider */}
+                  <div className="login-divider">
+                    <div className="login-divider-line" />
+                    <span className="login-divider-label">または</span>
+                    <div className="login-divider-line" />
+                  </div>
+
+                  {/* ── 2nd: Google (secondary) ── */}
                   <GoogleSignInButton />
 
                   {/* Divider */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "4px 0 16px" }}>
-                    <div style={{ flex: 1, height: 1, background: "#e5e7eb" }} />
-                    <span style={{ fontSize: 11, color: "#9ca3af", whiteSpace: "nowrap" }}>またはメールで続ける</span>
-                    <div style={{ flex: 1, height: 1, background: "#e5e7eb" }} />
+                  <div className="login-divider">
+                    <div className="login-divider-line" />
+                    <span className="login-divider-label">またはメールで続ける</span>
+                    <div className="login-divider-line" />
                   </div>
 
-                  {/* Magic Link — secondary */}
+                  {/* ── 3rd: Magic Link (tertiary) ── */}
                   <form action={sendMagicLink}>
                     <input
                       type="email"
