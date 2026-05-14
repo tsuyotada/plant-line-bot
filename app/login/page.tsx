@@ -105,6 +105,32 @@ export default async function LoginPage({
         }
         .login-divider-line { flex: 1; height: 1px; background: #e5e7eb; }
         .login-divider-label { font-size: 11px; color: #9ca3af; white-space: nowrap; }
+        /* ── Dev/admin accordion ── */
+        .admin-login-details {
+          margin-top: 14px;
+          padding-top: 14px;
+          border-top: 1px solid #f0ebe2;
+        }
+        .admin-login-details > summary {
+          cursor: pointer;
+          font-size: 11px;
+          color: #9ca3af;
+          user-select: none;
+          list-style: none;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          padding: 2px 0;
+          width: fit-content;
+        }
+        .admin-login-details > summary::-webkit-details-marker { display: none; }
+        .admin-login-details > summary::marker { display: none; }
+        .admin-login-details[open] > summary {
+          margin-bottom: 16px;
+          color: #6b7280;
+        }
+        .admin-login-chevron { font-size: 9px; transition: transform 0.15s; }
+        .admin-login-details[open] .admin-login-chevron { transform: rotate(180deg); }
         .login-input {
           width: 100%;
           padding: 13px 14px;
@@ -257,42 +283,43 @@ export default async function LoginPage({
               ) : (
                 <div style={{ marginTop: 18 }}>
 
-                  {/* ── 1st: LINE Login (primary) ── */}
+                  {/* ── Primary: LINE Login ── */}
                   <LineSignInButton />
 
-                  {/* Divider */}
-                  <div className="login-divider">
-                    <div className="login-divider-line" />
-                    <span className="login-divider-label">または</span>
-                    <div className="login-divider-line" />
-                  </div>
+                  {/* ── Dev / Admin accordion (Google + Magic Link) ── */}
+                  <details className="admin-login-details">
+                    <summary>
+                      管理者・開発者向けログイン
+                      <span className="admin-login-chevron">▾</span>
+                    </summary>
 
-                  {/* ── 2nd: Google (secondary) ── */}
-                  <GoogleSignInButton />
+                    {/* Google */}
+                    <GoogleSignInButton />
 
-                  {/* Divider */}
-                  <div className="login-divider">
-                    <div className="login-divider-line" />
-                    <span className="login-divider-label">またはメールで続ける</span>
-                    <div className="login-divider-line" />
-                  </div>
+                    {/* Divider */}
+                    <div className="login-divider">
+                      <div className="login-divider-line" />
+                      <span className="login-divider-label">またはメールで続ける</span>
+                      <div className="login-divider-line" />
+                    </div>
 
-                  {/* ── 3rd: Magic Link (tertiary) ── */}
-                  <form action={sendMagicLink}>
-                    <input
-                      type="email"
-                      name="email"
-                      placeholder="メールアドレス"
-                      required
-                      className="login-input"
-                    />
-                    <button type="submit" className="login-btn">
-                      リンクを送る
-                    </button>
-                  </form>
-                  <p style={{ fontSize: 12, color: "#9ca3af", lineHeight: 1.65, margin: "10px 0 0" }}>
-                    パスワード不要。届いたリンクを開くとガーデンに入れます。
-                  </p>
+                    {/* Magic Link */}
+                    <form action={sendMagicLink}>
+                      <input
+                        type="email"
+                        name="email"
+                        placeholder="メールアドレス"
+                        required
+                        className="login-input"
+                      />
+                      <button type="submit" className="login-btn">
+                        リンクを送る
+                      </button>
+                    </form>
+                    <p style={{ fontSize: 12, color: "#9ca3af", lineHeight: 1.65, margin: "10px 0 0" }}>
+                      パスワード不要。届いたリンクを開くとガーデンに入れます。
+                    </p>
+                  </details>
                 </div>
               )}
 
