@@ -154,10 +154,27 @@ export async function fetchHouseholdData(householdId: string): Promise<Household
     if (withPhoto.length === 0) return null;
     const priorityPool = withPhoto.filter((c) => c.priority === "urgent" || c.priority === "attention");
     const pool = priorityPool.length > 0 ? priorityPool : withPhoto;
-    const seed = today + ":spotlight";
-    let h = 0;
-    for (const ch of seed) h = (Math.imul(31, h) + ch.charCodeAt(0)) | 0;
-    return pool[Math.abs(h) % pool.length];
+
+    // Candidates of 1: no way to avoid repeat
+    if (pool.length === 1) return pool[0];
+
+    const hashSeed = (seed: string): number => {
+      let h = 0;
+      for (const ch of seed) h = (Math.imul(31, h) + ch.charCodeAt(0)) | 0;
+      return Math.abs(h);
+    };
+    const yesterdayJst = (dateStr: string): string => {
+      const d = new Date(dateStr);
+      d.setDate(d.getDate() - 1);
+      return d.toISOString().slice(0, 10);
+    };
+
+    const todayIdx = hashSeed(today + householdId + ":spotlight") % pool.length;
+    const yestIdx  = hashSeed(yesterdayJst(today) + householdId + ":spotlight") % pool.length;
+
+    // Shift by 1 when today would repeat yesterday's pick
+    const idx = todayIdx === yestIdx ? (todayIdx + 1) % pool.length : todayIdx;
+    return pool[idx];
   })();
 
   const spotlightTrivia = spotlightCard
