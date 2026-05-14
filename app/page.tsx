@@ -607,12 +607,13 @@ export default async function Home({
         }
 
         /* ─── Grid span helpers ─── */
-        .col-plants { grid-column: span 1; }
+        .col-plants { grid-column: span 1; min-width: 0; }
         .col-right {
           grid-column: span 1;
           display: flex;
           flex-direction: column;
           gap: 18px;
+          min-width: 0;
         }
 
         /* ─── Today's pick image — contained on all sizes ─── */
@@ -631,11 +632,13 @@ export default async function Home({
           display: flex;
           flex-direction: column;
           gap: 18px;
+          min-width: 0;
         }
         .sidebar-section {
           display: flex;
           flex-direction: column;
           gap: 18px;
+          min-width: 0;
         }
         @media (max-width: 767px) {
           .col-right { display: contents; }
@@ -653,6 +656,12 @@ export default async function Home({
           border-radius: 14px;
           padding: 18px;
           box-shadow: 0 2px 16px rgba(60, 50, 30, 0.10);
+          overflow: hidden;
+          min-width: 0;
+          box-sizing: border-box;
+        }
+        @media (max-width: 767px) {
+          .col-board { padding: 14px; }
         }
 
         /* ─── Column heading (Trello board label style) ─── */
@@ -700,7 +709,7 @@ export default async function Home({
         lineLinked={!!user.user_metadata?.line_user_id}
       />
 
-      <main style={{ minHeight: "100vh", padding: "14px 20px 48px", fontFamily }}>
+      <main style={{ minHeight: "100vh", padding: "14px 20px 48px", fontFamily, overflowX: "hidden" }}>
         <div className="board-grid" style={{ maxWidth: 1440, margin: "0 auto" }}>
           {/* ── Column 1: 育てている植物 (2/3幅) ── */}
           <div className="col-plants">

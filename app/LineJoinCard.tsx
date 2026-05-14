@@ -105,14 +105,17 @@ export function LineJoinCard({
                 target="_blank"
                 rel="noreferrer"
                 style={{
-                  display: "inline-block",
-                  padding: "7px 16px",
+                  display: "block",
+                  width: "100%",
+                  boxSizing: "border-box",
+                  padding: "8px 12px",
                   background: "#06c755",
                   color: "#fff",
                   textDecoration: "none",
                   borderRadius: 8,
                   fontSize: 12,
                   fontWeight: 700,
+                  textAlign: "center",
                 }}
               >
                 Plant Care Bot を友だち追加する
@@ -137,6 +140,7 @@ export function LineJoinCard({
                 background: "#f0fdf4",
                 borderRadius: 8,
                 padding: "8px 10px",
+                minWidth: 0,
               }}
             >
               <span

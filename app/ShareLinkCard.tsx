@@ -120,6 +120,7 @@ export function ShareLinkCard({
               borderRadius: 8,
               padding: "8px 10px",
               marginBottom: 10,
+              minWidth: 0,
             }}
           >
             <span

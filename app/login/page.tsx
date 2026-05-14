@@ -286,6 +286,26 @@ export default async function LoginPage({
                   {/* ── Primary: LINE Login ── */}
                   <LineSignInButton />
 
+                  {/* ── Feature summary — fills vertical space, reassures the user ── */}
+                  <div
+                    style={{
+                      margin: "14px 0 0",
+                      padding: "12px 14px",
+                      background: "#f6fdf7",
+                      borderRadius: 10,
+                      border: "1px solid #d1f0da",
+                    }}
+                  >
+                    <p style={{ fontSize: 11, fontWeight: 700, color: "#2d4a3e", margin: "0 0 6px", letterSpacing: 0.2 }}>
+                      Plant Care でできること
+                    </p>
+                    <ul style={{ margin: 0, padding: "0 0 0 14px", fontSize: 11, color: "#4b5563", lineHeight: 1.9 }}>
+                      <li>植物を写真つきで記録・管理</li>
+                      <li>家族には共有リンクを送るだけ（ログイン不要）</li>
+                      <li>毎朝 LINE で今日のお世話メモを受け取る</li>
+                    </ul>
+                  </div>
+
                   {/* ── Dev / Admin accordion (Google + Magic Link) ── */}
                   <details className="admin-login-details">
                     <summary>
