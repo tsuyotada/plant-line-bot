@@ -55,15 +55,15 @@ export default async function SharePage({
   return (
     <>
       <style>{`
-        /* 1280px+: left (My plants) is main, right (Today's pick) is sub */
+        /* 1280px+: My plants (main) 2:1 Today's pick (sub) */
         .board-grid {
           display: grid;
-          grid-template-columns: 2fr 1fr;
+          grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
           gap: 18px;
           align-items: start;
         }
         @media (max-width: 1279px) {
-          .board-grid { grid-template-columns: 1fr 1fr; }
+          .board-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
         }
         @media (max-width: 767px) {
           .board-grid { display: flex; flex-direction: column; }

@@ -645,16 +645,17 @@ export default async function Home({
     <>
       <style>{`
         /* ─── Board grid ─── */
-        /* 1280px+: left (My plants) is main, right (Today's pick) is sub */
+        /* 1280px+: My plants (main) 2:1 Today's pick (sub) */
+        /* minmax(0,Xfr) forces min=0 so columns are truly proportional */
         .board-grid {
           display: grid;
-          grid-template-columns: 2fr 1fr;
+          grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
           gap: 18px;
           align-items: start;
         }
-        /* 768–1279px: equal columns */
+        /* 768–1279px: strictly equal columns */
         @media (max-width: 1279px) {
-          .board-grid { grid-template-columns: 1fr 1fr; }
+          .board-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
         }
         /* <768px: single column */
         @media (max-width: 767px) {
