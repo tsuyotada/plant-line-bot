@@ -647,7 +647,7 @@ export default async function Home({
         /* ─── Board grid ─── */
         .board-grid {
           display: grid;
-          grid-template-columns: 1fr 1fr 1fr;
+          grid-template-columns: 1fr 1fr;
           gap: 18px;
           align-items: start;
         }
@@ -656,7 +656,7 @@ export default async function Home({
         }
 
         /* ─── Grid span helpers ─── */
-        .col-plants { grid-column: span 2; }
+        .col-plants { grid-column: span 1; }
         .col-right {
           grid-column: span 1;
           display: flex;
@@ -665,6 +665,14 @@ export default async function Home({
         }
         @media (max-width: 960px) {
           .col-plants, .col-right { grid-column: span 1; }
+        }
+
+        /* ─── Today's pick image cap ─── */
+        .spotlight-img {
+          width: 100%;
+          max-height: 280px;
+          object-fit: cover;
+          display: block;
         }
 
         /* ─── Mobile reorder: spotlight → plants → sidebar ─── */
@@ -776,7 +784,7 @@ export default async function Home({
                 <img
                   src={spotlightCard.latestPhotoUrl!}
                   alt={spotlightCard.plantName}
-                  style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", display: "block" }}
+                  className="spotlight-img"
                 />
                 <div style={{ padding: "10px 12px 12px" }}>
                   <div style={{ fontWeight: 700, fontSize: 13, color: "#2d4a3e", marginBottom: 4 }}>

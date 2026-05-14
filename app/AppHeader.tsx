@@ -76,7 +76,6 @@ export function AppHeader(props: Props) {
     <>
       <style>{`
         @media (max-width: 768px) {
-          .app-bg-photo { background-image: none !important; }
           .app-header-actions { display: none !important; }
         }
         .garden-title-btn {
@@ -109,6 +108,20 @@ export function AppHeader(props: Props) {
               }
         }
       />
+      {/* Mobile overlay — darkens bg for readability on small screens */}
+      <div style={{
+        display: "none",
+        position: "fixed",
+        top: 0, right: 0, bottom: 0, left: 0,
+        zIndex: -1,
+        background: "rgba(0,0,0,0.25)",
+        // shown via inline media query workaround — CSS class used instead
+      }} className="app-bg-mobile-overlay" />
+      <style>{`
+        @media (max-width: 768px) {
+          .app-bg-mobile-overlay { display: block !important; }
+        }
+      `}</style>
 
       {/* ── Control bar — owner only, top edge, blends into bg ── */}
       {props.mode === "owner" && (

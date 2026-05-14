@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/src/lib/supabase-ssr";
 import { BackgroundLayer } from "@/app/BackgroundLayer";
+import { GoogleSignInButton } from "./GoogleSignInButton";
 
 async function sendMagicLink(formData: FormData) {
   "use server";
@@ -237,23 +238,34 @@ export default async function LoginPage({
                   </p>
                 </div>
               ) : (
-                <form action={sendMagicLink} style={{ marginTop: 18 }}>
-                  <p style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.75, margin: "0 0 18px" }}>
-                    パスワードは不要です。
-                    <br />
-                    届いたリンクを開くと、あなたのガーデンに入れます。
+                <div style={{ marginTop: 18 }}>
+                  {/* Google — primary CTA */}
+                  <GoogleSignInButton />
+
+                  {/* Divider */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "4px 0 16px" }}>
+                    <div style={{ flex: 1, height: 1, background: "#e5e7eb" }} />
+                    <span style={{ fontSize: 11, color: "#9ca3af", whiteSpace: "nowrap" }}>またはメールで続ける</span>
+                    <div style={{ flex: 1, height: 1, background: "#e5e7eb" }} />
+                  </div>
+
+                  {/* Magic Link — secondary */}
+                  <form action={sendMagicLink}>
+                    <input
+                      type="email"
+                      name="email"
+                      placeholder="メールアドレス"
+                      required
+                      className="login-input"
+                    />
+                    <button type="submit" className="login-btn">
+                      リンクを送る
+                    </button>
+                  </form>
+                  <p style={{ fontSize: 12, color: "#9ca3af", lineHeight: 1.65, margin: "10px 0 0" }}>
+                    パスワード不要。届いたリンクを開くとガーデンに入れます。
                   </p>
-                  <input
-                    type="email"
-                    name="email"
-                    placeholder="メールアドレス"
-                    required
-                    className="login-input"
-                  />
-                  <button type="submit" className="login-btn">
-                    リンクを送る
-                  </button>
-                </form>
+                </div>
               )}
 
               <div style={{ marginTop: 24, paddingTop: 18, borderTop: "1px solid #f0ebe2" }}>

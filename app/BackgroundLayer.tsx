@@ -33,11 +33,6 @@ export function BackgroundLayer() {
 
   return (
     <>
-      <style>{`
-        @media (max-width: 768px) {
-          .app-bg-photo { background-image: none !important; }
-        }
-      `}</style>
       <div
         className="app-bg-photo"
         style={

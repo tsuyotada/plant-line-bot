@@ -57,14 +57,14 @@ export default async function SharePage({
       <style>{`
         .board-grid {
           display: grid;
-          grid-template-columns: 1fr 1fr 1fr;
+          grid-template-columns: 1fr 1fr;
           gap: 18px;
           align-items: start;
         }
         @media (max-width: 960px) {
           .board-grid { grid-template-columns: 1fr; }
         }
-        .col-plants { grid-column: span 2; }
+        .col-plants { grid-column: span 1; }
         .col-right {
           grid-column: span 1;
           display: flex;
@@ -162,7 +162,7 @@ export default async function SharePage({
                     <img
                       src={spotlightCard.latestPhotoUrl!}
                       alt={spotlightCard.plantName}
-                      style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", display: "block" }}
+                      style={{ width: "100%", maxHeight: 280, objectFit: "cover", display: "block" }}
                     />
                     <div style={{ padding: "10px 12px 12px" }}>
                       <div style={{ fontWeight: 700, fontSize: 13, color: "#2d4a3e", marginBottom: 4 }}>
