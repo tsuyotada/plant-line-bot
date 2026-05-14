@@ -645,10 +645,10 @@ export default async function Home({
     <>
       <style>{`
         /* ─── Board grid ─── */
-        /* 1280px+: right col (Today's pick) slightly wider */
+        /* 1280px+: right col barely wider (53.5 vs 46.5%) */
         .board-grid {
           display: grid;
-          grid-template-columns: 5fr 7fr;
+          grid-template-columns: 1fr 1.15fr;
           gap: 18px;
           align-items: start;
         }
@@ -670,18 +670,15 @@ export default async function Home({
           gap: 18px;
         }
 
-        /* ─── Today's pick image — height by breakpoint ─── */
+        /* ─── Today's pick image — contained on all sizes ─── */
         .spotlight-img {
           width: 100%;
-          max-height: 360px;
+          max-height: 260px;
           object-fit: cover;
           display: block;
         }
-        @media (max-width: 1279px) {
-          .spotlight-img { max-height: 280px; }
-        }
         @media (max-width: 767px) {
-          .spotlight-img { max-height: 220px; }
+          .spotlight-img { max-height: 200px; }
         }
 
         /* ─── Mobile reorder: spotlight → plants → sidebar ─── */

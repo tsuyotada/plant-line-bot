@@ -55,10 +55,10 @@ export default async function SharePage({
   return (
     <>
       <style>{`
-        /* 1280px+: right col slightly wider */
+        /* 1280px+: right col barely wider (53.5 vs 46.5%) */
         .board-grid {
           display: grid;
-          grid-template-columns: 5fr 7fr;
+          grid-template-columns: 1fr 1.15fr;
           gap: 18px;
           align-items: start;
         }
@@ -93,12 +93,11 @@ export default async function SharePage({
         }
         .spotlight-img {
           width: 100%;
-          max-height: 360px;
+          max-height: 260px;
           object-fit: cover;
           display: block;
         }
-        @media (max-width: 1279px) { .spotlight-img { max-height: 280px; } }
-        @media (max-width: 767px)  { .spotlight-img { max-height: 220px; } }
+        @media (max-width: 767px) { .spotlight-img { max-height: 200px; } }
         .col-board {
           background: rgba(253, 250, 244, 0.96);
           backdrop-filter: blur(12px);
