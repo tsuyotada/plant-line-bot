@@ -55,14 +55,18 @@ export default async function SharePage({
   return (
     <>
       <style>{`
+        /* 1280px+: right col slightly wider */
         .board-grid {
           display: grid;
-          grid-template-columns: 1fr 1fr;
+          grid-template-columns: 5fr 7fr;
           gap: 18px;
           align-items: start;
         }
-        @media (max-width: 960px) {
-          .board-grid { grid-template-columns: 1fr; }
+        @media (max-width: 1279px) {
+          .board-grid { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 767px) {
+          .board-grid { display: flex; flex-direction: column; }
         }
         .col-plants { grid-column: span 1; }
         .col-right {
@@ -70,9 +74,6 @@ export default async function SharePage({
           display: flex;
           flex-direction: column;
           gap: 18px;
-        }
-        @media (max-width: 960px) {
-          .col-plants, .col-right { grid-column: span 1; }
         }
         .spotlight-section {
           display: flex;
@@ -84,13 +85,20 @@ export default async function SharePage({
           flex-direction: column;
           gap: 18px;
         }
-        @media (max-width: 960px) {
-          .board-grid { display: flex; flex-direction: column; }
+        @media (max-width: 767px) {
           .col-right { display: contents; }
           .spotlight-section { order: 1; }
           .col-plants { order: 2; }
           .sidebar-section { order: 3; }
         }
+        .spotlight-img {
+          width: 100%;
+          max-height: 360px;
+          object-fit: cover;
+          display: block;
+        }
+        @media (max-width: 1279px) { .spotlight-img { max-height: 280px; } }
+        @media (max-width: 767px)  { .spotlight-img { max-height: 220px; } }
         .col-board {
           background: rgba(253, 250, 244, 0.96);
           backdrop-filter: blur(12px);
@@ -162,7 +170,7 @@ export default async function SharePage({
                     <img
                       src={spotlightCard.latestPhotoUrl!}
                       alt={spotlightCard.plantName}
-                      style={{ width: "100%", maxHeight: 280, objectFit: "cover", display: "block" }}
+                      className="spotlight-img"
                     />
                     <div style={{ padding: "10px 12px 12px" }}>
                       <div style={{ fontWeight: 700, fontSize: 13, color: "#2d4a3e", marginBottom: 4 }}>

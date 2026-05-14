@@ -645,14 +645,20 @@ export default async function Home({
     <>
       <style>{`
         /* ─── Board grid ─── */
+        /* 1280px+: right col (Today's pick) slightly wider */
         .board-grid {
           display: grid;
-          grid-template-columns: 1fr 1fr;
+          grid-template-columns: 5fr 7fr;
           gap: 18px;
           align-items: start;
         }
-        @media (max-width: 960px) {
-          .board-grid { grid-template-columns: 1fr; }
+        /* 768–1279px: equal columns */
+        @media (max-width: 1279px) {
+          .board-grid { grid-template-columns: 1fr 1fr; }
+        }
+        /* <768px: single column */
+        @media (max-width: 767px) {
+          .board-grid { display: flex; flex-direction: column; }
         }
 
         /* ─── Grid span helpers ─── */
@@ -663,16 +669,19 @@ export default async function Home({
           flex-direction: column;
           gap: 18px;
         }
-        @media (max-width: 960px) {
-          .col-plants, .col-right { grid-column: span 1; }
-        }
 
-        /* ─── Today's pick image cap ─── */
+        /* ─── Today's pick image — height by breakpoint ─── */
         .spotlight-img {
           width: 100%;
-          max-height: 280px;
+          max-height: 360px;
           object-fit: cover;
           display: block;
+        }
+        @media (max-width: 1279px) {
+          .spotlight-img { max-height: 280px; }
+        }
+        @media (max-width: 767px) {
+          .spotlight-img { max-height: 220px; }
         }
 
         /* ─── Mobile reorder: spotlight → plants → sidebar ─── */
@@ -686,8 +695,7 @@ export default async function Home({
           flex-direction: column;
           gap: 18px;
         }
-        @media (max-width: 960px) {
-          .board-grid { display: flex; flex-direction: column; }
+        @media (max-width: 767px) {
           .col-right { display: contents; }
           .spotlight-section { order: 1; }
           .col-plants { order: 2; }
