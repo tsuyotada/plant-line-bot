@@ -80,7 +80,6 @@ export function AppHeader(props: Props) {
         @media (max-width: 768px) {
           .app-header-bg-controls { display: none !important; }
           .app-header-first-sep   { display: none !important; }
-          .app-header-owner-label { display: none !important; }
         }
         .garden-title-btn {
           transition: background 0.15s ease;
