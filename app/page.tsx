@@ -2,7 +2,6 @@ import { supabaseServer as supabase } from "../src/lib/supabase-server";
 import { getAuthedHouseholdId, createSupabaseServerClient } from "../src/lib/supabase-ssr";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { BackgroundLayer } from "./BackgroundLayer";
 import { AppHeader } from "./AppHeader";
 import { PlantColumn } from "./PlantColumn";
 import { fetchHouseholdData, todayStringJst, getPlantLabel } from "@/lib/fetchHouseholdData";
@@ -419,65 +418,7 @@ export default async function Home({
   const { data: { user } } = await authClient.auth.getUser();
 
   if (!user) {
-    return (
-      <>
-        <BackgroundLayer />
-        <main
-          style={{
-            minHeight: "100vh",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "24px",
-            fontFamily,
-          }}
-        >
-          <div
-            style={{
-              background: "rgba(253, 250, 244, 0.96)",
-              backdropFilter: "blur(12px)",
-              WebkitBackdropFilter: "blur(12px)",
-              border: "1px solid rgba(255,255,255,0.95)",
-              borderRadius: 20,
-              padding: "48px 36px",
-              maxWidth: 400,
-              width: "100%",
-              boxShadow: "0 4px 32px rgba(60,50,30,0.12)",
-              textAlign: "center",
-            }}
-          >
-            <div style={{ fontSize: 44, marginBottom: 14 }}>🌱</div>
-            <h1 style={{ fontSize: 22, fontWeight: 800, color: "#1a3320", margin: "0 0 10px", letterSpacing: -0.3 }}>
-              My Garden
-            </h1>
-            <p style={{ fontSize: 14, color: "#4b6b5a", lineHeight: 1.75, margin: "0 0 28px" }}>
-              わが家の植物ページを、家族で見守る。
-            </p>
-            <a
-              href="/login"
-              style={{
-                display: "block",
-                padding: "13px 0",
-                background: "#4b7a5a",
-                color: "#fff",
-                borderRadius: 10,
-                fontSize: 15,
-                fontWeight: 700,
-                textDecoration: "none",
-                marginBottom: 20,
-              }}
-            >
-              あなたのガーデンを開く
-            </a>
-            <p style={{ fontSize: 12, color: "#9ca3af", lineHeight: 1.7, margin: 0 }}>
-              家族から共有リンクを受け取った方は、
-              <br />
-              そのリンクから開けます。ログインは不要です。
-            </p>
-          </div>
-        </main>
-      </>
-    );
+    redirect("/login");
   }
 
   // ── ログイン済み + household なし → セットアップ ──────────────────────────

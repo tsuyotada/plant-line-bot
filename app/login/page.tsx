@@ -223,7 +223,7 @@ export default async function LoginPage({
           <div className="login-form-col">
             <div className="login-card-form">
               <h2 style={{ fontSize: 21, fontWeight: 800, color: "#1a3320", margin: "0 0 6px", letterSpacing: -0.3 }}>
-                メールでガーデンを開く
+                ガーデンを開く
               </h2>
 
               {params.sent ? (
