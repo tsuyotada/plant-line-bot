@@ -76,8 +76,11 @@ export function AppHeader(props: Props) {
   return (
     <>
       <style>{`
+        /* Mobile: hide decorative-only controls, keep LINE連携 + ログアウト */
         @media (max-width: 768px) {
-          .app-header-actions { display: none !important; }
+          .app-header-bg-controls { display: none !important; }
+          .app-header-first-sep   { display: none !important; }
+          .app-header-owner-label { display: none !important; }
         }
         .garden-title-btn {
           transition: background 0.15s ease;
@@ -128,94 +131,84 @@ export function AppHeader(props: Props) {
       {props.mode === "owner" && (
         <div
           style={{
-            height: 32,
+            minHeight: 36,
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: "0 20px",
+            padding: "2px 16px",
             background: "transparent",
             fontFamily: ff,
           }}
         >
-          <span style={{ fontSize: 10, color: "rgba(255,255,255,0.55)", letterSpacing: 0.3, textShadow: "0 1px 4px rgba(0,0,0,0.40)" }}>
+          {/* Left label — hidden on mobile to save space */}
+          <span
+            className="app-header-owner-label"
+            style={{
+              fontSize: 10,
+              color: "rgba(255,255,255,0.55)",
+              letterSpacing: 0.3,
+              textShadow: "0 1px 4px rgba(0,0,0,0.40)",
+              flexShrink: 0,
+            }}
+          >
             オーナーとして管理中
           </span>
 
+          {/* Right: action buttons */}
           <div
-            className="app-header-actions"
-            style={{ display: "flex", alignItems: "center", gap: 2 }}
+            style={{ display: "flex", alignItems: "center", gap: 2, marginLeft: "auto" }}
           >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              style={{ display: "none" }}
-              onChange={handleFileChange}
-            />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              style={ctrlBtn}
-            >
-              背景を変更
-            </button>
-            {bgImage && (
+            {/* Decorative: 背景を変更 / リセット — hidden on mobile */}
+            <div className="app-header-bg-controls" style={{ display: "contents" }}>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={handleFileChange}
+              />
               <button
                 type="button"
-                onClick={handleReset}
+                onClick={() => fileInputRef.current?.click()}
                 style={ctrlBtn}
               >
-                リセット
+                背景を変更
               </button>
-            )}
+              {bgImage && (
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  style={ctrlBtn}
+                >
+                  リセット
+                </button>
+              )}
+            </div>
+
+            {/* First separator — hidden on mobile (bg controls hidden) */}
             <span
-              style={{
-                display: "inline-block",
-                width: 1,
-                height: 12,
-                background: "rgba(255,255,255,0.25)",
-                margin: "0 6px",
-                flexShrink: 0,
-              }}
+              className="app-header-first-sep"
+              style={sep}
             />
-            {/* LINE 連携 / LINE 連携済み */}
+
+            {/* LINE 連携 / LINE 連携済み — always visible */}
             {props.lineLinked ? (
-              <span
-                style={{
-                  ...ctrlBtn,
-                  color: "rgba(255,255,255,0.35)",
-                  cursor: "default",
-                  fontSize: 10,
-                }}
-              >
+              <span style={{ ...ctrlBtn, color: "rgba(255,255,255,0.35)", cursor: "default", fontSize: 10 }}>
                 LINE連携済み
               </span>
             ) : (
               <a
                 href="/api/auth/line/authorize"
-                style={{
-                  ...ctrlBtn,
-                  color: "#4dda7b",
-                  textDecoration: "none",
-                }}
+                style={{ ...ctrlBtn, color: "#4dda7b", textDecoration: "none" }}
               >
                 LINE連携
               </a>
             )}
-            <span
-              style={{
-                display: "inline-block",
-                width: 1,
-                height: 12,
-                background: "rgba(255,255,255,0.25)",
-                margin: "0 6px",
-                flexShrink: 0,
-              }}
-            />
-            <form
-              action={props.signOutAction}
-              style={{ display: "inline-flex", alignItems: "center" }}
-            >
+
+            <span style={sep} />
+
+            {/* ログアウト — always visible */}
+            <form action={props.signOutAction} style={{ display: "inline-flex", alignItems: "center" }}>
               <button type="submit" style={ctrlBtn}>
                 ログアウト
               </button>
@@ -271,8 +264,8 @@ export function AppHeader(props: Props) {
 const ctrlBtn: React.CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
-  height: 28,
-  padding: "0 8px",
+  minHeight: 32,
+  padding: "0 10px",
   background: "transparent",
   border: "none",
   borderRadius: 6,
@@ -283,6 +276,15 @@ const ctrlBtn: React.CSSProperties = {
   textShadow: "0 1px 4px rgba(0,0,0,0.40)",
   fontFamily: ff,
   lineHeight: 1,
+  flexShrink: 0,
+};
+
+const sep: React.CSSProperties = {
+  display: "inline-block",
+  width: 1,
+  height: 12,
+  background: "rgba(255,255,255,0.25)",
+  margin: "0 4px",
   flexShrink: 0,
 };
 
