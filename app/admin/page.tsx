@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/src/lib/supabase-ssr";
 import { supabaseServer as supabase } from "@/src/lib/supabase-server";
+import { BackgroundLayer } from "@/app/BackgroundLayer";
 
 const ff = 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 
@@ -85,25 +86,63 @@ export default async function AdminPage() {
   const noShareLinkHh = hh.filter((h) => !hasShareLink(h.id));
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f8f7f4", fontFamily: ff, padding: "32px 24px 64px" }}>
-      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+    <div style={{ minHeight: "100vh", fontFamily: ff }}>
+      <BackgroundLayer />
 
-        {/* ── Header ── */}
-        <div style={{ marginBottom: 32 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div>
-              <h1 style={{ fontSize: 22, fontWeight: 800, color: "#1a3320", margin: "0 0 4px", letterSpacing: -0.4 }}>
-                Plant Care Admin
-              </h1>
-              <p style={{ fontSize: 12, color: "#9ca3af", margin: 0 }}>
-                ログイン中: {user.email}
-              </p>
-            </div>
-            <span style={{ fontSize: 11, background: "#dcf5e4", color: "#1a5c36", padding: "4px 10px", borderRadius: 20, fontWeight: 700 }}>
+      {/* ── Hero ── */}
+      <div style={{ padding: "44px 28px 28px" }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+          <h1 style={{
+            fontSize: 48,
+            fontWeight: 800,
+            color: "#ffffff",
+            margin: "0 0 6px",
+            letterSpacing: -1.2,
+            lineHeight: 1.0,
+            textShadow: "0 2px 12px rgba(0,0,0,0.55), 0 0 32px rgba(0,0,0,0.25)",
+          }}>
+            Plant Care Admin
+          </h1>
+          <p style={{
+            fontSize: 11,
+            fontWeight: 500,
+            color: "rgba(255,255,255,0.78)",
+            margin: "0 0 14px",
+            letterSpacing: 2.5,
+            textTransform: "uppercase",
+            textShadow: "0 1px 6px rgba(0,0,0,0.45)",
+          }}>
+            Garden Operations
+          </p>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", textShadow: "0 1px 4px rgba(0,0,0,0.40)" }}>
+              ログイン中: {user.email}
+            </span>
+            <span style={{
+              fontSize: 10,
+              fontWeight: 600,
+              color: "rgba(255,255,255,0.65)",
+              border: "1px solid rgba(255,255,255,0.35)",
+              padding: "2px 9px",
+              borderRadius: 20,
+              textShadow: "0 1px 4px rgba(0,0,0,0.40)",
+            }}>
               読み取り専用
             </span>
           </div>
         </div>
+      </div>
+
+      {/* ── Content panel ── */}
+      <div style={{ padding: "0 28px 64px" }}>
+        <div style={{
+          maxWidth: 1100,
+          margin: "0 auto",
+          background: "rgba(248, 247, 244, 0.97)",
+          borderRadius: 14,
+          padding: "28px 24px",
+          boxShadow: "0 4px 24px rgba(60,50,30,0.12)",
+        }}>
 
         {/* ── Summary cards ── */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 12, marginBottom: 28 }}>
@@ -240,7 +279,8 @@ export default async function AdminPage() {
           Plant Care Admin · 読み取り専用 · データの編集・削除はこの画面からは行えません
         </p>
 
-      </div>
+        </div>{/* /content panel */}
+      </div>{/* /content padding */}
     </div>
   );
 }
