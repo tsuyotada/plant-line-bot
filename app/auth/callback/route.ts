@@ -8,6 +8,18 @@ export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
 
+  // One-time magic link codes must NOT be consumed inside LINE's WebView.
+  // If we exchange the code here, the session lives only in LINE's browser and
+  // the user can never use the app in an external browser with that code again.
+  // Redirect to the relay page first; the code stays in the URL so the external
+  // browser can exchange it after the user opens the link there.
+  const ua = request.headers.get("user-agent") ?? "";
+  if (/Line\/[\d.]+/i.test(ua) && code) {
+    const relayUrl = new URL("/open-in-browser", origin);
+    relayUrl.searchParams.set("next", request.url);
+    return NextResponse.redirect(relayUrl.toString());
+  }
+
   if (code) {
     const cookieStore = await cookies();
     const supabase = createServerClient(

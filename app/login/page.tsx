@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { createSupabaseServerClient } from "@/src/lib/supabase-ssr";
 import { BackgroundLayer } from "@/app/BackgroundLayer";
 import { GoogleSignInButton } from "./GoogleSignInButton";
@@ -35,6 +36,14 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ sent?: string }>;
 }) {
+  // Block LINE's in-app browser before rendering any login form.
+  // Both Google OAuth and Magic Link fail inside LINE WebView, so redirect
+  // users to a relay page that instructs them to open in an external browser.
+  const ua = (await headers()).get("user-agent") ?? "";
+  if (/Line\/[\d.]+/i.test(ua)) {
+    redirect("/open-in-browser?next=/login");
+  }
+
   const params = await searchParams;
 
   return (
