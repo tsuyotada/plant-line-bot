@@ -58,6 +58,8 @@ export function LineJoinCard({
         borderRadius: 14,
         padding: 18,
         boxShadow: "0 2px 16px rgba(60, 50, 30, 0.10)",
+        overflow: "hidden",
+        minWidth: 0,
       }}
     >
       <h2
@@ -140,11 +142,15 @@ export function LineJoinCard({
               <span
                 style={{
                   flex: 1,
+                  minWidth: 0,
                   fontSize: 13,
                   fontWeight: 700,
                   color: "#1a3320",
                   fontFamily: "monospace",
                   letterSpacing: 1,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
                 }}
               >
                 参加 {code}
