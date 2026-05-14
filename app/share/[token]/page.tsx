@@ -55,10 +55,10 @@ export default async function SharePage({
   return (
     <>
       <style>{`
-        /* 1280px+: right col barely wider (53.5 vs 46.5%) */
+        /* 1280px+: left (My plants) is main, right (Today's pick) is sub */
         .board-grid {
           display: grid;
-          grid-template-columns: 1fr 1.15fr;
+          grid-template-columns: 2fr 1fr;
           gap: 18px;
           align-items: start;
         }
