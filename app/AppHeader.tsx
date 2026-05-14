@@ -25,6 +25,7 @@ type Props =
       householdName: string;
       updateNameAction: (name: string) => Promise<void>;
       signOutAction: () => Promise<void>;
+      lineLinked?: boolean;
     }
   | {
       mode: "share";
@@ -166,6 +167,40 @@ export function AppHeader(props: Props) {
               >
                 リセット
               </button>
+            )}
+            <span
+              style={{
+                display: "inline-block",
+                width: 1,
+                height: 12,
+                background: "rgba(255,255,255,0.25)",
+                margin: "0 6px",
+                flexShrink: 0,
+              }}
+            />
+            {/* LINE 連携 / LINE 連携済み */}
+            {props.lineLinked ? (
+              <span
+                style={{
+                  ...ctrlBtn,
+                  color: "rgba(255,255,255,0.35)",
+                  cursor: "default",
+                  fontSize: 10,
+                }}
+              >
+                LINE連携済み
+              </span>
+            ) : (
+              <a
+                href="/api/auth/line/authorize"
+                style={{
+                  ...ctrlBtn,
+                  color: "#4dda7b",
+                  textDecoration: "none",
+                }}
+              >
+                LINE連携
+              </a>
             )}
             <span
               style={{

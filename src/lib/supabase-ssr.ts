@@ -32,8 +32,14 @@ export async function createSupabaseServerClient() {
 
 /**
  * Returns the household_id for the currently logged-in user, or null if not found.
- * Phase 0→1: looks up households.owner_id = auth.uid().
- * Phase 2 以降: household_members テーブルに移行予定。
+ *
+ * Lookup order:
+ *   1. households.line_user_id = user.user_metadata.line_user_id
+ *      → For LINE-linked users (LINE Login or Google/Magic Link that linked LINE).
+ *        This is set by the LINE-connect flow so a LINE Login user sees the same
+ *        garden as their linked Google/Magic Link account.
+ *   2. households.owner_id = user.id
+ *      → Standard lookup for Google / Magic Link / standalone LINE users.
  */
 export async function getAuthedHouseholdId(): Promise<string | null> {
   const supabase = await createSupabaseServerClient();
@@ -42,11 +48,24 @@ export async function getAuthedHouseholdId(): Promise<string | null> {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: household } = await supabaseServer
+  // 1. LINE-linked lookup (requires households.line_user_id column via migration)
+  const lineUserId = user.user_metadata?.line_user_id as string | undefined;
+  if (lineUserId) {
+    const { data: linked, error: linkedErr } = await supabaseServer
+      .from("households")
+      .select("id")
+      .eq("line_user_id", lineUserId)
+      .maybeSingle();
+    // linkedErr may occur if the column does not exist yet (pre-migration) — skip silently.
+    if (!linkedErr && linked) return linked.id;
+  }
+
+  // 2. Standard owner lookup
+  const { data: owned } = await supabaseServer
     .from("households")
     .select("id")
     .eq("owner_id", user.id)
-    .single();
+    .maybeSingle();
 
-  return household?.id ?? null;
+  return owned?.id ?? null;
 }

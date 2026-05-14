@@ -421,12 +421,15 @@ export default async function Home({
     redirect("/login");
   }
 
-  // ── ログイン済み + household なし → セットアップ ──────────────────────────
-  const { data: household } = await supabase
-    .from("households")
-    .select("id, name")
-    .eq("owner_id", user.id)
-    .single();
+  // ── ログイン済み + household → 表示。LINE 連携ユーザーは line_user_id 経由で引く ──
+  const authedHouseholdId = await getAuthedHouseholdId();
+  const { data: household } = authedHouseholdId
+    ? await supabase
+        .from("households")
+        .select("id, name")
+        .eq("id", authedHouseholdId)
+        .maybeSingle()
+    : { data: null };
 
   if (!household) {
     const { setup_error } = await searchParams;
@@ -694,6 +697,7 @@ export default async function Home({
         householdName={householdName}
         updateNameAction={updateHouseholdName}
         signOutAction={signOut}
+        lineLinked={!!user.user_metadata?.line_user_id}
       />
 
       <main style={{ minHeight: "100vh", padding: "14px 20px 48px", fontFamily }}>

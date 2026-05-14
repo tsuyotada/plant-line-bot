@@ -37,6 +37,8 @@ const LINE_ERROR_MESSAGES: Record<string, string> = {
   line_token_failed: "LINEとの認証に失敗しました。もう一度お試しください。",
   line_profile_failed: "LINEプロフィールの取得に失敗しました。",
   line_signin_failed: "ログイン処理に失敗しました。もう一度お試しください。",
+  line_already_linked: "このLINEアカウントは既に別のユーザーに連携されています。",
+  line_not_configured: "LINEログインの設定が完了していません。管理者にお問い合わせください。",
 };
 
 export default async function LoginPage({
