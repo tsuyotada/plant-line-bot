@@ -163,17 +163,17 @@ export default async function LoginPage({
           gap: 4px;
           font-size: 12px;
           font-weight: 600;
-          color: rgba(255,255,255,0.65);
+          color: rgba(255,255,255,0.78);
           text-decoration: none;
-          border-bottom: 1px solid rgba(255,255,255,0.28);
+          border-bottom: 1px solid rgba(255,255,255,0.42);
           padding-bottom: 2px;
           line-height: 1.4;
           text-shadow: 0 1px 4px rgba(0,0,0,0.35);
           transition: color 0.15s, border-color 0.15s;
         }
         .login-sample-link:hover {
-          color: rgba(255,255,255,0.88);
-          border-color: rgba(255,255,255,0.55);
+          color: rgba(255,255,255,0.95);
+          border-color: rgba(255,255,255,0.70);
         }
       `}</style>
 
@@ -194,10 +194,10 @@ export default async function LoginPage({
         <div style={{ maxWidth: 820, margin: "0 auto", width: "100%", paddingBottom: 20 }}>
           <h1
             style={{
-              fontSize: 64,
+              fontSize: 70,
               fontWeight: 800,
               color: "#ffffff",
-              margin: "0 0 6px",
+              margin: "0 0 8px",
               letterSpacing: -2,
               lineHeight: 1.0,
               textShadow: "0 2px 12px rgba(0,0,0,0.60), 0 0 40px rgba(0,0,0,0.30)",
@@ -211,7 +211,7 @@ export default async function LoginPage({
               fontWeight: 500,
               color: "rgba(255,255,255,0.72)",
               margin: 0,
-              letterSpacing: 1.4,
+              letterSpacing: 1.5,
               textShadow: "0 1px 6px rgba(0,0,0,0.50)",
               textTransform: "uppercase",
             }}
