@@ -32,13 +32,13 @@ const SAMPLE_URL =
   "https://plant-line-bot-forme.vercel.app/share/8f24ee1b-d5d1-47a3-be24-4a4ae1809ef0";
 
 const LINE_ERROR_MESSAGES: Record<string, string> = {
-  line_cancelled: "LINEログインがキャンセルされました。",
-  line_state_mismatch: "セキュリティエラーが発生しました。もう一度お試しください。",
-  line_token_failed: "LINEとの認証に失敗しました。もう一度お試しください。",
-  line_profile_failed: "LINEプロフィールの取得に失敗しました。",
+  line_cancelled:     "LINEログインがキャンセルされました。",
+  line_state_mismatch:"セキュリティエラーが発生しました。もう一度お試しください。",
+  line_token_failed:  "LINEとの認証に失敗しました。もう一度お試しください。",
+  line_profile_failed:"LINEプロフィールの取得に失敗しました。",
   line_signin_failed: "ログイン処理に失敗しました。もう一度お試しください。",
-  line_already_linked: "このLINEアカウントは既に別のユーザーに連携されています。",
-  line_not_configured: "LINEログインの設定が完了していません。管理者にお問い合わせください。",
+  line_already_linked:"このLINEアカウントは既に別のユーザーに連携されています。",
+  line_not_configured:"LINEログインの設定が完了していません。管理者にお問い合わせください。",
 };
 
 export default async function LoginPage({
@@ -47,90 +47,51 @@ export default async function LoginPage({
   searchParams: Promise<{ sent?: string; error?: string }>;
 }) {
   const params = await searchParams;
-  const lineError = params.error ? (LINE_ERROR_MESSAGES[params.error] ?? "ログインでエラーが発生しました。") : null;
+  const lineError = params.error
+    ? (LINE_ERROR_MESSAGES[params.error] ?? "ログインでエラーが発生しました。")
+    : null;
 
   return (
     <>
       <style>{`
+        /* ─── Grid: magazine spread ─── */
         .login-grid {
           display: grid;
           grid-template-columns: 5fr 8fr;
-          gap: 24px;
-          align-items: stretch;
+          gap: 48px;
+          align-items: start;
           max-width: 960px;
           margin: 0 auto;
         }
+        /* Mobile: stack — intro (on bg) first, card second */
         @media (max-width: 768px) {
-          .login-grid { grid-template-columns: 1fr; align-items: start; }
-          .login-intro-col { order: 2; }
-          .login-form-col  { order: 1; }
+          .login-grid  { grid-template-columns: 1fr; gap: 24px; }
+          .login-intro-col { order: 1; }
+          .login-form-col  { order: 2; }
         }
-        .login-card-intro {
-          background: rgba(253, 250, 244, 0.92);
-          border-radius: 16px;
-          padding: 24px 22px 20px;
-          box-shadow: 0 2px 12px rgba(60, 50, 30, 0.07);
-          border: 1px solid rgba(255, 255, 255, 0.88);
-          box-sizing: border-box;
-          height: 100%;
-        }
+
+        /* ─── Login card ─── */
         .login-card-form {
           background: #ffffff;
           border-radius: 16px;
-          padding: 36px 32px 28px;
+          padding: 32px 28px 24px;
           box-shadow: 0 6px 40px rgba(30, 60, 40, 0.22);
           border: 1px solid rgba(163, 196, 160, 0.50);
           box-sizing: border-box;
-          height: 100%;
         }
-        .feature-item {
-          display: flex;
-          gap: 10px;
-          align-items: flex-start;
-          margin-bottom: 10px;
+        @media (max-width: 480px) {
+          .login-card-form { padding: 24px 20px 20px; }
         }
-        .feature-item:last-child { margin-bottom: 0; }
-        .sample-link-block {
-          margin-top: 18px;
-          background: #f0fdf4;
-          border: 1px solid #c8e6cc;
-          border-radius: 10px;
-          padding: 12px 14px;
-        }
+
+        /* ─── Form fields ─── */
         .login-divider {
           display: flex;
           align-items: center;
           gap: 10px;
           margin: 4px 0 14px;
         }
-        .login-divider-line { flex: 1; height: 1px; background: #e5e7eb; }
+        .login-divider-line  { flex: 1; height: 1px; background: #e5e7eb; }
         .login-divider-label { font-size: 11px; color: #9ca3af; white-space: nowrap; }
-        /* ── Dev/admin accordion ── */
-        .admin-login-details {
-          margin-top: 14px;
-          padding-top: 14px;
-          border-top: 1px solid #f0ebe2;
-        }
-        .admin-login-details > summary {
-          cursor: pointer;
-          font-size: 11px;
-          color: #9ca3af;
-          user-select: none;
-          list-style: none;
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          padding: 2px 0;
-          width: fit-content;
-        }
-        .admin-login-details > summary::-webkit-details-marker { display: none; }
-        .admin-login-details > summary::marker { display: none; }
-        .admin-login-details[open] > summary {
-          margin-bottom: 16px;
-          color: #6b7280;
-        }
-        .admin-login-chevron { font-size: 9px; transition: transform 0.15s; }
-        .admin-login-details[open] .admin-login-chevron { transform: rotate(180deg); }
         .login-input {
           width: 100%;
           padding: 13px 14px;
@@ -162,6 +123,59 @@ export default async function LoginPage({
           transition: background 0.15s;
         }
         .login-btn:hover { background: #3d6649; }
+
+        /* ─── Dev/admin accordion ─── */
+        .admin-login-details {
+          margin-top: 14px;
+          padding-top: 14px;
+          border-top: 1px solid #f0ebe2;
+        }
+        .admin-login-details > summary {
+          cursor: pointer;
+          font-size: 11px;
+          color: #9ca3af;
+          user-select: none;
+          list-style: none;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          padding: 2px 0;
+          width: fit-content;
+        }
+        .admin-login-details > summary::-webkit-details-marker { display: none; }
+        .admin-login-details > summary::marker { display: none; }
+        .admin-login-details[open] > summary { margin-bottom: 16px; color: #6b7280; }
+        .admin-login-chevron { font-size: 9px; transition: transform 0.15s; }
+        .admin-login-details[open] .admin-login-chevron { transform: rotate(180deg); }
+
+        /* ─── Intro: text directly on background ─── */
+        .login-intro-text {
+          font-size: 13px;
+          color: rgba(255,255,255,0.88);
+          line-height: 1.85;
+          margin: 0 0 22px;
+          text-shadow: 0 1px 5px rgba(0,0,0,0.35);
+        }
+        .login-feature-icon {
+          font-size: 15px;
+          line-height: 1.4;
+          flex-shrink: 0;
+          margin-top: 1px;
+        }
+        .login-feature-title {
+          font-size: 12px;
+          font-weight: 700;
+          color: rgba(255,255,255,0.95);
+          margin-bottom: 2px;
+          line-height: 1.4;
+          text-shadow: 0 1px 4px rgba(0,0,0,0.35);
+        }
+        .login-feature-desc {
+          font-size: 11px;
+          color: rgba(255,255,255,0.62);
+          line-height: 1.6;
+          text-shadow: 0 1px 3px rgba(0,0,0,0.25);
+        }
       `}</style>
 
       <BackgroundLayer />
@@ -169,7 +183,7 @@ export default async function LoginPage({
       <main style={{ minHeight: "100vh", padding: "0 20px 60px", fontFamily: ff }}>
 
         {/* ── Hero ── */}
-        <div style={{ maxWidth: 960, margin: "0 auto", padding: "52px 0 36px" }}>
+        <div style={{ maxWidth: 960, margin: "0 auto", padding: "52px 0 40px" }}>
           <h1
             style={{
               fontSize: 72,
@@ -201,64 +215,62 @@ export default async function LoginPage({
         {/* ── 2-column grid ── */}
         <div className="login-grid">
 
-          {/* ── Left: service intro ── */}
+          {/* ── Left: intro directly on background — no card ── */}
           <div className="login-intro-col">
-            <div className="login-card-intro">
-              <p style={{ fontSize: 12, color: "#4b5563", lineHeight: 1.85, margin: "0 0 16px" }}>
-                わが家の植物を、写真とメモで見守る。
-                <br />
-                家族と共有して、LINEでも今日の植物メモを受け取れます。
-              </p>
-              <div>
-                {FEATURES.map(({ icon, title, desc }) => (
-                  <div key={title} className="feature-item">
-                    <span style={{ fontSize: 14, lineHeight: 1.5, flexShrink: 0, marginTop: 1 }}>{icon}</span>
-                    <div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: "#2d4a3e", marginBottom: 1, lineHeight: 1.4 }}>
-                        {title}
-                      </div>
-                      <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.6 }}>
-                        {desc}
-                      </div>
-                    </div>
+
+            <p className="login-intro-text">
+              わが家の植物を、写真とメモで見守る。<br />
+              家族と共有して、LINEでも今日の植物メモを受け取れます。
+            </p>
+
+            <div style={{ marginBottom: 20 }}>
+              {FEATURES.map(({ icon, title, desc }) => (
+                <div key={title} style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 12 }}>
+                  <span className="login-feature-icon">{icon}</span>
+                  <div>
+                    <div className="login-feature-title">{title}</div>
+                    <div className="login-feature-desc">{desc}</div>
                   </div>
-                ))}
-              </div>
-              <div className="sample-link-block">
-                <div style={{ fontSize: 11, color: "#4b7a5a", fontWeight: 600, marginBottom: 4 }}>
-                  共有ページの見え方を試す
                 </div>
-                <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.6, marginBottom: 8 }}>
-                  実際の家族向けページがどう見えるか確認できます。
-                </div>
-                <a
-                  href={SAMPLE_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 4,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: "#2d6a3f",
-                    textDecoration: "none",
-                    borderBottom: "1px solid #93c9a0",
-                    paddingBottom: 1,
-                    lineHeight: 1.4,
-                  }}
-                >
-                  サンプルの植物ページを開く
-                  <span style={{ fontSize: 10 }}>↗</span>
-                </a>
-              </div>
+              ))}
             </div>
+
+            <a
+              href={SAMPLE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                fontSize: 12,
+                fontWeight: 600,
+                color: "rgba(255,255,255,0.72)",
+                textDecoration: "none",
+                borderBottom: "1px solid rgba(255,255,255,0.30)",
+                paddingBottom: 1,
+                lineHeight: 1.4,
+                textShadow: "0 1px 3px rgba(0,0,0,0.30)",
+              }}
+            >
+              サンプルの植物ページを開く
+              <span style={{ fontSize: 10 }}>↗</span>
+            </a>
+
           </div>
 
-          {/* ── Right: login form ── */}
+          {/* ── Right: login card ── */}
           <div className="login-form-col">
             <div className="login-card-form">
-              <h2 style={{ fontSize: 21, fontWeight: 800, color: "#1a3320", margin: "0 0 6px", letterSpacing: -0.3 }}>
+              <h2
+                style={{
+                  fontSize: 20,
+                  fontWeight: 800,
+                  color: "#1a3320",
+                  margin: "0 0 6px",
+                  letterSpacing: -0.3,
+                }}
+              >
                 ガーデンを開く
               </h2>
 
@@ -286,44 +298,21 @@ export default async function LoginPage({
                   {/* ── Primary: LINE Login ── */}
                   <LineSignInButton />
 
-                  {/* ── Feature summary — fills vertical space, reassures the user ── */}
-                  <div
-                    style={{
-                      margin: "14px 0 0",
-                      padding: "12px 14px",
-                      background: "#f6fdf7",
-                      borderRadius: 10,
-                      border: "1px solid #d1f0da",
-                    }}
-                  >
-                    <p style={{ fontSize: 11, fontWeight: 700, color: "#2d4a3e", margin: "0 0 6px", letterSpacing: 0.2 }}>
-                      Plant Care でできること
-                    </p>
-                    <ul style={{ margin: 0, padding: "0 0 0 14px", fontSize: 11, color: "#4b5563", lineHeight: 1.9 }}>
-                      <li>植物を写真つきで記録・管理</li>
-                      <li>家族には共有リンクを送るだけ（ログイン不要）</li>
-                      <li>毎朝 LINE で今日のお世話メモを受け取る</li>
-                    </ul>
-                  </div>
-
-                  {/* ── Dev / Admin accordion (Google + Magic Link) ── */}
+                  {/* ── Dev / Admin accordion ── */}
                   <details className="admin-login-details">
                     <summary>
                       管理者・開発者向けログイン
                       <span className="admin-login-chevron">▾</span>
                     </summary>
 
-                    {/* Google */}
                     <GoogleSignInButton />
 
-                    {/* Divider */}
                     <div className="login-divider">
                       <div className="login-divider-line" />
                       <span className="login-divider-label">またはメールで続ける</span>
                       <div className="login-divider-line" />
                     </div>
 
-                    {/* Magic Link */}
                     <form action={sendMagicLink}>
                       <input
                         type="email"
@@ -343,7 +332,7 @@ export default async function LoginPage({
                 </div>
               )}
 
-              <div style={{ marginTop: 24, paddingTop: 18, borderTop: "1px solid #f0ebe2" }}>
+              <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid #f0ebe2" }}>
                 <p style={{ fontSize: 11, color: "#9ca3af", margin: 0, lineHeight: 1.7 }}>
                   共有リンクを受け取った方は、ログイン不要です。
                   <br />
