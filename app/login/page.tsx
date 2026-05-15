@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createSupabaseServerClient } from "@/src/lib/supabase-ssr";
 import { BackgroundLayer } from "@/app/BackgroundLayer";
 import { LineSignInButton } from "./LineSignInButton";
@@ -175,6 +176,16 @@ export default async function LoginPage({
           color: rgba(255,255,255,0.95);
           border-color: rgba(255,255,255,0.70);
         }
+        .login-about-link {
+          display: block;
+          margin-top: 10px;
+          font-size: 11px;
+          color: rgba(255,255,255,0.42);
+          text-decoration: none;
+          text-shadow: 0 1px 3px rgba(0,0,0,0.25);
+          transition: color 0.15s;
+        }
+        .login-about-link:hover { color: rgba(255,255,255,0.65); }
       `}</style>
 
       <BackgroundLayer overlayStrength="medium" />
@@ -249,6 +260,10 @@ export default async function LoginPage({
               サンプルを見る
               <span style={{ fontSize: 10 }}>↗</span>
             </a>
+
+            <Link href="/about" className="login-about-link">
+              Plant Care について →
+            </Link>
 
           </div>
 
