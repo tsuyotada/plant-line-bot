@@ -239,7 +239,9 @@ async function deletePhoto(formData: FormData): Promise<void> {
   revalidatePath("/");
 }
 
-async function createHousehold(formData: FormData): Promise<{ error: string } | void> {
+async function createHousehold(
+  formData: FormData
+): Promise<{ error: string } | { ok: true }> {
   "use server";
   const name = String(formData.get("name") || "").trim();
   if (!name) return { error: "ページ名を入力してください。" };
@@ -248,21 +250,31 @@ async function createHousehold(formData: FormData): Promise<{ error: string } | 
   const {
     data: { user },
   } = await authClient.auth.getUser();
-  if (!user) {
-    redirect("/login");
-    return;
-  }
+  if (!user) return { error: "ログインセッションが切れています。再ログインしてください。" };
 
   const { error } = await supabase
     .from("households")
     .insert({ owner_id: user.id, name });
 
   if (error) {
-    console.error("createHousehold error:", error.message, error.code);
-    return { error: `ページの作成に失敗しました（${error.message}）。時間をおいてもう一度お試しください。` };
+    console.error("createHousehold insert error:", error.message, error.code);
+    return { error: `ページの作成に失敗しました（${error.message}）。` };
   }
 
-  redirect("/");
+  // insert 直後に SELECT して確認（問題の切り分け用）
+  const { data: created, error: verifyErr } = await supabase
+    .from("households")
+    .select("id")
+    .eq("owner_id", user.id)
+    .maybeSingle();
+
+  if (verifyErr || !created) {
+    console.error("createHousehold verify error:", verifyErr?.message, "uid:", user.id);
+    return { error: `作成は完了しましたが確認に失敗しました（${verifyErr?.message ?? "not found"}）。ページを再読み込みしてください。` };
+  }
+
+  revalidatePath("/");
+  return { ok: true };
 }
 
 // ── Share link actions ─────────────────────────────────────────────────────────

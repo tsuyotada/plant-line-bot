@@ -1,16 +1,20 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 
 const fontFamily =
   'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 
 type Props = {
-  createHouseholdAction: (formData: FormData) => Promise<{ error: string } | void>;
+  createHouseholdAction: (
+    formData: FormData
+  ) => Promise<{ error: string } | { ok: true }>;
   userEmail: string | null;
 };
 
 export function HouseholdSetupForm({ createHouseholdAction, userEmail }: Props) {
+  const router = useRouter();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -18,7 +22,12 @@ export function HouseholdSetupForm({ createHouseholdAction, userEmail }: Props) 
     setErrorMsg(null);
     startTransition(async () => {
       const result = await createHouseholdAction(formData);
-      if (result?.error) setErrorMsg(result.error);
+      if ("error" in result) {
+        setErrorMsg(result.error);
+      } else {
+        // redirect() を使わず router.refresh() で Server Component を再描画
+        router.refresh();
+      }
     });
   }
 
