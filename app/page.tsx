@@ -252,25 +252,24 @@ async function createHousehold(
   } = await authClient.auth.getUser();
   if (!user) return { error: "ログインセッションが切れています。再ログインしてください。" };
 
-  const { error } = await supabase
-    .from("households")
-    .insert({ owner_id: user.id, name });
-
-  if (error) {
-    console.error("createHousehold insert error:", error.message, error.code);
-    return { error: `ページの作成に失敗しました（${error.message}）。` };
-  }
-
-  // insert 直後に SELECT して確認（問題の切り分け用）
-  const { data: created, error: verifyErr } = await supabase
+  // 既存の household があれば INSERT せずそのまま成功扱い（冪等）
+  const { data: existing } = await supabase
     .from("households")
     .select("id")
     .eq("owner_id", user.id)
+    .order("created_at", { ascending: true })
+    .limit(1)
     .maybeSingle();
 
-  if (verifyErr || !created) {
-    console.error("createHousehold verify error:", verifyErr?.message, "uid:", user.id);
-    return { error: `作成は完了しましたが確認に失敗しました（${verifyErr?.message ?? "not found"}）。ページを再読み込みしてください。` };
+  if (!existing) {
+    const { error } = await supabase
+      .from("households")
+      .insert({ owner_id: user.id, name });
+
+    if (error) {
+      console.error("createHousehold insert error:", error.message, error.code);
+      return { error: `ページの作成に失敗しました（${error.message}）。` };
+    }
   }
 
   revalidatePath("/");

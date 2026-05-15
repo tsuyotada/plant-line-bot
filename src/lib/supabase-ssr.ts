@@ -55,16 +55,19 @@ export async function getAuthedHouseholdId(): Promise<string | null> {
       .from("households")
       .select("id")
       .eq("line_user_id", lineUserId)
+      .limit(1)
       .maybeSingle();
     // linkedErr may occur if the column does not exist yet (pre-migration) — skip silently.
     if (!linkedErr && linked) return linked.id;
   }
 
-  // 2. Standard owner lookup
+  // 2. Standard owner lookup — limit(1) で重複 household があっても最初の1件を返す
   const { data: owned } = await supabaseServer
     .from("households")
     .select("id")
     .eq("owner_id", user.id)
+    .order("created_at", { ascending: true })
+    .limit(1)
     .maybeSingle();
 
   return owned?.id ?? null;
