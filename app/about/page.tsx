@@ -61,17 +61,20 @@ const LINE_FEATURES = [
 ] as const;
 
 const CONTENTS = [
-  { text: "Plant Care でできること",     anchor: "#features"   },
-  { text: "植物ごとのケアのヒント例",     anchor: "#care-hints" },
+  { text: "Plant Care でできること",     anchor: "#features"     },
+  { text: "植物ごとのケアのヒント例",     anchor: "#care-hints"   },
   { text: "使い方のながれ",               anchor: "#how-it-works" },
-  { text: "LINEでできること",             anchor: "#line"       },
-  { text: "サンプルを確認する",           anchor: "#sample"     },
+  { text: "LINEでできること",             anchor: "#line"         },
+  { text: "サンプルを確認する",           anchor: "#sample"       },
+  { text: "Let's get started",           anchor: "#get-started"  },
 ];
 
 export default function AboutPage() {
   return (
     <>
       <style>{`
+        html { scroll-behavior: smooth; }
+
         /* ─── Top bar ─── */
         .about-topbar {
           display: flex;
@@ -523,7 +526,7 @@ export default function AboutPage() {
         </div>
 
         {/* ══ Section 6: Get started（下部CTA・強め） ══ */}
-        <div style={{ maxWidth: 560, margin: "0 auto", width: "100%", paddingTop: 72 }}>
+        <div id="get-started" style={{ maxWidth: 560, margin: "0 auto", width: "100%", paddingTop: 72 }}>
           <p className="about-section-label">Get started</p>
           <h2 className="about-section-heading">LINEで始められます</h2>
           <p style={{ fontSize: 13, color: "rgba(255,255,255,0.74)", lineHeight: 1.85, margin: "0 0 8px", textShadow: "0 1px 5px rgba(0,0,0,0.35)" }}>
