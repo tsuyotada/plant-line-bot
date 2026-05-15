@@ -7,18 +7,18 @@ const ff =
 const SAMPLE_URL =
   "https://plant-line-bot-forme.vercel.app/share/e66f00d8-ae82-42c9-99ad-d133456d8cb6";
 
-const EXAMPLES = [
+const FEATURES = [
   {
-    plant: "サボテン・多肉植物",
-    hint: "土がしっかり乾いてから水やりを。乾燥気味のほうが安心です。水のあげすぎには注意が必要です。",
+    title: "植物ごとのケアのヒント",
+    body: "水やり、肥料、葉の変化のタイミングを、育てている植物の種類に合わせてお知らせします。サボテンと観葉植物では、適切なペースが違います。",
   },
   {
-    plant: "ハーブ",
-    hint: "葉が混み合ってきたら、収穫や切り戻しのタイミングかもしれません。乾燥しすぎるとすぐ元気がなくなります。",
+    title: "写真で変化を残す",
+    body: "今日の写真を1枚残しておくと、あとから元気の変化に気づきやすくなります。記録が積み重なると、ケアの判断が楽になります。",
   },
   {
-    plant: "観葉植物",
-    hint: "葉の色や張り、置き場所の光を気にかけます。季節によって日当たりを変えてみるのもよさそうです。",
+    title: "LINEを入口にする",
+    body: "朝の植物メモを受け取るだけでなく、気になった写真をLINEから送ったり、葉の色や水やりについて相談したりできます。通知はあとから設定できます。",
   },
 ] as const;
 
@@ -44,6 +44,27 @@ const STEPS = [
     body: "朝の植物メモをLINEで届けられます。通知はあとから設定できます。まずはWebだけでも使えます。",
   },
 ] as const;
+
+const LINE_FEATURES = [
+  {
+    title: "写真を送って記録する",
+    body: "気になったときに植物の写真をLINEへ送ると、どの植物の記録として残すか選べます。アプリを開き直さなくても、日々の変化をためていけます。",
+  },
+  {
+    title: "気になることを相談する",
+    body: "葉の色が気になる、水やりの頻度に迷う。そんなときはLINEから植物の様子を相談できます。答えを押しつけるのではなく、見るポイントを一緒に整理します。",
+  },
+  {
+    title: "朝の植物メモを受け取る",
+    body: "必要なら、今日気にかけたい植物メモをLINEで受け取れます。設定はあとからでも大丈夫です。",
+  },
+] as const;
+
+const CONTENTS = [
+  "植物ごとのケアのヒントについて",
+  "LINEを使った写真記録と相談",
+  "使い方のながれ",
+];
 
 export default function AboutPage() {
   return (
@@ -78,58 +99,97 @@ export default function AboutPage() {
 
         /* ─── Hero ─── */
         .about-hero {
-          min-height: 88vh;
+          min-height: 80vh;
           display: flex;
           align-items: center;
           max-width: 620px;
           margin: 0 auto;
           width: 100%;
         }
-        .about-hero-inner { padding-bottom: 48px; width: 100%; }
+        .about-hero-inner { padding-bottom: 32px; width: 100%; }
         .about-hero-h1 {
-          font-size: 40px;
+          font-size: 38px;
           font-weight: 800;
           color: #ffffff;
-          margin: 0 0 18px;
-          line-height: 1.28;
-          letter-spacing: -0.8px;
+          margin: 0 0 16px;
+          line-height: 1.3;
+          letter-spacing: -0.6px;
           text-shadow: 0 2px 12px rgba(0,0,0,0.55), 0 0 32px rgba(0,0,0,0.25);
         }
         @media (max-width: 480px) {
-          .about-hero-h1 { font-size: 32px; }
+          .about-hero-h1 { font-size: 30px; }
         }
         .about-hero-body {
           font-size: 14px;
-          color: rgba(255,255,255,0.78);
+          color: rgba(255,255,255,0.76);
           line-height: 1.85;
-          margin: 0 0 10px;
+          margin: 0 0 22px;
           text-shadow: 0 1px 6px rgba(0,0,0,0.40);
           max-width: 500px;
         }
-        .about-hero-sample-note {
-          font-size: 11px;
-          color: rgba(255,255,255,0.45);
-          margin: 0 0 22px;
+
+        /* ─── Contents list ─── */
+        .about-contents {
+          margin: 0 0 24px;
+          padding: 14px 16px;
+          border-left: 2px solid rgba(255,255,255,0.20);
+        }
+        .about-contents-label {
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 1.2px;
+          text-transform: uppercase;
+          color: rgba(255,255,255,0.35);
+          margin: 0 0 8px;
           text-shadow: 0 1px 3px rgba(0,0,0,0.25);
         }
-        .about-hero-line-note {
-          margin-top: 14px;
-          font-size: 11px;
-          color: rgba(255,255,255,0.42);
+        .about-contents-item {
+          font-size: 12px;
+          color: rgba(255,255,255,0.58);
+          line-height: 1.8;
+          margin: 0;
           text-shadow: 0 1px 3px rgba(0,0,0,0.25);
+          list-style: none;
+          padding: 0;
+        }
+        .about-contents-item li::before {
+          content: "— ";
+          color: rgba(255,255,255,0.28);
         }
 
         /* ─── CTA row ─── */
         .about-cta-row {
           display: flex;
           align-items: center;
-          gap: 16px;
+          gap: 14px;
           flex-wrap: wrap;
         }
-        .about-login-btn {
+        /* Ghost button — FV上部用（控えめ） */
+        .about-login-btn-ghost {
           display: inline-flex;
           align-items: center;
-          padding: 11px 22px;
+          padding: 9px 18px;
+          background: transparent;
+          border: 1px solid rgba(255,255,255,0.45);
+          border-radius: 9px;
+          font-size: 13px;
+          font-weight: 600;
+          color: rgba(255,255,255,0.82);
+          text-decoration: none;
+          transition: border-color 0.15s, color 0.15s;
+          white-space: nowrap;
+          font-family: inherit;
+          text-shadow: 0 1px 4px rgba(0,0,0,0.35);
+        }
+        .about-login-btn-ghost:hover {
+          border-color: rgba(255,255,255,0.70);
+          color: rgba(255,255,255,0.96);
+        }
+        /* Solid button — ページ下部用（主役） */
+        .about-login-btn-solid {
+          display: inline-flex;
+          align-items: center;
+          padding: 11px 24px;
           background: rgba(255,255,255,0.92);
           border-radius: 9px;
           font-size: 14px;
@@ -140,16 +200,17 @@ export default function AboutPage() {
           white-space: nowrap;
           font-family: inherit;
         }
-        .about-login-btn:hover { background: #ffffff; }
+        .about-login-btn-solid:hover { background: #ffffff; }
+        /* Text link */
         .about-sample-link {
           display: inline-flex;
           align-items: center;
           gap: 3px;
           font-size: 13px;
           font-weight: 600;
-          color: rgba(255,255,255,0.78);
+          color: rgba(255,255,255,0.72);
           text-decoration: none;
-          border-bottom: 1px solid rgba(255,255,255,0.40);
+          border-bottom: 1px solid rgba(255,255,255,0.36);
           padding-bottom: 2px;
           text-shadow: 0 1px 4px rgba(0,0,0,0.35);
           transition: color 0.15s, border-color 0.15s;
@@ -165,7 +226,7 @@ export default function AboutPage() {
           max-width: 620px;
           margin: 0 auto;
           width: 100%;
-          padding-bottom: 20px;
+          padding-bottom: 16px;
           display: flex;
           align-items: center;
           gap: 10px;
@@ -174,55 +235,55 @@ export default function AboutPage() {
           flex: none;
           width: 24px;
           height: 1px;
-          background: rgba(255,255,255,0.25);
+          background: rgba(255,255,255,0.22);
         }
         .about-scroll-text {
           font-size: 10px;
           font-weight: 600;
           letter-spacing: 1.2px;
           text-transform: uppercase;
-          color: rgba(255,255,255,0.30);
+          color: rgba(255,255,255,0.28);
           text-shadow: 0 1px 3px rgba(0,0,0,0.25);
         }
 
-        /* ─── Section common ─── */
+        /* ─── Section label / heading / body ─── */
         .about-section-label {
           font-size: 10px;
           font-weight: 700;
           letter-spacing: 1.8px;
           text-transform: uppercase;
           color: rgba(255,255,255,0.38);
-          margin: 0 0 16px;
+          margin: 0 0 14px;
           text-shadow: 0 1px 3px rgba(0,0,0,0.25);
         }
         .about-section-heading {
           font-size: 18px;
           font-weight: 700;
           color: rgba(255,255,255,0.96);
-          margin: 0 0 12px;
+          margin: 0 0 11px;
           line-height: 1.45;
-          letter-spacing: -0.2px;
+          letter-spacing: "-0.2px";
           text-shadow: 0 1px 8px rgba(0,0,0,0.45);
         }
         .about-section-body {
           font-size: 13px;
-          color: rgba(255,255,255,0.76);
+          color: rgba(255,255,255,0.74);
           line-height: 1.85;
-          margin: 0 0 24px;
+          margin: 0 0 22px;
           text-shadow: 0 1px 5px rgba(0,0,0,0.35);
         }
 
-        /* ─── Example cards ─── */
-        .about-examples {
+        /* ─── Feature cards ─── */
+        .about-features {
           display: grid;
           grid-template-columns: 1fr 1fr 1fr;
           gap: 14px;
           width: 100%;
         }
         @media (max-width: 640px) {
-          .about-examples { grid-template-columns: 1fr; gap: 10px; }
+          .about-features { grid-template-columns: 1fr; gap: 10px; }
         }
-        .about-example-card {
+        .about-feature-card {
           background: rgba(255,255,255,0.09);
           border: 1px solid rgba(255,255,255,0.18);
           border-radius: 10px;
@@ -230,21 +291,20 @@ export default function AboutPage() {
           backdrop-filter: blur(8px);
           -webkit-backdrop-filter: blur(8px);
         }
-        .about-example-plant {
-          font-size: 11px;
+        .about-feature-title {
+          font-size: 13px;
           font-weight: 700;
-          color: rgba(255,255,255,0.60);
-          letter-spacing: 0.5px;
+          color: rgba(255,255,255,0.92);
           margin: 0 0 8px;
-          text-shadow: 0 1px 3px rgba(0,0,0,0.25);
-          text-transform: uppercase;
+          line-height: 1.4;
+          text-shadow: 0 1px 5px rgba(0,0,0,0.35);
         }
-        .about-example-hint {
+        .about-feature-body {
           font-size: 12px;
-          color: rgba(255,255,255,0.80);
-          line-height: 1.75;
+          color: rgba(255,255,255,0.70);
+          line-height: 1.78;
           margin: 0;
-          text-shadow: 0 1px 4px rgba(0,0,0,0.30);
+          text-shadow: 0 1px 4px rgba(0,0,0,0.28);
         }
 
         /* ─── Steps ─── */
@@ -260,7 +320,7 @@ export default function AboutPage() {
         .about-step-num {
           font-size: 20px;
           font-weight: 800;
-          color: rgba(255,255,255,0.28);
+          color: rgba(255,255,255,0.26);
           line-height: 1.2;
           letter-spacing: -1px;
           text-shadow: 0 1px 4px rgba(0,0,0,0.30);
@@ -275,18 +335,40 @@ export default function AboutPage() {
         }
         .about-step-body {
           font-size: 12px;
-          color: rgba(255,255,255,0.68);
+          color: rgba(255,255,255,0.66);
           line-height: 1.75;
           margin: 0;
           text-shadow: 0 1px 4px rgba(0,0,0,0.28);
         }
 
+        /* ─── LINE list ─── */
+        .about-line-item {
+          padding: 18px 0;
+          border-top: 1px solid rgba(255,255,255,0.12);
+        }
+        .about-line-item:last-child { border-bottom: 1px solid rgba(255,255,255,0.12); }
+        .about-line-item-title {
+          font-size: 14px;
+          font-weight: 700;
+          color: rgba(255,255,255,0.90);
+          margin: 0 0 6px;
+          text-shadow: 0 1px 5px rgba(0,0,0,0.40);
+        }
+        .about-line-item-body {
+          font-size: 12px;
+          color: rgba(255,255,255,0.66);
+          line-height: 1.8;
+          margin: 0;
+          text-shadow: 0 1px 4px rgba(0,0,0,0.28);
+          max-width: 480px;
+        }
+
         /* ─── Sample block ─── */
         .about-sample-block {
-          background: rgba(255,255,255,0.10);
-          border: 1px solid rgba(255,255,255,0.22);
+          background: rgba(255,255,255,0.09);
+          border: 1px solid rgba(255,255,255,0.20);
           border-radius: 12px;
-          padding: 24px 24px 26px;
+          padding: 22px 22px 24px;
           backdrop-filter: blur(8px);
           -webkit-backdrop-filter: blur(8px);
         }
@@ -296,13 +378,13 @@ export default function AboutPage() {
 
       <main style={{ minHeight: "100vh", padding: "0 20px 80px", fontFamily: ff }}>
 
-        {/* ── Top bar: small brand + back link ── */}
+        {/* ── Top bar ── */}
         <div className="about-topbar">
           <span className="about-brand">Plant Care</span>
           <Link href="/login" className="about-back-link">← ログイン画面へ</Link>
         </div>
 
-        {/* ── Hero ── */}
+        {/* ── Hero（説明ページとして読み物寄りに） ── */}
         <div className="about-hero">
           <div className="about-hero-inner">
 
@@ -315,60 +397,77 @@ export default function AboutPage() {
               水やり、肥料、葉の変化。育てている植物の種類と写真をもとに、その植物に合ったヒントを受け取れます。毎日きっちり管理するというより、気になったときに少しずつ様子を残していけます。
             </p>
 
-            <p className="about-hero-sample-note">
-              ログイン前に、実際の植物ページを確認できます。
-            </p>
+            {/* このページで分かること */}
+            <div className="about-contents">
+              <p className="about-contents-label">このページで分かること</p>
+              <ul className="about-contents-item">
+                {CONTENTS.map((c) => <li key={c}>{c}</li>)}
+              </ul>
+            </div>
 
+            {/* FV CTA：控えめ（ゴーストボタン） */}
             <div className="about-cta-row">
-              <Link href="/login" className="about-login-btn">
-                LINEで始める
-              </Link>
               <a href={SAMPLE_URL} target="_blank" rel="noopener noreferrer" className="about-sample-link">
                 サンプルを見る <span style={{ fontSize: 10 }}>↗</span>
               </a>
+              <Link href="/login" className="about-login-btn-ghost">
+                LINEで始める
+              </Link>
             </div>
-
-            <p className="about-hero-line-note">
-              LINEアカウントで始められます。朝の通知はあとから設定できます。
-            </p>
 
           </div>
         </div>
 
-        {/* ── Scroll hint ── */}
+        {/* Scroll hint */}
         <div className="about-scroll-hint">
           <span className="about-scroll-line" />
           <span className="about-scroll-text">植物ごとのケアのヒントについて</span>
         </div>
 
-        {/* ══ Section 1: 植物によって違う ══ */}
+        {/* ══ Section 1: できること 3カード ══ */}
         <div style={{ maxWidth: 620, margin: "0 auto", width: "100%", paddingTop: 56 }}>
+          <p className="about-section-label">Features</p>
+          <h2 className="about-section-heading">Plant Care でできること</h2>
+          <div className="about-features">
+            {FEATURES.map((f) => (
+              <div key={f.title} className="about-feature-card">
+                <p className="about-feature-title">{f.title}</p>
+                <p className="about-feature-body">{f.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ══ Section 2: 植物ごとの具体例 ══ */}
+        <div style={{ maxWidth: 620, margin: "0 auto", width: "100%", paddingTop: 64 }}>
           <p className="about-section-label">Care Hints</p>
           <h2 className="about-section-heading">植物によって、気にかけることは違う</h2>
           <p className="about-section-body">
-            サボテン、ハーブ、観葉植物など、植物ごとに水やりや肥料、見るポイントは違います。
-            育てている植物の種類と写真をもとに、それぞれに合ったヒントをお知らせします。
+            サボテン、ハーブ、観葉植物など、植物ごとに水やりや肥料、見るポイントは違います。種類と写真をもとに、それぞれに合ったヒントをお知らせします。
           </p>
 
-          <div className="about-examples">
-            {EXAMPLES.map((ex) => (
-              <div key={ex.plant} className="about-example-card">
-                <p className="about-example-plant">{ex.plant}</p>
-                <p className="about-example-hint">{ex.hint}</p>
+          <div className="about-features">
+            {[
+              { plant: "サボテン・多肉植物", hint: "土がしっかり乾いてから水やりを。乾燥気味のほうが安心です。水のあげすぎには注意が必要です。" },
+              { plant: "ハーブ", hint: "葉が混み合ってきたら、収穫や切り戻しのタイミングかもしれません。乾燥しすぎるとすぐ元気がなくなります。" },
+              { plant: "観葉植物", hint: "葉の色や張り、置き場所の光を気にかけます。季節によって日当たりを変えてみるのもよさそうです。" },
+            ].map((ex) => (
+              <div key={ex.plant} className="about-feature-card">
+                <p style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.50)", letterSpacing: "0.5px", margin: "0 0 8px", textTransform: "uppercase", textShadow: "0 1px 3px rgba(0,0,0,0.25)" }}>{ex.plant}</p>
+                <p style={{ fontSize: 12, color: "rgba(255,255,255,0.78)", lineHeight: 1.75, margin: 0, textShadow: "0 1px 4px rgba(0,0,0,0.28)" }}>{ex.hint}</p>
               </div>
             ))}
           </div>
 
-          <p style={{ marginTop: 14, fontSize: 11, color: "rgba(255,255,255,0.35)", lineHeight: 1.7, textShadow: "0 1px 3px rgba(0,0,0,0.25)" }}>
+          <p style={{ marginTop: 12, fontSize: 11, color: "rgba(255,255,255,0.32)", lineHeight: 1.7, textShadow: "0 1px 3px rgba(0,0,0,0.25)" }}>
             ※ ヒントは植物の種類と記録をもとに生成されます。断定ではなく、気にかけるきっかけとしてお使いください。
           </p>
         </div>
 
-        {/* ══ Section 2: 使い方 ══ */}
+        {/* ══ Section 3: 使い方 ══ */}
         <div style={{ maxWidth: 560, margin: "0 auto", width: "100%", paddingTop: 72 }}>
           <p className="about-section-label">How it works</p>
           <h2 className="about-section-heading">使い方はかんたんです</h2>
-
           <div>
             {STEPS.map((step) => (
               <div key={step.n} className="about-step">
@@ -382,14 +481,34 @@ export default function AboutPage() {
           </div>
         </div>
 
-        {/* ══ Section 3: サンプルで確認 ══ */}
+        {/* ══ Section 4: LINEでできること ══ */}
+        <div style={{ maxWidth: 560, margin: "0 auto", width: "100%", paddingTop: 72 }}>
+          <p className="about-section-label">LINE</p>
+          <h2 className="about-section-heading">LINEでできること</h2>
+          <p className="about-section-body">
+            LINEログインで始めると、アプリを毎日開かなくてもLINEを入口にして使えます。
+          </p>
+          <div>
+            {LINE_FEATURES.map((item) => (
+              <div key={item.title} className="about-line-item">
+                <p className="about-line-item-title">{item.title}</p>
+                <p className="about-line-item-body">{item.body}</p>
+              </div>
+            ))}
+          </div>
+          <p style={{ marginTop: 14, fontSize: 11, color: "rgba(255,255,255,0.35)", textShadow: "0 1px 3px rgba(0,0,0,0.25)" }}>
+            LINEログインとLINE通知は別々に設定できます。まずはWebだけで始めても大丈夫です。
+          </p>
+        </div>
+
+        {/* ══ Section 5: サンプルで確認 ══ */}
         <div style={{ maxWidth: 560, margin: "0 auto", width: "100%", paddingTop: 72 }}>
           <p className="about-section-label">Sample</p>
           <div className="about-sample-block">
-            <h2 style={{ fontSize: 16, fontWeight: 700, color: "rgba(255,255,255,0.96)", margin: "0 0 10px", textShadow: "0 1px 6px rgba(0,0,0,0.40)" }}>
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: "rgba(255,255,255,0.96)", margin: "0 0 10px", textShadow: "0 1px 6px rgba(0,0,0,0.40)" }}>
               ログイン前に、使い心地を確認できます
             </h2>
-            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.72)", lineHeight: 1.8, margin: "0 0 18px", textShadow: "0 1px 4px rgba(0,0,0,0.30)" }}>
+            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.70)", lineHeight: 1.8, margin: "0 0 16px", textShadow: "0 1px 4px rgba(0,0,0,0.28)" }}>
               サンプルの植物ページを公開しています。どんなヒントが届くか、どんな見え方になるか、登録前に確認できます。
             </p>
             <a href={SAMPLE_URL} target="_blank" rel="noopener noreferrer" className="about-sample-link">
@@ -398,18 +517,18 @@ export default function AboutPage() {
           </div>
         </div>
 
-        {/* ══ Section 4: LINEで始める ══ */}
+        {/* ══ Section 6: Get started（下部CTA・強め） ══ */}
         <div style={{ maxWidth: 560, margin: "0 auto", width: "100%", paddingTop: 72 }}>
           <p className="about-section-label">Get started</p>
           <h2 className="about-section-heading">LINEで始められます</h2>
-          <p style={{ fontSize: 13, color: "rgba(255,255,255,0.76)", lineHeight: 1.85, margin: "0 0 8px", textShadow: "0 1px 5px rgba(0,0,0,0.35)" }}>
+          <p style={{ fontSize: 13, color: "rgba(255,255,255,0.74)", lineHeight: 1.85, margin: "0 0 8px", textShadow: "0 1px 5px rgba(0,0,0,0.35)" }}>
             LINEアカウントでログインできます。メールアドレスの入力は不要です。
           </p>
-          <p style={{ fontSize: 13, color: "rgba(255,255,255,0.76)", lineHeight: 1.85, margin: "0 0 28px", textShadow: "0 1px 5px rgba(0,0,0,0.35)" }}>
-            まずはWebだけで使い始めても大丈夫です。朝のLINE通知は、ログイン後にいつでも設定できます。LINEログインと朝の通知は、別々に設定できます。
+          <p style={{ fontSize: 13, color: "rgba(255,255,255,0.74)", lineHeight: 1.85, margin: "0 0 28px", textShadow: "0 1px 5px rgba(0,0,0,0.35)" }}>
+            まずはWebだけで使い始めても大丈夫です。朝のLINE通知は、ログイン後にいつでも設定できます。
           </p>
           <div className="about-cta-row">
-            <Link href="/login" className="about-login-btn">
+            <Link href="/login" className="about-login-btn-solid">
               LINEで始める
             </Link>
             <Link href="/login" className="about-back-link">
