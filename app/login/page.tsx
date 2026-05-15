@@ -51,13 +51,13 @@ export default async function LoginPage({
         .login-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 48px;
-          align-items: start;
-          max-width: 900px;
+          gap: 36px;
+          align-items: center;
+          max-width: 820px;
           margin: 0 auto;
         }
-        @media (max-width: 720px) {
-          .login-grid      { grid-template-columns: 1fr; gap: 28px; }
+        @media (max-width: 680px) {
+          .login-grid      { grid-template-columns: 1fr; gap: 24px; }
           .login-intro-col { order: 1; }
           .login-form-col  { order: 2; }
         }
@@ -65,14 +65,14 @@ export default async function LoginPage({
         /* ─── Login card ─── */
         .login-card-form {
           background: #ffffff;
-          border-radius: 16px;
-          padding: 28px 26px 22px;
-          box-shadow: 0 6px 40px rgba(20, 50, 30, 0.28);
-          border: 1px solid rgba(163, 196, 160, 0.45);
+          border-radius: 14px;
+          padding: 24px 22px 20px;
+          box-shadow: 0 6px 36px rgba(20, 50, 30, 0.26);
+          border: 1px solid rgba(163, 196, 160, 0.40);
           box-sizing: border-box;
         }
         @media (max-width: 480px) {
-          .login-card-form { padding: 22px 18px 18px; }
+          .login-card-form { padding: 20px 16px 16px; }
         }
 
         /* ─── Form fields ─── */
@@ -142,19 +142,19 @@ export default async function LoginPage({
 
         /* ─── Intro text on background ─── */
         .login-intro-lead {
-          font-size: 18px;
+          font-size: 17px;
           font-weight: 700;
           color: rgba(255,255,255,0.96);
           line-height: 1.5;
-          margin: 0 0 18px;
+          margin: 0 0 14px;
           letter-spacing: -0.3px;
           text-shadow: 0 1px 10px rgba(0,0,0,0.50);
         }
         .login-intro-body {
           font-size: 13px;
           color: rgba(255,255,255,0.80);
-          line-height: 1.9;
-          margin: 0 0 28px;
+          line-height: 1.85;
+          margin: 0 0 18px;
           text-shadow: 0 1px 6px rgba(0,0,0,0.40);
         }
         .login-sample-link {
@@ -179,16 +179,25 @@ export default async function LoginPage({
 
       <BackgroundLayer overlayStrength="medium" />
 
-      <main style={{ minHeight: "100vh", padding: "0 20px 60px", fontFamily: ff }}>
+      <main
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          padding: "40px 20px",
+          fontFamily: ff,
+        }}
+      >
 
         {/* ── Hero ── */}
-        <div style={{ maxWidth: 900, margin: "0 auto", padding: "52px 0 44px" }}>
+        <div style={{ maxWidth: 820, margin: "0 auto", width: "100%", paddingBottom: 20 }}>
           <h1
             style={{
-              fontSize: 72,
+              fontSize: 64,
               fontWeight: 800,
               color: "#ffffff",
-              margin: "0 0 8px",
+              margin: "0 0 6px",
               letterSpacing: -2,
               lineHeight: 1.0,
               textShadow: "0 2px 12px rgba(0,0,0,0.60), 0 0 40px rgba(0,0,0,0.30)",
@@ -198,9 +207,9 @@ export default async function LoginPage({
           </h1>
           <p
             style={{
-              fontSize: 14,
+              fontSize: 13,
               fontWeight: 500,
-              color: "rgba(255,255,255,0.80)",
+              color: "rgba(255,255,255,0.72)",
               margin: 0,
               letterSpacing: 1.4,
               textShadow: "0 1px 6px rgba(0,0,0,0.50)",
@@ -248,10 +257,10 @@ export default async function LoginPage({
             <div className="login-card-form">
               <h2
                 style={{
-                  fontSize: 19,
+                  fontSize: 18,
                   fontWeight: 800,
                   color: "#1a3320",
-                  margin: "0 0 4px",
+                  margin: "0 0 2px",
                   letterSpacing: -0.3,
                 }}
               >
@@ -275,7 +284,7 @@ export default async function LoginPage({
                   </p>
                 </div>
               ) : (
-                <div style={{ marginTop: 16 }}>
+                <div style={{ marginTop: 14 }}>
 
                   <LineSignInButton />
 
@@ -312,7 +321,7 @@ export default async function LoginPage({
                 </div>
               )}
 
-              <div style={{ marginTop: 18, paddingTop: 14, borderTop: "1px solid #f0ebe2" }}>
+              <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid #f0ebe2" }}>
                 <p style={{ fontSize: 11, color: "#b0b8b0", margin: 0, lineHeight: 1.65 }}>
                   共有リンクを受け取った方はログイン不要です。
                   リンクから直接開いてください。
