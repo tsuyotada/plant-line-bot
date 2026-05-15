@@ -48,20 +48,20 @@ export default async function LoginPage({
   return (
     <>
       <style>{`
-        /* ─── Grid: 1:2 — left intro narrower, right card dominant ─── */
+        /* ─── Grid: 3 columns — text | sample | card ─── */
         .login-grid {
           display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 44px;
+          grid-template-columns: 1fr 1fr 1fr;
+          gap: 32px;
           align-items: start;
-          max-width: 960px;
+          max-width: 1080px;
           margin: 0 auto;
         }
-        /* Mobile: stack — intro (on bg) first, card second */
-        @media (max-width: 768px) {
-          .login-grid  { grid-template-columns: 1fr; gap: 28px; }
-          .login-intro-col { order: 1; }
-          .login-form-col  { order: 2; }
+        @media (max-width: 900px) {
+          .login-grid { grid-template-columns: 1fr; gap: 24px; }
+          .login-intro-col  { order: 1; }
+          .login-sample-col { order: 2; }
+          .login-form-col   { order: 3; }
         }
 
         /* ─── Login card ─── */
@@ -211,7 +211,7 @@ export default async function LoginPage({
       <main style={{ minHeight: "100vh", padding: "0 20px 60px", fontFamily: ff }}>
 
         {/* ── Hero ── */}
-        <div style={{ maxWidth: 960, margin: "0 auto", padding: "52px 0 40px" }}>
+        <div style={{ maxWidth: 1080, margin: "0 auto", padding: "52px 0 40px" }}>
           <h1
             style={{
               fontSize: 72,
@@ -240,10 +240,10 @@ export default async function LoginPage({
           </p>
         </div>
 
-        {/* ── 2-column grid ── */}
+        {/* ── 3-column grid: text | sample | card ── */}
         <div className="login-grid">
 
-          {/* ── Left: intro directly on background — no card ── */}
+          {/* ── Col 1: intro text on background ── */}
           <div className="login-intro-col">
 
             <p className="login-intro-lead">
@@ -264,10 +264,14 @@ export default async function LoginPage({
               そのくらいの距離感で続けられます。
             </p>
 
+          </div>
+
+          {/* ── Col 2: sample ── */}
+          <div className="login-sample-col">
             <div className="login-sample-block">
               <p className="login-sample-label">Sample</p>
               <p className="login-sample-desc">
-                使い心地はサンプルページで確認できます。
+                使い心地はサンプルページで確認できます。ログイン不要で見られます。
               </p>
               <a
                 href={SAMPLE_URL}
@@ -278,10 +282,9 @@ export default async function LoginPage({
                 サンプルを見る ↗
               </a>
             </div>
-
           </div>
 
-          {/* ── Right: login card ── */}
+          {/* ── Col 3: login card ── */}
           <div className="login-form-col">
             <div className="login-card-form">
               <h2
