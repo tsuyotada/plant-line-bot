@@ -7,6 +7,7 @@ import { PlantColumn } from "./PlantColumn";
 import { fetchHouseholdData, todayStringJst, getPlantLabel } from "@/lib/fetchHouseholdData";
 import { ShareLinkCard } from "./ShareLinkCard";
 import { LineJoinCard } from "./LineJoinCard";
+import { HouseholdSetupForm } from "./HouseholdSetupForm";
 
 // DB migration required (run once):
 // alter table plants add column if not exists sort_order integer;
@@ -238,13 +239,10 @@ async function deletePhoto(formData: FormData): Promise<void> {
   revalidatePath("/");
 }
 
-async function createHousehold(formData: FormData) {
+async function createHousehold(formData: FormData): Promise<{ error: string } | void> {
   "use server";
   const name = String(formData.get("name") || "").trim();
-  if (!name) {
-    redirect("/?setup_error=1");
-    return;
-  }
+  if (!name) return { error: "ページ名を入力してください。" };
 
   const authClient = await createSupabaseServerClient();
   const {
@@ -259,7 +257,10 @@ async function createHousehold(formData: FormData) {
     .from("households")
     .insert({ owner_id: user.id, name });
 
-  if (error) console.error("createHousehold error:", error);
+  if (error) {
+    console.error("createHousehold error:", error.message, error.code);
+    return { error: `ページの作成に失敗しました（${error.message}）。時間をおいてもう一度お試しください。` };
+  }
 
   redirect("/");
 }
@@ -403,11 +404,7 @@ async function updateHouseholdName(name: string): Promise<void> {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-export default async function Home({
-  searchParams,
-}: {
-  searchParams: Promise<{ setup_error?: string }>;
-}) {
+export default async function Home() {
   const pageStart = Date.now();
 
   const fontFamily =
@@ -432,7 +429,6 @@ export default async function Home({
     : { data: null };
 
   if (!household) {
-    const { setup_error } = await searchParams;
     return (
       <main
         style={{
@@ -445,94 +441,10 @@ export default async function Home({
           fontFamily,
         }}
       >
-        <div
-          style={{
-            background: "#fff",
-            borderRadius: 16,
-            padding: "40px 32px",
-            maxWidth: 400,
-            width: "100%",
-            boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
-            textAlign: "center",
-          }}
-        >
-          <div style={{ fontSize: 40, marginBottom: 12 }}>🌱</div>
-          <h1
-            style={{
-              fontSize: 20,
-              fontWeight: 700,
-              color: "#1f3a2a",
-              margin: "0 0 10px",
-            }}
-          >
-            あなたの植物ページを作りましょう
-          </h1>
-          <p
-            style={{
-              fontSize: 14,
-              color: "#555",
-              lineHeight: 1.6,
-              margin: "0 0 24px",
-            }}
-          >
-            育てている植物を記録するページを作ります。
-            <br />
-            名前はあとからいつでも変えられます。
-          </p>
-          <form action={createHousehold}>
-            {setup_error && (
-              <p
-                style={{
-                  fontSize: 13,
-                  color: "#b91c1c",
-                  background: "#fef2f2",
-                  border: "1px solid #fecaca",
-                  borderRadius: 8,
-                  padding: "8px 12px",
-                  margin: "0 0 14px",
-                }}
-              >
-                ページ名を入力してください。
-              </p>
-            )}
-            <input
-              type="text"
-              name="name"
-              placeholder="例：ベランダの植物、My Garden"
-              maxLength={50}
-              style={{
-                width: "100%",
-                padding: "12px 14px",
-                border: "1.5px solid #d1e8d8",
-                borderRadius: 10,
-                fontSize: 15,
-                outline: "none",
-                boxSizing: "border-box",
-                marginBottom: 14,
-                fontFamily: "inherit",
-              }}
-            />
-            <button
-              type="submit"
-              style={{
-                width: "100%",
-                padding: "12px",
-                background: "#4b7a5a",
-                color: "#fff",
-                border: "none",
-                borderRadius: 10,
-                fontSize: 15,
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              はじめる
-            </button>
-          </form>
-          <p style={{ fontSize: 12, color: "#9ca3af", margin: "20px 0 0", lineHeight: 1.5 }}>
-            ログイン中: {user.email}
-          </p>
-        </div>
+        <HouseholdSetupForm
+          createHouseholdAction={createHousehold}
+          userEmail={user?.email ?? null}
+        />
       </main>
     );
   }
