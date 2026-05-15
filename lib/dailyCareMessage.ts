@@ -75,12 +75,22 @@ type ClassifiedPlant = {
   notableRule: CareRule | null;
 };
 
+// Days after each interval period during which fertilizer appears in LINE notifications.
+// Matches the window in buildPlantCareAdvice.ts so the two systems stay in sync.
+const FERT_LINE_REMINDER_DAYS = 3;
+
 function classifyPlant(plant: PlantWithRecency, rules: CareRule[]): ClassifiedPlant {
   const priority = getCarePriority(plant.daysSinceLastPhoto);
   const needsWater = priority === "urgent" || priority === "attention";
+
+  // Use a windowed check so fertilizer shows for at most FERT_LINE_REMINDER_DAYS per cycle.
+  // Without this, needsFertilizer stays true every day once the interval is exceeded, causing
+  // the reminder to repeat indefinitely until last_fertilized_at is recorded.
+  const daysPastInterval = plant.daysSinceLastFertilized - plant.fertilizerIntervalDays;
   const needsFertilizer =
     plant.fertilizerEnabled &&
-    plant.daysSinceLastFertilized >= plant.fertilizerIntervalDays;
+    daysPastInterval >= 0 &&
+    daysPastInterval % plant.fertilizerIntervalDays < FERT_LINE_REMINDER_DAYS;
 
   // Notable rule = only care rules containing detected-problem keywords (not routine reminders)
   const notableRule = rules
@@ -146,24 +156,68 @@ function buildSpotlightDescription(c: ClassifiedPlant): string {
   return `${name}はしばらく写真の記録がありません。`;
 }
 
-// Pick the best spotlight plant: notable > both > water > fertilizer > ok (all require latestPhotoUrl)
-function pickSpotlight(classified: ClassifiedPlant[]): ClassifiedPlant | null {
-  const withPhoto = classified.filter(c => !!c.plant.latestPhotoUrl);
-  if (withPhoto.length === 0) return null;
-  const order: PlantActionType[] = ["notable", "both", "water", "fertilizer", "ok"];
-  for (const type of order) {
-    const found = withPhoto.find(c => c.actionType === type);
-    if (found) return found;
-  }
-  return withPhoto[0];
+// ── Spotlight helpers (shared hash logic with fetchHouseholdData.ts) ──────────
+function _hashSeed(seed: string): number {
+  let h = 0;
+  for (const ch of seed) h = (Math.imul(31, h) + ch.charCodeAt(0)) | 0;
+  return Math.abs(h);
+}
+function _yesterday(dateStr: string): string {
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
 }
 
-// Build 2-line grouped care summary for 4+ plants with same TODO
+// Pick the spotlight plant using the same daily-rotating hash as the app (fetchHouseholdData.ts).
+// Pool = plants with urgent/attention photo priority (4+ days without photo), falling back to
+// all plants with a photo. A hash of today+householdId+":spotlight" ensures LINE notification
+// and the app's Today's Pick show the same plant on the same day.
+function pickSpotlight(
+  classified: ClassifiedPlant[],
+  today: string,
+  householdId: string,
+): ClassifiedPlant | null {
+  const withPhoto = classified.filter(c => !!c.plant.latestPhotoUrl);
+  if (withPhoto.length === 0) return null;
+
+  const priorityPool = withPhoto.filter(c => {
+    const p = getCarePriority(c.plant.daysSinceLastPhoto);
+    return p === "urgent" || p === "attention";
+  });
+  const pool = priorityPool.length > 0 ? priorityPool : withPhoto;
+
+  if (pool.length === 1) return pool[0];
+
+  const todayIdx = _hashSeed(today + householdId + ":spotlight") % pool.length;
+  const yestIdx  = _hashSeed(_yesterday(today) + householdId + ":spotlight") % pool.length;
+  const idx = todayIdx === yestIdx ? (todayIdx + 1) % pool.length : todayIdx;
+  return pool[idx];
+}
+
+// Build 2-line grouped care summary for 4+ plants with same watering need
 function buildGroupedLines(label: string, items: ClassifiedPlant[]): string[] {
   const shown = items.slice(0, 4).map(c => c.plant.display_name).join("、");
   const rest = items.length - 4;
   const suffix = rest > 0 ? ` ほか${rest}件` : "";
-  return [`${label}が${items.length}件あります。`, `対象：${shown}${suffix}`];
+  return [`${label}の頃合いかもしれない植物が${items.length}件あります。`, `（${shown}${suffix}）`];
+}
+
+// Soft fertilizer hint — never shows count or plant list for large batches.
+// Fertilizer is a periodic gentle suggestion, not an urgent task.
+function buildFertilizerNote(items: ClassifiedPlant[]): string[] {
+  if (items.length === 0) return [];
+  if (items.length === 1) {
+    return [`・${items[0].plant.display_name}：そろそろ液体肥料の頃合いかもしれません`];
+  }
+  if (items.length <= 3) {
+    const names = items.map(c => c.plant.display_name).join("、");
+    return [`・${names}：液体肥料の時期が近いかもしれません`];
+  }
+  // For many plants: one calm suggestion — no count, no list
+  return [
+    "・液体肥料を少し気にかけてもよさそうな植物がいくつかあります。",
+    "　余裕のある日に、元気な株から少し見てみてもよさそうです。",
+  ];
 }
 
 export function buildDailyCareMessage(
@@ -171,6 +225,7 @@ export function buildDailyCareMessage(
   plants: PlantWithRecency[],
   careRulesMap: Map<string, CareRule[]> = new Map(),
   shareUrl?: string | null,
+  householdId = "",
 ): { message: string; messageBody: string; spotlightPhotoUrl: string | null; appLinkPhrase: string; appUrl: string } {
   const appLinkPhrase = datePick(APP_LINK_PHRASES, today, 200);
   const appUrl =
@@ -183,7 +238,7 @@ export function buildDailyCareMessage(
   );
 
   // ── Spotlight ──────────────────────────────────────────
-  const spotlight = pickSpotlight(classified);
+  const spotlight = pickSpotlight(classified, today, householdId);
   const spotlightPhotoUrl = spotlight?.plant.latestPhotoUrl ?? null;
 
   // Trivia: use spotlight plant first, then first action plant, then any plant
@@ -228,27 +283,28 @@ export function buildDailyCareMessage(
     const allWaterPlants = [...bothItems, ...waterItems];
 
     if (allFertPlants.length >= GROUPING_THRESHOLD) {
-      // All fertilizer-needing plants (both water+fert and fert-only) grouped together
-      routineLines.push(...buildGroupedLines("液体肥料のタイミング", allFertPlants));
-      // Remaining water-only plants shown separately
+      // Large fertilizer pool: show a single soft hint (no count, no plant list).
+      // Water-only plants are shown separately with their normal per-plant summaries.
+      routineLines.push(...buildFertilizerNote(allFertPlants));
       if (waterItems.length >= GROUPING_THRESHOLD) {
         routineLines.push(...buildGroupedLines("水やりのタイミング", waterItems));
       } else {
         waterItems.forEach(c => routineLines.push(`・${c.plant.display_name}：${c.summary}`));
       }
     } else if (allWaterPlants.length >= GROUPING_THRESHOLD) {
-      // All water-needing plants grouped together (no large fert pool)
+      // Large water pool — group water, then soft fertilizer hint for fert-only plants
       routineLines.push(...buildGroupedLines("水やりのタイミング", allWaterPlants));
-      // Remaining fert-only plants shown separately
       if (fertItems.length >= GROUPING_THRESHOLD) {
-        routineLines.push(...buildGroupedLines("液体肥料のタイミング", fertItems));
+        routineLines.push(...buildFertilizerNote(fertItems));
       } else {
         fertItems.forEach(c => routineLines.push(`・${c.plant.display_name}：${c.summary}`));
       }
     } else {
       // All buckets below threshold — show individually
       if (bothItems.length >= GROUPING_THRESHOLD) {
-        routineLines.push(...buildGroupedLines("水やりと液体肥料のタイミング", bothItems));
+        // Both water+fert large batch: separate the concerns
+        routineLines.push(...buildGroupedLines("水やりのタイミング", bothItems));
+        routineLines.push(...buildFertilizerNote(bothItems));
       } else {
         bothItems.forEach(c => routineLines.push(`・${c.plant.display_name}：${c.summary}`));
       }
@@ -258,7 +314,7 @@ export function buildDailyCareMessage(
         waterItems.forEach(c => routineLines.push(`・${c.plant.display_name}：${c.summary}`));
       }
       if (fertItems.length >= GROUPING_THRESHOLD) {
-        routineLines.push(...buildGroupedLines("液体肥料のタイミング", fertItems));
+        routineLines.push(...buildFertilizerNote(fertItems));
       } else {
         fertItems.forEach(c => routineLines.push(`・${c.plant.display_name}：${c.summary}`));
       }

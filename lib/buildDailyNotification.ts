@@ -177,7 +177,7 @@ export async function buildDailyNotificationMessage(householdId: string): Promis
   const shareToken = (shareLinkData as { token: string } | null)?.token ?? null;
   const shareUrl = shareToken ? `${appBaseUrl}/share/${shareToken}` : null;
 
-  const { message, messageBody, spotlightPhotoUrl: rawSpotlightUrl, appLinkPhrase, appUrl } = buildDailyCareMessage(today, plantsWithRecency, careRulesMap, shareUrl);
+  const { message, messageBody, spotlightPhotoUrl: rawSpotlightUrl, appLinkPhrase, appUrl } = buildDailyCareMessage(today, plantsWithRecency, careRulesMap, shareUrl, householdId);
 
   // Upgrade spotlight to a signed URL (1h validity) so LINE servers can fetch the image
   // regardless of whether the Supabase Storage bucket is public or private.
