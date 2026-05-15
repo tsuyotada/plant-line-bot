@@ -61,9 +61,11 @@ const LINE_FEATURES = [
 ] as const;
 
 const CONTENTS = [
-  "植物ごとのケアのヒントについて",
-  "LINEを使った写真記録と相談",
-  "使い方のながれ",
+  { text: "Plant Care でできること",     anchor: "#features"   },
+  { text: "植物ごとのケアのヒント例",     anchor: "#care-hints" },
+  { text: "使い方のながれ",               anchor: "#how-it-works" },
+  { text: "LINEでできること",             anchor: "#line"       },
+  { text: "サンプルを確認する",           anchor: "#sample"     },
 ];
 
 export default function AboutPage() {
@@ -145,16 +147,25 @@ export default function AboutPage() {
         }
         .about-contents-item {
           font-size: 12px;
-          color: rgba(255,255,255,0.58);
           line-height: 1.8;
           margin: 0;
-          text-shadow: 0 1px 3px rgba(0,0,0,0.25);
           list-style: none;
           padding: 0;
         }
         .about-contents-item li::before {
           content: "— ";
           color: rgba(255,255,255,0.28);
+        }
+        .about-contents-item a {
+          color: rgba(255,255,255,0.58);
+          text-decoration: none;
+          text-shadow: 0 1px 3px rgba(0,0,0,0.25);
+          transition: color 0.15s;
+          border-bottom: 1px solid transparent;
+        }
+        .about-contents-item a:hover {
+          color: rgba(255,255,255,0.85);
+          border-bottom-color: rgba(255,255,255,0.35);
         }
 
         /* ─── CTA row ─── */
@@ -397,22 +408,16 @@ export default function AboutPage() {
               水やり、肥料、葉の変化。育てている植物の種類と写真をもとに、その植物に合ったヒントを受け取れます。毎日きっちり管理するというより、気になったときに少しずつ様子を残していけます。
             </p>
 
-            {/* このページで分かること */}
+            {/* このページで分かること — ページ内ナビリンク */}
             <div className="about-contents">
               <p className="about-contents-label">このページで分かること</p>
               <ul className="about-contents-item">
-                {CONTENTS.map((c) => <li key={c}>{c}</li>)}
+                {CONTENTS.map((c) => (
+                  <li key={c.anchor}>
+                    <a href={c.anchor}>{c.text}</a>
+                  </li>
+                ))}
               </ul>
-            </div>
-
-            {/* FV CTA：控えめ（ゴーストボタン） */}
-            <div className="about-cta-row">
-              <a href={SAMPLE_URL} target="_blank" rel="noopener noreferrer" className="about-sample-link">
-                サンプルを見る <span style={{ fontSize: 10 }}>↗</span>
-              </a>
-              <Link href="/login" className="about-login-btn-ghost">
-                LINEで始める
-              </Link>
             </div>
 
           </div>
@@ -425,7 +430,7 @@ export default function AboutPage() {
         </div>
 
         {/* ══ Section 1: できること 3カード ══ */}
-        <div style={{ maxWidth: 620, margin: "0 auto", width: "100%", paddingTop: 56 }}>
+        <div id="features" style={{ maxWidth: 620, margin: "0 auto", width: "100%", paddingTop: 56 }}>
           <p className="about-section-label">Features</p>
           <h2 className="about-section-heading">Plant Care でできること</h2>
           <div className="about-features">
@@ -439,7 +444,7 @@ export default function AboutPage() {
         </div>
 
         {/* ══ Section 2: 植物ごとの具体例 ══ */}
-        <div style={{ maxWidth: 620, margin: "0 auto", width: "100%", paddingTop: 64 }}>
+        <div id="care-hints" style={{ maxWidth: 620, margin: "0 auto", width: "100%", paddingTop: 64 }}>
           <p className="about-section-label">Care Hints</p>
           <h2 className="about-section-heading">植物によって、気にかけることは違う</h2>
           <p className="about-section-body">
@@ -465,7 +470,7 @@ export default function AboutPage() {
         </div>
 
         {/* ══ Section 3: 使い方 ══ */}
-        <div style={{ maxWidth: 560, margin: "0 auto", width: "100%", paddingTop: 72 }}>
+        <div id="how-it-works" style={{ maxWidth: 560, margin: "0 auto", width: "100%", paddingTop: 72 }}>
           <p className="about-section-label">How it works</p>
           <h2 className="about-section-heading">使い方はかんたんです</h2>
           <div>
@@ -482,7 +487,7 @@ export default function AboutPage() {
         </div>
 
         {/* ══ Section 4: LINEでできること ══ */}
-        <div style={{ maxWidth: 560, margin: "0 auto", width: "100%", paddingTop: 72 }}>
+        <div id="line" style={{ maxWidth: 560, margin: "0 auto", width: "100%", paddingTop: 72 }}>
           <p className="about-section-label">LINE</p>
           <h2 className="about-section-heading">LINEでできること</h2>
           <p className="about-section-body">
@@ -502,7 +507,7 @@ export default function AboutPage() {
         </div>
 
         {/* ══ Section 5: サンプルで確認 ══ */}
-        <div style={{ maxWidth: 560, margin: "0 auto", width: "100%", paddingTop: 72 }}>
+        <div id="sample" style={{ maxWidth: 560, margin: "0 auto", width: "100%", paddingTop: 72 }}>
           <p className="about-section-label">Sample</p>
           <div className="about-sample-block">
             <h2 style={{ fontSize: 15, fontWeight: 700, color: "rgba(255,255,255,0.96)", margin: "0 0 10px", textShadow: "0 1px 6px rgba(0,0,0,0.40)" }}>
