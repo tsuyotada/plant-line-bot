@@ -51,7 +51,7 @@ export default async function LoginPage({
         /* ─── Grid: 1:2 — left intro narrower, right card dominant ─── */
         .login-grid {
           display: grid;
-          grid-template-columns: 1fr 2fr;
+          grid-template-columns: 1fr 1fr;
           gap: 44px;
           align-items: start;
           max-width: 960px;
@@ -161,41 +161,46 @@ export default async function LoginPage({
         }
         .login-sample-block {
           margin-top: 22px;
-          padding: 16px 18px;
+          padding: 20px 22px 22px;
           background: rgba(255,255,255,0.12);
           border: 1px solid rgba(255,255,255,0.28);
-          border-radius: 12px;
+          border-radius: 14px;
           backdrop-filter: blur(6px);
           -webkit-backdrop-filter: blur(6px);
+          box-sizing: border-box;
+          width: 100%;
         }
         .login-sample-label {
           font-size: 10px;
           font-weight: 700;
           letter-spacing: 1.2px;
           text-transform: uppercase;
-          color: rgba(255,255,255,0.55);
-          margin: 0 0 8px;
+          color: rgba(255,255,255,0.50);
+          margin: 0 0 10px;
           text-shadow: 0 1px 3px rgba(0,0,0,0.25);
         }
         .login-sample-desc {
           font-size: 12px;
-          color: rgba(255,255,255,0.75);
-          line-height: 1.6;
-          margin: 0 0 12px;
+          color: rgba(255,255,255,0.78);
+          line-height: 1.65;
+          margin: 0 0 14px;
           text-shadow: 0 1px 3px rgba(0,0,0,0.25);
         }
         .login-sample-btn {
-          display: inline-flex;
+          display: flex;
           align-items: center;
+          justify-content: center;
           gap: 5px;
-          padding: 9px 16px;
-          background: rgba(255,255,255,0.90);
+          width: 100%;
+          padding: 11px 16px;
+          background: rgba(255,255,255,0.92);
           border: none;
-          border-radius: 8px;
+          border-radius: 9px;
           font-size: 13px;
           font-weight: 700;
           color: #1a3320;
           text-decoration: none;
+          box-sizing: border-box;
           transition: background 0.15s;
         }
         .login-sample-btn:hover { background: #ffffff; }
