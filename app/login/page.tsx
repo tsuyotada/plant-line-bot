@@ -21,18 +21,17 @@ async function sendMagicLink(formData: FormData) {
 
 const ff = 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 
-
 const SAMPLE_URL =
   "https://plant-line-bot-forme.vercel.app/share/e66f00d8-ae82-42c9-99ad-d133456d8cb6";
 
 const LINE_ERROR_MESSAGES: Record<string, string> = {
-  line_cancelled:     "LINEログインがキャンセルされました。",
-  line_state_mismatch:"セキュリティエラーが発生しました。もう一度お試しください。",
-  line_token_failed:  "LINEとの認証に失敗しました。もう一度お試しください。",
-  line_profile_failed:"LINEプロフィールの取得に失敗しました。",
-  line_signin_failed: "ログイン処理に失敗しました。もう一度お試しください。",
-  line_already_linked:"このLINEアカウントは既に別のユーザーに連携されています。",
-  line_not_configured:"LINEログインの設定が完了していません。管理者にお問い合わせください。",
+  line_cancelled:      "LINEログインがキャンセルされました。",
+  line_state_mismatch: "セキュリティエラーが発生しました。もう一度お試しください。",
+  line_token_failed:   "LINEとの認証に失敗しました。もう一度お試しください。",
+  line_profile_failed: "LINEプロフィールの取得に失敗しました。",
+  line_signin_failed:  "ログイン処理に失敗しました。もう一度お試しください。",
+  line_already_linked: "このLINEアカウントは既に別のユーザーに連携されています。",
+  line_not_configured: "LINEログインの設定が完了していません。管理者にお問い合わせください。",
 };
 
 export default async function LoginPage({
@@ -48,33 +47,32 @@ export default async function LoginPage({
   return (
     <>
       <style>{`
-        /* ─── Grid: 3 columns — text | sample | card ─── */
+        /* ─── Grid: 2 columns — intro | card ─── */
         .login-grid {
           display: grid;
-          grid-template-columns: 1fr 1fr 1fr;
-          gap: 32px;
+          grid-template-columns: 1fr 1fr;
+          gap: 48px;
           align-items: start;
-          max-width: 1080px;
+          max-width: 900px;
           margin: 0 auto;
         }
-        @media (max-width: 900px) {
-          .login-grid { grid-template-columns: 1fr; gap: 24px; }
-          .login-intro-col  { order: 1; }
-          .login-sample-col { order: 2; }
-          .login-form-col   { order: 3; }
+        @media (max-width: 720px) {
+          .login-grid      { grid-template-columns: 1fr; gap: 28px; }
+          .login-intro-col { order: 1; }
+          .login-form-col  { order: 2; }
         }
 
         /* ─── Login card ─── */
         .login-card-form {
           background: #ffffff;
           border-radius: 16px;
-          padding: 32px 28px 24px;
-          box-shadow: 0 6px 40px rgba(30, 60, 40, 0.22);
-          border: 1px solid rgba(163, 196, 160, 0.50);
+          padding: 28px 26px 22px;
+          box-shadow: 0 6px 40px rgba(20, 50, 30, 0.28);
+          border: 1px solid rgba(163, 196, 160, 0.45);
           box-sizing: border-box;
         }
         @media (max-width: 480px) {
-          .login-card-form { padding: 24px 20px 20px; }
+          .login-card-form { padding: 22px 18px 18px; }
         }
 
         /* ─── Form fields ─── */
@@ -88,7 +86,7 @@ export default async function LoginPage({
         .login-divider-label { font-size: 11px; color: #9ca3af; white-space: nowrap; }
         .login-input {
           width: 100%;
-          padding: 13px 14px;
+          padding: 12px 14px;
           border: 1.5px solid #d1e8d8;
           border-radius: 10px;
           font-size: 15px;
@@ -105,12 +103,12 @@ export default async function LoginPage({
         }
         .login-btn {
           width: 100%;
-          padding: 14px;
+          padding: 13px;
           background: #4b7a5a;
           color: #fff;
           border: none;
           border-radius: 10px;
-          font-size: 16px;
+          font-size: 15px;
           font-weight: 600;
           cursor: pointer;
           font-family: inherit;
@@ -127,7 +125,7 @@ export default async function LoginPage({
         .admin-login-details > summary {
           cursor: pointer;
           font-size: 11px;
-          color: #9ca3af;
+          color: #b0b8b0;
           user-select: none;
           list-style: none;
           display: flex;
@@ -138,80 +136,53 @@ export default async function LoginPage({
         }
         .admin-login-details > summary::-webkit-details-marker { display: none; }
         .admin-login-details > summary::marker { display: none; }
-        .admin-login-details[open] > summary { margin-bottom: 16px; color: #6b7280; }
+        .admin-login-details[open] > summary { margin-bottom: 16px; color: #9ca3af; }
         .admin-login-chevron { font-size: 9px; transition: transform 0.15s; }
         .admin-login-details[open] .admin-login-chevron { transform: rotate(180deg); }
 
-        /* ─── Intro: text directly on background ─── */
+        /* ─── Intro text on background ─── */
         .login-intro-lead {
-          font-size: 17px;
+          font-size: 18px;
           font-weight: 700;
           color: rgba(255,255,255,0.96);
-          line-height: 1.55;
-          margin: 0 0 20px;
-          letter-spacing: -0.2px;
-          text-shadow: 0 1px 8px rgba(0,0,0,0.45);
+          line-height: 1.5;
+          margin: 0 0 18px;
+          letter-spacing: -0.3px;
+          text-shadow: 0 1px 10px rgba(0,0,0,0.50);
         }
         .login-intro-body {
           font-size: 13px;
-          color: rgba(255,255,255,0.82);
+          color: rgba(255,255,255,0.80);
           line-height: 1.9;
-          margin: 0 0 14px;
-          text-shadow: 0 1px 5px rgba(0,0,0,0.35);
+          margin: 0 0 28px;
+          text-shadow: 0 1px 6px rgba(0,0,0,0.40);
         }
-        .login-sample-block {
-          margin-top: 22px;
-          padding: 20px 22px 22px;
-          background: rgba(255,255,255,0.12);
-          border: 1px solid rgba(255,255,255,0.28);
-          border-radius: 14px;
-          backdrop-filter: blur(6px);
-          -webkit-backdrop-filter: blur(6px);
-          box-sizing: border-box;
-          width: 100%;
-        }
-        .login-sample-label {
-          font-size: 10px;
-          font-weight: 700;
-          letter-spacing: 1.2px;
-          text-transform: uppercase;
-          color: rgba(255,255,255,0.50);
-          margin: 0 0 10px;
-          text-shadow: 0 1px 3px rgba(0,0,0,0.25);
-        }
-        .login-sample-desc {
-          font-size: 12px;
-          color: rgba(255,255,255,0.78);
-          line-height: 1.65;
-          margin: 0 0 14px;
-          text-shadow: 0 1px 3px rgba(0,0,0,0.25);
-        }
-        .login-sample-btn {
-          display: flex;
+        .login-sample-link {
+          display: inline-flex;
           align-items: center;
-          justify-content: center;
-          gap: 5px;
-          width: 100%;
-          padding: 11px 16px;
-          background: rgba(255,255,255,0.92);
-          border: none;
-          border-radius: 9px;
-          font-size: 13px;
-          font-weight: 700;
-          color: #1a3320;
+          gap: 4px;
+          font-size: 12px;
+          font-weight: 600;
+          color: rgba(255,255,255,0.65);
           text-decoration: none;
-          box-sizing: border-box;
-          transition: background 0.15s;
+          border-bottom: 1px solid rgba(255,255,255,0.28);
+          padding-bottom: 2px;
+          line-height: 1.4;
+          text-shadow: 0 1px 4px rgba(0,0,0,0.35);
+          transition: color 0.15s, border-color 0.15s;
         }
-        .login-sample-btn:hover { background: #ffffff; }
+        .login-sample-link:hover {
+          color: rgba(255,255,255,0.88);
+          border-color: rgba(255,255,255,0.55);
+        }
       `}</style>
 
-      <BackgroundLayer />
+      <BackgroundLayer overlayStrength="medium" />
 
       <main style={{ minHeight: "100vh", padding: "0 20px 60px", fontFamily: ff }}>
 
         {/* ── Hero ── */}
-        <div style={{ maxWidth: 1080, margin: "0 auto", padding: "52px 0 40px" }}>
+        <div style={{ maxWidth: 900, margin: "0 auto", padding: "52px 0 44px" }}>
           <h1
             style={{
               fontSize: 72,
@@ -220,18 +191,18 @@ export default async function LoginPage({
               margin: "0 0 8px",
               letterSpacing: -2,
               lineHeight: 1.0,
-              textShadow: "0 2px 12px rgba(0,0,0,0.55), 0 0 32px rgba(0,0,0,0.25)",
+              textShadow: "0 2px 12px rgba(0,0,0,0.60), 0 0 40px rgba(0,0,0,0.30)",
             }}
           >
             Plant Care
           </h1>
           <p
             style={{
-              fontSize: 15,
+              fontSize: 14,
               fontWeight: 500,
-              color: "rgba(255,255,255,0.88)",
+              color: "rgba(255,255,255,0.80)",
               margin: 0,
-              letterSpacing: 1.2,
+              letterSpacing: 1.4,
               textShadow: "0 1px 6px rgba(0,0,0,0.50)",
               textTransform: "uppercase",
             }}
@@ -240,68 +211,55 @@ export default async function LoginPage({
           </p>
         </div>
 
-        {/* ── 3-column grid: text | sample | card ── */}
+        {/* ── 2-column grid: intro | card ── */}
         <div className="login-grid">
 
-          {/* ── Col 1: intro text on background ── */}
+          {/* ── Left: intro on background ── */}
           <div className="login-intro-col">
 
             <p className="login-intro-lead">
-              あなたの植物を見守り、<br />
-              ケアのしかたを教えてくれる場所。
+              植物ごとのケアを、<br />
+              少し相談できる場所。
             </p>
 
             <p className="login-intro-body">
-              育てている植物の種類と写真をもとに、<br />
-              水やり・肥料のタイミングや、<br />
-              葉の変化のヒントを受け取れます。
-            </p>
-
-            <p className="login-intro-body">
+              水やり、肥料、葉の変化。<br />
+              種類と写真をもとに、<br />
+              その植物に合ったヒントを受け取れます。<br />
+              <br />
               毎日きっちり管理するというより、<br />
-              気になったときに開いて、<br />
-              少しずつ様子を残していく。<br />
-              そのくらいの距離感で続けられます。
+              気になったときに少しずつ。
             </p>
 
+            <a
+              href={SAMPLE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="login-sample-link"
+            >
+              サンプルを見る
+              <span style={{ fontSize: 10 }}>↗</span>
+            </a>
+
           </div>
 
-          {/* ── Col 2: sample ── */}
-          <div className="login-sample-col">
-            <div className="login-sample-block">
-              <p className="login-sample-label">Sample</p>
-              <p className="login-sample-desc">
-                使い心地はサンプルページで確認できます。ログイン不要で見られます。
-              </p>
-              <a
-                href={SAMPLE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="login-sample-btn"
-              >
-                サンプルを見る ↗
-              </a>
-            </div>
-          </div>
-
-          {/* ── Col 3: login card ── */}
+          {/* ── Right: login card ── */}
           <div className="login-form-col">
             <div className="login-card-form">
               <h2
                 style={{
-                  fontSize: 20,
+                  fontSize: 19,
                   fontWeight: 800,
                   color: "#1a3320",
-                  margin: "0 0 6px",
+                  margin: "0 0 4px",
                   letterSpacing: -0.3,
                 }}
               >
                 ガーデンを開く
               </h2>
 
-              {/* LINE login error */}
               {lineError && (
-                <p style={{ fontSize: 13, color: "#dc2626", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "10px 12px", margin: "8px 0 0" }}>
+                <p style={{ fontSize: 13, color: "#dc2626", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "10px 12px", margin: "10px 0 0" }}>
                   {lineError}
                 </p>
               )}
@@ -309,8 +267,7 @@ export default async function LoginPage({
               {params.sent ? (
                 <div style={{ paddingTop: 10 }}>
                   <p style={{ fontSize: 14, color: "#4b7a5a", lineHeight: 1.8, margin: "0 0 10px" }}>
-                    メールを送信しました。
-                    <br />
+                    メールを送信しました。<br />
                     届いたリンクを開くと、あなたのガーデンに入れます。
                   </p>
                   <p style={{ fontSize: 12, color: "#9ca3af", lineHeight: 1.65, margin: 0 }}>
@@ -318,12 +275,10 @@ export default async function LoginPage({
                   </p>
                 </div>
               ) : (
-                <div style={{ marginTop: 18 }}>
+                <div style={{ marginTop: 16 }}>
 
-                  {/* ── Primary: LINE Login ── */}
                   <LineSignInButton />
 
-                  {/* ── Dev / Admin accordion ── */}
                   <details className="admin-login-details">
                     <summary>
                       管理者・開発者向けログイン
@@ -357,11 +312,10 @@ export default async function LoginPage({
                 </div>
               )}
 
-              <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid #f0ebe2" }}>
-                <p style={{ fontSize: 11, color: "#9ca3af", margin: 0, lineHeight: 1.7 }}>
-                  共有リンクを受け取った方は、ログイン不要です。
-                  <br />
-                  共有リンクから開いてください。
+              <div style={{ marginTop: 18, paddingTop: 14, borderTop: "1px solid #f0ebe2" }}>
+                <p style={{ fontSize: 11, color: "#b0b8b0", margin: 0, lineHeight: 1.65 }}>
+                  共有リンクを受け取った方はログイン不要です。
+                  リンクから直接開いてください。
                 </p>
               </div>
             </div>

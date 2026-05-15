@@ -20,8 +20,10 @@ const DEFAULT_BG_LIST = [
   "/images/bg-14.jpg.jpg",
 ];
 
-export function BackgroundLayer() {
+export function BackgroundLayer({ overlayStrength = "light" }: { overlayStrength?: "light" | "medium" }) {
   const [bgImage, setBgImage] = useState<string | null>(null);
+  const overlayBase = overlayStrength === "medium" ? "rgba(0,0,0,0.32)" : "rgba(0,0,0,0.18)";
+  const overlayMobile = overlayStrength === "medium" ? "rgba(0,0,0,0.42)" : "rgba(0,0,0,0.28)";
 
   useEffect(() => {
     const randomDefault =
@@ -57,20 +59,19 @@ export function BackgroundLayer() {
               }
         }
       />
-      {/* Subtle overlay for white-text legibility — desktop light, mobile slightly darker */}
       <div
         className="app-bg-overlay"
         style={{
           position: "fixed",
           top: 0, right: 0, bottom: 0, left: 0,
           zIndex: -1,
-          background: "rgba(0,0,0,0.18)",
+          background: overlayBase,
           pointerEvents: "none",
         }}
       />
       <style>{`
         @media (max-width: 768px) {
-          .app-bg-overlay { background: rgba(0,0,0,0.28) !important; }
+          .app-bg-overlay { background: ${overlayMobile} !important; }
         }
       `}</style>
     </>
