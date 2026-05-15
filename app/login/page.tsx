@@ -23,7 +23,7 @@ const ff = 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 
 
 
 const SAMPLE_URL =
-  "https://plant-line-bot-forme.vercel.app/share/8f24ee1b-d5d1-47a3-be24-4a4ae1809ef0";
+  "https://plant-line-bot-forme.vercel.app/share/e66f00d8-ae82-42c9-99ad-d133456d8cb6";
 
 const LINE_ERROR_MESSAGES: Record<string, string> = {
   line_cancelled:     "LINEログインがキャンセルされました。",
@@ -48,10 +48,10 @@ export default async function LoginPage({
   return (
     <>
       <style>{`
-        /* ─── Grid: magazine spread — equal columns ─── */
+        /* ─── Grid: 1:2 — left intro narrower, right card dominant ─── */
         .login-grid {
           display: grid;
-          grid-template-columns: 1fr 1fr;
+          grid-template-columns: 1fr 2fr;
           gap: 44px;
           align-items: start;
           max-width: 960px;
@@ -159,28 +159,46 @@ export default async function LoginPage({
           margin: 0 0 14px;
           text-shadow: 0 1px 5px rgba(0,0,0,0.35);
         }
+        .login-sample-block {
+          margin-top: 22px;
+          padding: 16px 18px;
+          background: rgba(255,255,255,0.12);
+          border: 1px solid rgba(255,255,255,0.28);
+          border-radius: 12px;
+          backdrop-filter: blur(6px);
+          -webkit-backdrop-filter: blur(6px);
+        }
+        .login-sample-label {
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 1.2px;
+          text-transform: uppercase;
+          color: rgba(255,255,255,0.55);
+          margin: 0 0 8px;
+          text-shadow: 0 1px 3px rgba(0,0,0,0.25);
+        }
+        .login-sample-desc {
+          font-size: 12px;
+          color: rgba(255,255,255,0.75);
+          line-height: 1.6;
+          margin: 0 0 12px;
+          text-shadow: 0 1px 3px rgba(0,0,0,0.25);
+        }
         .login-sample-btn {
           display: inline-flex;
           align-items: center;
           gap: 5px;
-          padding: 10px 18px;
-          background: rgba(255,255,255,0.14);
-          border: 1px solid rgba(255,255,255,0.32);
-          border-radius: 24px;
+          padding: 9px 16px;
+          background: rgba(255,255,255,0.90);
+          border: none;
+          border-radius: 8px;
           font-size: 13px;
-          font-weight: 600;
-          color: rgba(255,255,255,0.92);
+          font-weight: 700;
+          color: #1a3320;
           text-decoration: none;
-          text-shadow: 0 1px 3px rgba(0,0,0,0.25);
-          backdrop-filter: blur(4px);
-          -webkit-backdrop-filter: blur(4px);
-          transition: background 0.15s, border-color 0.15s;
-          margin-top: 6px;
+          transition: background 0.15s;
         }
-        .login-sample-btn:hover {
-          background: rgba(255,255,255,0.22);
-          border-color: rgba(255,255,255,0.50);
-        }
+        .login-sample-btn:hover { background: #ffffff; }
       `}</style>
 
       <BackgroundLayer />
@@ -241,15 +259,20 @@ export default async function LoginPage({
               そのくらいの距離感で続けられます。
             </p>
 
-            <a
-              href={SAMPLE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="login-sample-btn"
-            >
-              サンプルの植物ページを見る
-              <span style={{ fontSize: 11, opacity: 0.8 }}>↗</span>
-            </a>
+            <div className="login-sample-block">
+              <p className="login-sample-label">Sample</p>
+              <p className="login-sample-desc">
+                使い心地はサンプルページで確認できます。
+              </p>
+              <a
+                href={SAMPLE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="login-sample-btn"
+              >
+                サンプルを見る ↗
+              </a>
+            </div>
 
           </div>
 
