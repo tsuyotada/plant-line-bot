@@ -49,6 +49,169 @@ export default function AboutPage() {
   return (
     <>
       <style>{`
+        /* ─── Top bar ─── */
+        .about-topbar {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          max-width: 820px;
+          margin: 0 auto;
+          width: 100%;
+          padding: 24px 0 0;
+        }
+        .about-brand {
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 1.5px;
+          color: rgba(255,255,255,0.38);
+          text-shadow: 0 1px 4px rgba(0,0,0,0.30);
+          text-transform: uppercase;
+        }
+        .about-back-link {
+          font-size: 11px;
+          color: rgba(255,255,255,0.38);
+          text-decoration: none;
+          text-shadow: 0 1px 3px rgba(0,0,0,0.25);
+          transition: color 0.15s;
+        }
+        .about-back-link:hover { color: rgba(255,255,255,0.65); }
+
+        /* ─── Hero ─── */
+        .about-hero {
+          min-height: 88vh;
+          display: flex;
+          align-items: center;
+          max-width: 620px;
+          margin: 0 auto;
+          width: 100%;
+        }
+        .about-hero-inner { padding-bottom: 48px; width: 100%; }
+        .about-hero-h1 {
+          font-size: 40px;
+          font-weight: 800;
+          color: #ffffff;
+          margin: 0 0 18px;
+          line-height: 1.28;
+          letter-spacing: -0.8px;
+          text-shadow: 0 2px 12px rgba(0,0,0,0.55), 0 0 32px rgba(0,0,0,0.25);
+        }
+        @media (max-width: 480px) {
+          .about-hero-h1 { font-size: 32px; }
+        }
+        .about-hero-body {
+          font-size: 14px;
+          color: rgba(255,255,255,0.78);
+          line-height: 1.85;
+          margin: 0 0 10px;
+          text-shadow: 0 1px 6px rgba(0,0,0,0.40);
+          max-width: 500px;
+        }
+        .about-hero-sample-note {
+          font-size: 11px;
+          color: rgba(255,255,255,0.45);
+          margin: 0 0 22px;
+          text-shadow: 0 1px 3px rgba(0,0,0,0.25);
+        }
+        .about-hero-line-note {
+          margin-top: 14px;
+          font-size: 11px;
+          color: rgba(255,255,255,0.42);
+          text-shadow: 0 1px 3px rgba(0,0,0,0.25);
+        }
+
+        /* ─── CTA row ─── */
+        .about-cta-row {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          flex-wrap: wrap;
+        }
+        .about-login-btn {
+          display: inline-flex;
+          align-items: center;
+          padding: 11px 22px;
+          background: rgba(255,255,255,0.92);
+          border-radius: 9px;
+          font-size: 14px;
+          font-weight: 700;
+          color: #1a3320;
+          text-decoration: none;
+          transition: background 0.15s;
+          white-space: nowrap;
+          font-family: inherit;
+        }
+        .about-login-btn:hover { background: #ffffff; }
+        .about-sample-link {
+          display: inline-flex;
+          align-items: center;
+          gap: 3px;
+          font-size: 13px;
+          font-weight: 600;
+          color: rgba(255,255,255,0.78);
+          text-decoration: none;
+          border-bottom: 1px solid rgba(255,255,255,0.40);
+          padding-bottom: 2px;
+          text-shadow: 0 1px 4px rgba(0,0,0,0.35);
+          transition: color 0.15s, border-color 0.15s;
+          white-space: nowrap;
+        }
+        .about-sample-link:hover {
+          color: rgba(255,255,255,0.95);
+          border-color: rgba(255,255,255,0.65);
+        }
+
+        /* ─── Scroll hint ─── */
+        .about-scroll-hint {
+          max-width: 620px;
+          margin: 0 auto;
+          width: 100%;
+          padding-bottom: 20px;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .about-scroll-line {
+          flex: none;
+          width: 24px;
+          height: 1px;
+          background: rgba(255,255,255,0.25);
+        }
+        .about-scroll-text {
+          font-size: 10px;
+          font-weight: 600;
+          letter-spacing: 1.2px;
+          text-transform: uppercase;
+          color: rgba(255,255,255,0.30);
+          text-shadow: 0 1px 3px rgba(0,0,0,0.25);
+        }
+
+        /* ─── Section common ─── */
+        .about-section-label {
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 1.8px;
+          text-transform: uppercase;
+          color: rgba(255,255,255,0.38);
+          margin: 0 0 16px;
+          text-shadow: 0 1px 3px rgba(0,0,0,0.25);
+        }
+        .about-section-heading {
+          font-size: 18px;
+          font-weight: 700;
+          color: rgba(255,255,255,0.96);
+          margin: 0 0 12px;
+          line-height: 1.45;
+          letter-spacing: -0.2px;
+          text-shadow: 0 1px 8px rgba(0,0,0,0.45);
+        }
+        .about-section-body {
+          font-size: 13px;
+          color: rgba(255,255,255,0.76);
+          line-height: 1.85;
+          margin: 0 0 24px;
+          text-shadow: 0 1px 5px rgba(0,0,0,0.35);
+        }
+
         /* ─── Example cards ─── */
         .about-examples {
           display: grid;
@@ -127,169 +290,59 @@ export default function AboutPage() {
           backdrop-filter: blur(8px);
           -webkit-backdrop-filter: blur(8px);
         }
-
-        /* ─── CTA buttons ─── */
-        .about-cta-row {
-          display: flex;
-          align-items: center;
-          gap: 16px;
-          flex-wrap: wrap;
-        }
-        .about-login-btn {
-          display: inline-flex;
-          align-items: center;
-          padding: 11px 22px;
-          background: rgba(255,255,255,0.92);
-          border-radius: 9px;
-          font-size: 14px;
-          font-weight: 700;
-          color: #1a3320;
-          text-decoration: none;
-          transition: background 0.15s;
-          white-space: nowrap;
-          font-family: inherit;
-        }
-        .about-login-btn:hover { background: #ffffff; }
-        .about-sample-link {
-          display: inline-flex;
-          align-items: center;
-          gap: 3px;
-          font-size: 13px;
-          font-weight: 600;
-          color: rgba(255,255,255,0.78);
-          text-decoration: none;
-          border-bottom: 1px solid rgba(255,255,255,0.40);
-          padding-bottom: 2px;
-          text-shadow: 0 1px 4px rgba(0,0,0,0.35);
-          transition: color 0.15s, border-color 0.15s;
-          white-space: nowrap;
-        }
-        .about-sample-link:hover {
-          color: rgba(255,255,255,0.95);
-          border-color: rgba(255,255,255,0.65);
-        }
-        .about-back-link {
-          font-size: 11px;
-          color: rgba(255,255,255,0.40);
-          text-decoration: none;
-          text-shadow: 0 1px 3px rgba(0,0,0,0.25);
-          transition: color 0.15s;
-        }
-        .about-back-link:hover { color: rgba(255,255,255,0.65); }
-
-        /* ─── Section label ─── */
-        .about-section-label {
-          font-size: 10px;
-          font-weight: 700;
-          letter-spacing: 1.8px;
-          text-transform: uppercase;
-          color: rgba(255,255,255,0.38);
-          margin: 0 0 16px;
-          text-shadow: 0 1px 3px rgba(0,0,0,0.25);
-        }
-        .about-section-heading {
-          font-size: 18px;
-          font-weight: 700;
-          color: rgba(255,255,255,0.96);
-          margin: 0 0 12px;
-          line-height: 1.45;
-          letter-spacing: -0.2px;
-          text-shadow: 0 1px 8px rgba(0,0,0,0.45);
-        }
-        .about-section-body {
-          font-size: 13px;
-          color: rgba(255,255,255,0.76);
-          line-height: 1.85;
-          margin: 0 0 24px;
-          text-shadow: 0 1px 5px rgba(0,0,0,0.35);
-        }
       `}</style>
 
       <BackgroundLayer overlayStrength="medium" />
 
       <main style={{ minHeight: "100vh", padding: "0 20px 80px", fontFamily: ff }}>
 
-        {/* ══ Hero ══ */}
-        <div
-          style={{
-            minHeight: "88vh",
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            maxWidth: 560,
-            margin: "0 auto",
-            width: "100%",
-          }}
-        >
-          <Link href="/login" className="about-back-link" style={{ display: "inline-block", marginBottom: 32 }}>
-            ← ログイン画面へ
-          </Link>
+        {/* ── Top bar: small brand + back link ── */}
+        <div className="about-topbar">
+          <span className="about-brand">Plant Care</span>
+          <Link href="/login" className="about-back-link">← ログイン画面へ</Link>
+        </div>
 
-          <h1
-            style={{
-              fontSize: 70,
-              fontWeight: 800,
-              color: "#ffffff",
-              margin: "0 0 8px",
-              letterSpacing: -2,
-              lineHeight: 1.0,
-              textShadow: "0 2px 12px rgba(0,0,0,0.60), 0 0 40px rgba(0,0,0,0.30)",
-            }}
-          >
-            Plant Care
-          </h1>
-          <p
-            style={{
-              fontSize: 13,
-              fontWeight: 500,
-              color: "rgba(255,255,255,0.72)",
-              margin: "0 0 28px",
-              letterSpacing: 1.5,
-              textShadow: "0 1px 6px rgba(0,0,0,0.50)",
-              textTransform: "uppercase",
-            }}
-          >
-            Keep every green healthy.
-          </p>
+        {/* ── Hero ── */}
+        <div className="about-hero">
+          <div className="about-hero-inner">
 
-          <h2
-            style={{
-              fontSize: 20,
-              fontWeight: 700,
-              color: "rgba(255,255,255,0.96)",
-              margin: "0 0 14px",
-              lineHeight: 1.45,
-              letterSpacing: "-0.3px",
-              textShadow: "0 1px 8px rgba(0,0,0,0.45)",
-            }}
-          >
-            植物ごとのケアを、<br />少し相談できる場所。
-          </h2>
+            <h1 className="about-hero-h1">
+              植物の世話を、<br />
+              ひとりで悩まないために。
+            </h1>
 
-          <p
-            style={{
-              fontSize: 14,
-              color: "rgba(255,255,255,0.78)",
-              lineHeight: 1.85,
-              margin: "0 0 32px",
-              textShadow: "0 1px 6px rgba(0,0,0,0.40)",
-            }}
-          >
-            水やり、肥料、葉の変化。育てている植物の種類と写真をもとに、その植物に合ったヒントを受け取れます。
-          </p>
+            <p className="about-hero-body">
+              水やり、肥料、葉の変化。育てている植物の種類と写真をもとに、その植物に合ったヒントを受け取れます。毎日きっちり管理するというより、気になったときに少しずつ様子を残していけます。
+            </p>
 
-          <div className="about-cta-row">
-            <Link href="/login" className="about-login-btn">
-              LINEで始める
-            </Link>
-            <a href={SAMPLE_URL} target="_blank" rel="noopener noreferrer" className="about-sample-link">
-              サンプルを見る <span style={{ fontSize: 10 }}>↗</span>
-            </a>
+            <p className="about-hero-sample-note">
+              ログイン前に、実際の植物ページを確認できます。
+            </p>
+
+            <div className="about-cta-row">
+              <Link href="/login" className="about-login-btn">
+                LINEで始める
+              </Link>
+              <a href={SAMPLE_URL} target="_blank" rel="noopener noreferrer" className="about-sample-link">
+                サンプルを見る <span style={{ fontSize: 10 }}>↗</span>
+              </a>
+            </div>
+
+            <p className="about-hero-line-note">
+              LINEアカウントで始められます。朝の通知はあとから設定できます。
+            </p>
+
           </div>
         </div>
 
+        {/* ── Scroll hint ── */}
+        <div className="about-scroll-hint">
+          <span className="about-scroll-line" />
+          <span className="about-scroll-text">植物ごとのケアのヒントについて</span>
+        </div>
+
         {/* ══ Section 1: 植物によって違う ══ */}
-        <div style={{ maxWidth: 620, margin: "0 auto", width: "100%", paddingTop: 72 }}>
+        <div style={{ maxWidth: 620, margin: "0 auto", width: "100%", paddingTop: 56 }}>
           <p className="about-section-label">Care Hints</p>
           <h2 className="about-section-heading">植物によって、気にかけることは違う</h2>
           <p className="about-section-body">
@@ -306,15 +359,7 @@ export default function AboutPage() {
             ))}
           </div>
 
-          <p
-            style={{
-              marginTop: 16,
-              fontSize: 11,
-              color: "rgba(255,255,255,0.38)",
-              lineHeight: 1.7,
-              textShadow: "0 1px 3px rgba(0,0,0,0.25)",
-            }}
-          >
+          <p style={{ marginTop: 14, fontSize: 11, color: "rgba(255,255,255,0.35)", lineHeight: 1.7, textShadow: "0 1px 3px rgba(0,0,0,0.25)" }}>
             ※ ヒントは植物の種類と記録をもとに生成されます。断定ではなく、気にかけるきっかけとしてお使いください。
           </p>
         </div>
@@ -341,28 +386,11 @@ export default function AboutPage() {
         <div style={{ maxWidth: 560, margin: "0 auto", width: "100%", paddingTop: 72 }}>
           <p className="about-section-label">Sample</p>
           <div className="about-sample-block">
-            <h2
-              style={{
-                fontSize: 16,
-                fontWeight: 700,
-                color: "rgba(255,255,255,0.96)",
-                margin: "0 0 10px",
-                textShadow: "0 1px 6px rgba(0,0,0,0.40)",
-              }}
-            >
+            <h2 style={{ fontSize: 16, fontWeight: 700, color: "rgba(255,255,255,0.96)", margin: "0 0 10px", textShadow: "0 1px 6px rgba(0,0,0,0.40)" }}>
               ログイン前に、使い心地を確認できます
             </h2>
-            <p
-              style={{
-                fontSize: 13,
-                color: "rgba(255,255,255,0.72)",
-                lineHeight: 1.8,
-                margin: "0 0 18px",
-                textShadow: "0 1px 4px rgba(0,0,0,0.30)",
-              }}
-            >
-              サンプルの植物ページを公開しています。どんなヒントが届くか、どんな見え方になるか、
-              登録前に確認できます。
+            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.72)", lineHeight: 1.8, margin: "0 0 18px", textShadow: "0 1px 4px rgba(0,0,0,0.30)" }}>
+              サンプルの植物ページを公開しています。どんなヒントが届くか、どんな見え方になるか、登録前に確認できます。
             </p>
             <a href={SAMPLE_URL} target="_blank" rel="noopener noreferrer" className="about-sample-link">
               サンプルの植物ページを見る <span style={{ fontSize: 10 }}>↗</span>
@@ -374,29 +402,11 @@ export default function AboutPage() {
         <div style={{ maxWidth: 560, margin: "0 auto", width: "100%", paddingTop: 72 }}>
           <p className="about-section-label">Get started</p>
           <h2 className="about-section-heading">LINEで始められます</h2>
-          <p
-            style={{
-              fontSize: 13,
-              color: "rgba(255,255,255,0.76)",
-              lineHeight: 1.85,
-              margin: "0 0 10px",
-              textShadow: "0 1px 5px rgba(0,0,0,0.35)",
-            }}
-          >
+          <p style={{ fontSize: 13, color: "rgba(255,255,255,0.76)", lineHeight: 1.85, margin: "0 0 8px", textShadow: "0 1px 5px rgba(0,0,0,0.35)" }}>
             LINEアカウントでログインできます。メールアドレスの入力は不要です。
           </p>
-          <p
-            style={{
-              fontSize: 13,
-              color: "rgba(255,255,255,0.76)",
-              lineHeight: 1.85,
-              margin: "0 0 28px",
-              textShadow: "0 1px 5px rgba(0,0,0,0.35)",
-            }}
-          >
-            まずはWebだけで使い始めても大丈夫です。
-            朝のLINE通知は、ログイン後にいつでも設定できます。
-            LINEログインと朝の通知は、別々に設定できます。
+          <p style={{ fontSize: 13, color: "rgba(255,255,255,0.76)", lineHeight: 1.85, margin: "0 0 28px", textShadow: "0 1px 5px rgba(0,0,0,0.35)" }}>
+            まずはWebだけで使い始めても大丈夫です。朝のLINE通知は、ログイン後にいつでも設定できます。LINEログインと朝の通知は、別々に設定できます。
           </p>
           <div className="about-cta-row">
             <Link href="/login" className="about-login-btn">
