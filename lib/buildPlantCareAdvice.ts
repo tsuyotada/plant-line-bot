@@ -34,6 +34,50 @@ export type PlantCareCard = {
 // 例: interval=14 → 14日目〜16日目に表示、17日目に消える。28日目にまた表示。
 const FERTILIZER_REMINDER_DAYS = 3;
 
+// ── 植物カテゴリ判定（ケア閾値の調整に使用） ────────────────────────────────
+
+type PlantCategory = "succulent" | "general";
+
+function detectPlantCategory(plantType: string | null | undefined): PlantCategory {
+  if (!plantType) return "general";
+  const t = plantType.toLowerCase();
+  const succulentKeywords = [
+    "サボテン", "cactus", "多肉", "succulent",
+    "アガベ", "agave", "アロエ", "aloe",
+    "ハオルシア", "haworthia", "ガステリア", "gasteria",
+    "コノフィツム", "リトープス", "echeveria", "エケベリア",
+    "ユーフォルビア", "euphorbia",
+  ];
+  if (succulentKeywords.some((k) => t.includes(k))) return "succulent";
+  return "general";
+}
+
+/** 植物タイプを考慮した水やり優先度。サボテン系は大幅に閾値を緩和 */
+function getCarePriorityForType(
+  days: number | null,
+  category: PlantCategory,
+): CarePriority {
+  if (category === "succulent") {
+    if (days === null || days >= 21) return "urgent";
+    if (days <= 5) return "recent";
+    if (days <= 12) return "normal";
+    return "attention"; // 13-20日
+  }
+  return getCarePriority(days);
+}
+
+/** サボテン系はデフォルト14日インターバルの液体肥料を抑制 */
+function shouldShowFertilizer(plant: PlantAdviceInput, category: PlantCategory): boolean {
+  if (!plant.fertilizerEnabled) return false;
+  // サボテン/多肉：AIが30日超のインターバルを設定した場合のみ表示
+  if (category === "succulent" && plant.fertilizerIntervalDays < 30) return false;
+  const daysPastInterval = plant.daysSinceLastFertilized - plant.fertilizerIntervalDays;
+  return (
+    daysPastInterval >= 0 &&
+    daysPastInterval % plant.fertilizerIntervalDays < FERTILIZER_REMINDER_DAYS
+  );
+}
+
 // 日付+plantId をシードにした決定論的選択（同じ日は同じ結果、翌日は変わる）
 function datePick<T>(items: T[], seed: string): T {
   let h = 0;
@@ -97,16 +141,13 @@ export function buildPlantCareCards(
 ): PlantCareCard[] {
   return plants.map(plant => {
     const rules = careRulesMap.get(plant.id) ?? [];
-    const priority = getCarePriority(plant.daysSinceLastPhoto);
+    const category = detectPlantCategory(plant.plantType);
+    const priority = getCarePriorityForType(plant.daysSinceLastPhoto, category);
     const needsWater = priority === "urgent" || priority === "attention";
 
     // 液体肥料: インターバル経過後 FERTILIZER_REMINDER_DAYS 日間のみ表示し、以後は次のサイクルまで非表示。
-    // last_fertilized_at が記録されない場合も created_at 起点で周期的にリマインドする。
-    const daysPastInterval = plant.daysSinceLastFertilized - plant.fertilizerIntervalDays;
-    const needsFertilizer =
-      plant.fertilizerEnabled &&
-      daysPastInterval >= 0 &&
-      daysPastInterval % plant.fertilizerIntervalDays < FERTILIZER_REMINDER_DAYS;
+    // サボテン/多肉はデフォルト14日インターバルを無視し、AI生成ルール（30日超）があるときだけ表示。
+    const needsFertilizer = shouldShowFertilizer(plant, category);
 
     const needsPhoto = (plant.daysSinceLastPhoto ?? 999) >= 3;
 

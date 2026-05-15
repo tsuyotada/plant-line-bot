@@ -219,9 +219,9 @@ function OnboardingWizard({
 }: {
   addPlantAction: (formData: FormData) => Promise<void>;
 }) {
-  type WizardStep = "welcome" | "name" | "photo" | "details" | "done";
+  type WizardStep = "welcome" | "type" | "photo" | "details";
   const [step, setStep] = useState<WizardStep>("welcome");
-  const [name, setName] = useState("");
+  const [plantType, setPlantType] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [location, setLocation] = useState("");
@@ -241,11 +241,10 @@ function OnboardingWizard({
   }
 
   function handleSubmit() {
-    if (!name.trim()) return;
-    setStep("done");
+    if (!plantType.trim()) return;
     startTransition(async () => {
       const fd = new FormData();
-      fd.set("name", name.trim());
+      fd.set("name", plantType.trim());
       if (location.trim()) fd.set("location", location.trim());
       if (memo.trim()) fd.set("memo", memo.trim());
       if (photo) {
@@ -256,14 +255,15 @@ function OnboardingWizard({
           fd.set("photo", photo);
         }
       }
+      try { sessionStorage.setItem("pc-welcome", "1"); } catch { /* ignore */ }
       await addPlantAction(fd);
     });
   }
 
-  const stepNum = step === "name" ? 1 : step === "photo" ? 2 : step === "details" ? 3 : null;
+  const stepNum = step === "type" ? 1 : step === "photo" ? 2 : step === "details" ? 3 : null;
 
   return (
-    <div style={{ padding: "8px 0" }}>
+    <div style={{ padding: "8px 0", minHeight: 280 }}>
       <style>{`
         .wizard-btn-primary {
           width: 100%; padding: 10px; background: #4b7a5a; color: #fff;
@@ -271,26 +271,29 @@ function OnboardingWizard({
           cursor: pointer; font-family: ${fontFamily};
         }
         .wizard-btn-primary:disabled { background: #9ca3af; cursor: not-allowed; }
-        .wizard-btn-secondary {
-          width: 100%; padding: 10px; background: #f2faf4; color: #4b7a5a;
-          border: 1.5px solid #93c9a0; border-radius: 8px; font-size: 12px;
-          font-weight: 600; cursor: pointer; font-family: ${fontFamily};
-        }
+        @keyframes pc-fadein { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
 
       {step === "welcome" && (
-        <div style={{ textAlign: "center", padding: "24px 8px 16px" }}>
-          <div style={{ fontSize: 38, marginBottom: 14 }}>🌿</div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: "#1a3320", marginBottom: 8, lineHeight: 1.4 }}>
+        <div style={{ textAlign: "center", padding: "28px 8px 20px", animation: "pc-fadein 0.3s ease" }}>
+          <div style={{
+            fontSize: 10, fontWeight: 700, color: "#a0b8a0",
+            letterSpacing: 2, textTransform: "uppercase",
+            marginBottom: 20, fontFamily,
+          }}>
+            First plant
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: "#1a3320", marginBottom: 10, lineHeight: 1.4, fontFamily }}>
             まずは、1鉢置いてみましょう
           </div>
-          <div style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.8, marginBottom: 28 }}>
-            名前と写真だけでも大丈夫です。<br />
+          <div style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.8, marginBottom: 32, fontFamily }}>
+            種類と写真があると、その植物に合わせた<br />
+            ケアのタイミングを調整できます。<br />
             あとから少しずつ整えられます。
           </div>
           <button
             type="button"
-            onClick={() => setStep("name")}
+            onClick={() => setStep("type")}
             style={{
               padding: "10px 32px", background: "#4b7a5a", color: "#fff",
               border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700,
@@ -303,9 +306,9 @@ function OnboardingWizard({
       )}
 
       {stepNum !== null && (
-        <div>
+        <div style={{ animation: "pc-fadein 0.25s ease" }}>
           {/* ステップインジケーター */}
-          <div style={{ display: "flex", justifyContent: "center", gap: 6, marginBottom: 20 }}>
+          <div style={{ display: "flex", justifyContent: "center", gap: 6, marginBottom: 22 }}>
             {[1, 2, 3].map((n) => (
               <div key={n} style={{
                 width: 32, height: 4, borderRadius: 2,
@@ -315,27 +318,29 @@ function OnboardingWizard({
             ))}
           </div>
 
-          {step === "name" && (
+          {step === "type" && (
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#2d4a3e", marginBottom: 4, lineHeight: 1.5 }}>
-                この植物を、なんと呼んでいますか？
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#2d4a3e", marginBottom: 4, lineHeight: 1.5, fontFamily }}>
+                植物の種類を教えてください
               </div>
-              <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 12 }}>正式な名前でなくても大丈夫です。</div>
+              <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 12, lineHeight: 1.65, fontFamily }}>
+                わかる範囲で大丈夫です。種類と写真をもとに、気にかけるタイミングを調整します。
+              </div>
               <input
                 type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="例：ミニトマト、パキラ、モンステラ"
+                value={plantType}
+                onChange={(e) => setPlantType(e.target.value)}
+                placeholder="例：サボテン、ガジュマル、コブミカン、バジル"
                 className="form-input"
                 autoFocus
-                onKeyDown={(e) => { if (e.key === "Enter" && name.trim()) setStep("photo"); }}
+                onKeyDown={(e) => { if (e.key === "Enter" && plantType.trim()) setStep("photo"); }}
                 style={{ marginBottom: 14 }}
               />
               <button
                 type="button"
                 className="wizard-btn-primary"
-                onClick={() => name.trim() && setStep("photo")}
-                disabled={!name.trim()}
+                onClick={() => plantType.trim() && setStep("photo")}
+                disabled={!plantType.trim()}
               >
                 次へ →
               </button>
@@ -344,17 +349,17 @@ function OnboardingWizard({
 
           {step === "photo" && (
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#2d4a3e", marginBottom: 4, lineHeight: 1.5 }}>
-                いまの姿を1枚残しておきませんか？
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#2d4a3e", marginBottom: 4, lineHeight: 1.5, fontFamily }}>
+                写真があると、あとから変化を見やすくなります
               </div>
-              <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 12 }}>
-                あとで変化に気づきやすくなります。写真はあとから追加しても大丈夫です。
+              <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 12, lineHeight: 1.65, fontFamily }}>
+                写真はあとから追加しても大丈夫です。
               </div>
               {photoPreview && (
                 <img
                   src={photoPreview}
                   alt="プレビュー"
-                  style={{ width: "100%", height: 120, objectFit: "cover", borderRadius: 8, display: "block", marginBottom: 10 }}
+                  style={{ width: "100%", height: 130, objectFit: "cover", borderRadius: 8, display: "block", marginBottom: 10 }}
                 />
               )}
               <button
@@ -363,7 +368,7 @@ function OnboardingWizard({
                 onClick={() => photoInputRef.current?.click()}
                 style={{ marginBottom: 12 }}
               >
-                {photoPreview ? "📷 写真を変更する" : "📷 写真を選ぶ / 撮る"}
+                {photoPreview ? "写真を変更する" : "写真を選ぶ / 撮る"}
               </button>
               <input
                 ref={photoInputRef}
@@ -398,10 +403,10 @@ function OnboardingWizard({
 
           {step === "details" && (
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#2d4a3e", marginBottom: 4, lineHeight: 1.5 }}>
-                どこに置いているか、軽く残しておけます。
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#2d4a3e", marginBottom: 4, lineHeight: 1.5, fontFamily }}>
+                どこに置いているか、軽く残しておけます
               </div>
-              <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 12 }}>どちらも任意です。あとから追加しても大丈夫です。</div>
+              <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 12, fontFamily }}>どちらも任意です。あとから追加しても大丈夫です。</div>
               <div style={{ marginBottom: 10 }}>
                 <label className="form-label">置き場所</label>
                 <input
@@ -434,19 +439,6 @@ function OnboardingWizard({
           )}
         </div>
       )}
-
-      {step === "done" && (
-        <div style={{ textAlign: "center", padding: "24px 8px 16px" }}>
-          <div style={{ fontSize: 38, marginBottom: 14 }}>🌱</div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: "#1a3320", marginBottom: 8 }}>
-            最初の1鉢を置きました。
-          </div>
-          <div style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.8 }}>
-            今日から、少しずつ様子を残していけます。<br />
-            詳しい設定や通知は、あとからいつでも整えられます。
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -470,6 +462,7 @@ export function PlantColumn({
 }: Props) {
   const router = useRouter();
   const [localPlants, setLocalPlants] = useState(plants);
+  const [welcomeToast, setWelcomeToast] = useState(false);
   const [photoPreviews, setPhotoPreviews] = useState<Record<string, string>>({});
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [historyModalId, setHistoryModalId] = useState<string | null>(null);
@@ -497,6 +490,23 @@ export function PlantColumn({
   useEffect(() => {
     setLocalPlants(plants);
   }, [plants]);
+
+  // ウィザード完了後のウェルカムトーストを plants が増えたタイミングで表示
+  useEffect(() => {
+    if (plants.length === 0) return;
+    try {
+      if (sessionStorage.getItem("pc-welcome") === "1") {
+        sessionStorage.removeItem("pc-welcome");
+        setWelcomeToast(true);
+      }
+    } catch { /* sessionStorage 使用不可環境 */ }
+  }, [plants.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!welcomeToast) return;
+    const t = setTimeout(() => setWelcomeToast(false), 4000);
+    return () => clearTimeout(t);
+  }, [welcomeToast]);
 
   const lightboxOpen = lightbox !== null;
   useEffect(() => {
@@ -1957,6 +1967,36 @@ export function PlantColumn({
           </div>
         );
       })()}
+
+      {/* ウェルカムトースト（初回植物登録完了後、数秒表示） */}
+      {welcomeToast && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: 28,
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "#1a3320",
+            color: "#fff",
+            borderRadius: 12,
+            padding: "14px 28px",
+            fontSize: 13,
+            fontWeight: 600,
+            boxShadow: "0 4px 24px rgba(0,0,0,0.28)",
+            zIndex: 400,
+            textAlign: "center",
+            maxWidth: "calc(100vw - 48px)",
+            fontFamily,
+            animation: "pc-fadein 0.35s ease",
+            pointerEvents: "none",
+          }}
+        >
+          最初の1鉢を置きました。
+          <div style={{ fontSize: 11, fontWeight: 400, marginTop: 5, color: "rgba(255,255,255,0.70)" }}>
+            今日から、少しずつ様子を残していけます。
+          </div>
+        </div>
+      )}
     </>
   );
 }

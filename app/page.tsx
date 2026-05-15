@@ -8,6 +8,7 @@ import { fetchHouseholdData, todayStringJst, getPlantLabel } from "@/lib/fetchHo
 import { ShareLinkCard } from "./ShareLinkCard";
 import { LineJoinCard } from "./LineJoinCard";
 import { HouseholdSetupForm } from "./HouseholdSetupForm";
+import { BackgroundLayer } from "./BackgroundLayer";
 
 // DB migration required (run once):
 // alter table plants add column if not exists sort_order integer;
@@ -441,22 +442,15 @@ export default async function Home() {
 
   if (!household) {
     return (
-      <main
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%)",
-          padding: "24px",
-          fontFamily,
-        }}
-      >
-        <HouseholdSetupForm
-          createHouseholdAction={createHousehold}
-          userEmail={user?.email ?? null}
-        />
-      </main>
+      <>
+        <BackgroundLayer />
+        <main style={{ minHeight: "100vh", padding: "0 20px 60px", fontFamily }}>
+          <HouseholdSetupForm
+            createHouseholdAction={createHousehold}
+            userEmail={user?.email ?? null}
+          />
+        </main>
+      </>
     );
   }
 
@@ -852,22 +846,24 @@ export default async function Home() {
             </div>
           )}
 
-          {/* ── 家族共有リンク ── */}
-          <ShareLinkCard
-            shareUrl={shareUrl}
-            linkId={shareLink?.id ?? null}
-            createShareLinkAction={createShareLink}
-            revokeShareLinkAction={revokeShareLink}
-            regenerateShareLinkAction={regenerateShareLink}
-          />
-
-          {/* ── LINE 家族参加 ── */}
-          <LineJoinCard
-            code={joinCode}
-            createJoinCodeAction={createJoinCode}
-            revokeJoinCodeAction={revokeJoinCode}
-            regenerateJoinCodeAction={regenerateJoinCode}
-          />
+          {/* 共有・LINE通知は植物を1件以上登録してから表示 */}
+          {plants.length > 0 && (
+            <>
+              <ShareLinkCard
+                shareUrl={shareUrl}
+                linkId={shareLink?.id ?? null}
+                createShareLinkAction={createShareLink}
+                revokeShareLinkAction={revokeShareLink}
+                regenerateShareLinkAction={regenerateShareLink}
+              />
+              <LineJoinCard
+                code={joinCode}
+                createJoinCodeAction={createJoinCode}
+                revokeJoinCodeAction={revokeJoinCode}
+                regenerateJoinCodeAction={regenerateJoinCode}
+              />
+            </>
+          )}
           </div>{/* /sidebar-section */}
           </div>{/* /col-right */}
         </div>
