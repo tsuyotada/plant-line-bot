@@ -48,10 +48,10 @@ export default async function LoginPage({
   return (
     <>
       <style>{`
-        /* ─── Grid: magazine spread ─── */
+        /* ─── Grid: magazine spread — equal columns ─── */
         .login-grid {
           display: grid;
-          grid-template-columns: 6fr 7fr;
+          grid-template-columns: 1fr 1fr;
           gap: 44px;
           align-items: start;
           max-width: 960px;
@@ -224,8 +224,8 @@ export default async function LoginPage({
           <div className="login-intro-col">
 
             <p className="login-intro-lead">
-              植物ごとのケアを、<br />
-              少し相談できる場所。
+              あなたの植物を見守り、<br />
+              ケアのしかたを教えてくれる場所。
             </p>
 
             <p className="login-intro-body">
