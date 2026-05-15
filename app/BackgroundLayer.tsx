@@ -20,12 +20,19 @@ const DEFAULT_BG_LIST = [
   "/images/bg-14.jpg.jpg",
 ];
 
-export function BackgroundLayer({ overlayStrength = "light" }: { overlayStrength?: "light" | "medium" }) {
-  const [bgImage, setBgImage] = useState<string | null>(null);
+export function BackgroundLayer({
+  overlayStrength = "light",
+  fixedBg,
+}: {
+  overlayStrength?: "light" | "medium";
+  fixedBg?: string;
+}) {
+  const [bgImage, setBgImage] = useState<string | null>(fixedBg ?? null);
   const overlayBase = overlayStrength === "medium" ? "rgba(0,0,0,0.32)" : "rgba(0,0,0,0.18)";
   const overlayMobile = overlayStrength === "medium" ? "rgba(0,0,0,0.42)" : "rgba(0,0,0,0.28)";
 
   useEffect(() => {
+    if (fixedBg) return; // 固定画像が指定されている場合はランダム選択しない
     const randomDefault =
       DEFAULT_BG_LIST[Math.floor(Math.random() * DEFAULT_BG_LIST.length)];
     try {
@@ -34,7 +41,7 @@ export function BackgroundLayer({ overlayStrength = "light" }: { overlayStrength
     } catch {
       setBgImage(randomDefault);
     }
-  }, []);
+  }, [fixedBg]);
 
   return (
     <>

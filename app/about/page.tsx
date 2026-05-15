@@ -374,7 +374,7 @@ export default function AboutPage() {
         }
       `}</style>
 
-      <BackgroundLayer overlayStrength="medium" />
+      <BackgroundLayer overlayStrength="medium" fixedBg="/images/bg-14.jpg.jpg" />
 
       <main style={{ minHeight: "100vh", padding: "0 20px 80px", fontFamily: ff }}>
 
