@@ -21,12 +21,6 @@ async function sendMagicLink(formData: FormData) {
 
 const ff = 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 
-const FEATURES = [
-  { icon: "🌿", title: "植物をまとめて見る",  desc: "写真つきで、わが家の植物を一覧できます。" },
-  { icon: "📷", title: "写真とメモを残す",    desc: "成長や変化をあとから見返せます。" },
-  { icon: "🔗", title: "家族と共有する",      desc: "共有リンクで、ログインなしでも植物ページを見られます。" },
-  { icon: "💬", title: "LINEで受け取る",     desc: "朝の植物メモを家庭ごとに届けます。" },
-];
 
 const SAMPLE_URL =
   "https://plant-line-bot-forme.vercel.app/share/8f24ee1b-d5d1-47a3-be24-4a4ae1809ef0";
@@ -57,15 +51,15 @@ export default async function LoginPage({
         /* ─── Grid: magazine spread ─── */
         .login-grid {
           display: grid;
-          grid-template-columns: 5fr 8fr;
-          gap: 48px;
+          grid-template-columns: 6fr 7fr;
+          gap: 44px;
           align-items: start;
           max-width: 960px;
           margin: 0 auto;
         }
         /* Mobile: stack — intro (on bg) first, card second */
         @media (max-width: 768px) {
-          .login-grid  { grid-template-columns: 1fr; gap: 24px; }
+          .login-grid  { grid-template-columns: 1fr; gap: 28px; }
           .login-intro-col { order: 1; }
           .login-form-col  { order: 2; }
         }
@@ -149,32 +143,43 @@ export default async function LoginPage({
         .admin-login-details[open] .admin-login-chevron { transform: rotate(180deg); }
 
         /* ─── Intro: text directly on background ─── */
-        .login-intro-text {
+        .login-intro-lead {
+          font-size: 17px;
+          font-weight: 700;
+          color: rgba(255,255,255,0.96);
+          line-height: 1.55;
+          margin: 0 0 20px;
+          letter-spacing: -0.2px;
+          text-shadow: 0 1px 8px rgba(0,0,0,0.45);
+        }
+        .login-intro-body {
           font-size: 13px;
-          color: rgba(255,255,255,0.88);
-          line-height: 1.85;
-          margin: 0 0 22px;
+          color: rgba(255,255,255,0.82);
+          line-height: 1.9;
+          margin: 0 0 14px;
           text-shadow: 0 1px 5px rgba(0,0,0,0.35);
         }
-        .login-feature-icon {
-          font-size: 15px;
-          line-height: 1.4;
-          flex-shrink: 0;
-          margin-top: 1px;
-        }
-        .login-feature-title {
-          font-size: 12px;
-          font-weight: 700;
-          color: rgba(255,255,255,0.95);
-          margin-bottom: 2px;
-          line-height: 1.4;
-          text-shadow: 0 1px 4px rgba(0,0,0,0.35);
-        }
-        .login-feature-desc {
-          font-size: 11px;
-          color: rgba(255,255,255,0.62);
-          line-height: 1.6;
+        .login-sample-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          padding: 10px 18px;
+          background: rgba(255,255,255,0.14);
+          border: 1px solid rgba(255,255,255,0.32);
+          border-radius: 24px;
+          font-size: 13px;
+          font-weight: 600;
+          color: rgba(255,255,255,0.92);
+          text-decoration: none;
           text-shadow: 0 1px 3px rgba(0,0,0,0.25);
+          backdrop-filter: blur(4px);
+          -webkit-backdrop-filter: blur(4px);
+          transition: background 0.15s, border-color 0.15s;
+          margin-top: 6px;
+        }
+        .login-sample-btn:hover {
+          background: rgba(255,255,255,0.22);
+          border-color: rgba(255,255,255,0.50);
         }
       `}</style>
 
@@ -218,43 +223,32 @@ export default async function LoginPage({
           {/* ── Left: intro directly on background — no card ── */}
           <div className="login-intro-col">
 
-            <p className="login-intro-text">
-              わが家の植物を、写真とメモで見守る。<br />
-              家族と共有して、LINEでも今日の植物メモを受け取れます。
+            <p className="login-intro-lead">
+              植物ごとのケアを、<br />
+              少し相談できる場所。
             </p>
 
-            <div style={{ marginBottom: 20 }}>
-              {FEATURES.map(({ icon, title, desc }) => (
-                <div key={title} style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 12 }}>
-                  <span className="login-feature-icon">{icon}</span>
-                  <div>
-                    <div className="login-feature-title">{title}</div>
-                    <div className="login-feature-desc">{desc}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <p className="login-intro-body">
+              育てている植物の種類と写真をもとに、<br />
+              水やり・肥料のタイミングや、<br />
+              葉の変化のヒントを受け取れます。
+            </p>
+
+            <p className="login-intro-body">
+              毎日きっちり管理するというより、<br />
+              気になったときに開いて、<br />
+              少しずつ様子を残していく。<br />
+              そのくらいの距離感で続けられます。
+            </p>
 
             <a
               href={SAMPLE_URL}
               target="_blank"
               rel="noopener noreferrer"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 4,
-                fontSize: 12,
-                fontWeight: 600,
-                color: "rgba(255,255,255,0.72)",
-                textDecoration: "none",
-                borderBottom: "1px solid rgba(255,255,255,0.30)",
-                paddingBottom: 1,
-                lineHeight: 1.4,
-                textShadow: "0 1px 3px rgba(0,0,0,0.30)",
-              }}
+              className="login-sample-btn"
             >
-              サンプルの植物ページを開く
-              <span style={{ fontSize: 10 }}>↗</span>
+              サンプルの植物ページを見る
+              <span style={{ fontSize: 11, opacity: 0.8 }}>↗</span>
             </a>
 
           </div>
