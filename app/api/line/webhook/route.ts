@@ -28,10 +28,7 @@ function getPlantLabel(plantType: string): string {
 const PLANT_PAGE_SIZE = 11;
 const CONFIDENCE_THRESHOLD = 0.6;
 
-async function fetchActivePlants(supabase: ReturnType<typeof getSupabase>) {
-  // Phase 0: 1 household 固定。将来の家族共有・マルチ household 対応に備えて明示的な変数として扱う。
-  const householdId = process.env.DEFAULT_HOUSEHOLD_ID!;
-
+async function fetchActivePlants(supabase: ReturnType<typeof getSupabase>, householdId: string) {
   const { data: raw } = await supabase
     .from("plants")
     .select("id, plant_type, sort_order, species, memo")
@@ -49,6 +46,27 @@ async function fetchActivePlants(supabase: ReturnType<typeof getSupabase>) {
     return 0;
   });
 }
+
+/** LINE userId から紐づく household_id を取得（is_active 問わず最新の有効レコード） */
+async function getLinkedHouseholdId(
+  supabase: ReturnType<typeof getSupabase>,
+  lineUserId: string,
+): Promise<string | null> {
+  const { data } = await supabase
+    .from("line_notification_users")
+    .select("household_id")
+    .eq("line_user_id", lineUserId)
+    .not("household_id", "is", null)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data as { household_id: string } | null)?.household_id ?? null;
+}
+
+const NOT_LINKED_TEXT =
+  "このLINEアカウントはまだ植物ページにつながっていません。\n" +
+  "WebアプリのLINE通知カードに表示されているコードをLINEで送ってください。\n\n" +
+  "例：通知 ABC123";
 
 function buildPlantPageItems(plants: any[], pendingId: string, page: number): any[] {
   const start = page * PLANT_PAGE_SIZE;
@@ -402,13 +420,9 @@ async function handleFollowEvent(event: any, lineToken: string) {
   await replyToLine(lineToken, replyToken, [
     {
       type: "text",
-      text: "こんにちは🌱\n植物の見守りBotです。\n\nこのBotでは、毎朝のケア通知や写真記録ができます。\n\nまずは下のボタンから登録してください。\n登録すると、毎朝の植物通知が届くようになります。\n\n写真を送ると、そのまま記録とアドバイスもできます📸\n\nやめたいときは『解除』と送ればOKです",
+      text: "こんにちは🌱\nPlant Care Botです。\n\n写真を送ると植物の記録とアドバイスができます📸\n毎朝のケア通知も受け取れます。\n\n通知を受け取るには、WebアプリのLINE通知カードに表示されているコードを送ってください。\n\n例：通知 ABC123\n\nやめたいときは『解除』と送ればOKです",
       quickReply: {
         items: [
-          {
-            type: "action",
-            action: { type: "message", label: "登録する", text: "登録" },
-          },
           {
             type: "action",
             action: { type: "message", label: "通知テスト", text: "通知テスト" },
@@ -428,6 +442,13 @@ async function handleImageMessage(event: any, lineToken: string) {
 
   console.log(`[LINE] 画像受信 userId=${lineUserId}`);
   console.log(`[LINE] messageId=${messageId}`);
+
+  // household が紐づいていない場合は案内して終了
+  const householdId = await getLinkedHouseholdId(supabase, lineUserId);
+  if (!householdId) {
+    await replyToLine(lineToken, replyToken, [{ type: "text", text: NOT_LINKED_TEXT }]);
+    return;
+  }
 
   // 1. LINE から画像バイナリを取得
   const image = await fetchLineImage(messageId, lineToken);
@@ -505,7 +526,7 @@ async function handleImageMessage(event: any, lineToken: string) {
   }
 
   // 5. AI で植物を推定 → 確認メッセージ送信
-  const plants = await fetchActivePlants(supabase);
+  const plants = await fetchActivePlants(supabase, householdId);
 
   if (plants.length === 0) {
     await replyToLine(lineToken, replyToken, [
@@ -595,12 +616,16 @@ async function handleImageMessage(event: any, lineToken: string) {
 
 async function handlePostback(event: any, lineToken: string) {
   const supabase = getSupabase();
+  const lineUserId: string = event.source?.userId ?? "";
   const replyToken: string = event.replyToken;
   const params = new URLSearchParams(event.postback?.data ?? "");
   const action = params.get("action");
   const pendingId = params.get("id");
   const plantId = params.get("plant_id");
   const batchSessionId = params.get("batch_id");
+
+  // 植物一覧が必要なアクションには household 紐づきが必要
+  const householdId = await getLinkedHouseholdId(supabase, lineUserId);
 
   // ── 「追加する」が押された → 植物一覧を Quick Reply で表示 ──
   if (action === "confirm_photo" && pendingId) {
@@ -623,7 +648,11 @@ async function handlePostback(event: any, lineToken: string) {
       .update({ status: "selecting_plant" })
       .eq("id", pendingId);
 
-    const plants = await fetchActivePlants(supabase);
+    if (!householdId) {
+      await replyToLine(lineToken, replyToken, [{ type: "text", text: NOT_LINKED_TEXT }]);
+      return;
+    }
+    const plants = await fetchActivePlants(supabase, householdId);
 
     console.log(`[Plants] 取得件数=${plants.length} 候補: ${plants.map((p: any) => getPlantLabel(p.plant_type)).join(", ")}`);
 
@@ -670,7 +699,6 @@ async function handlePostback(event: any, lineToken: string) {
 
   // ── AI推定結果を「はい」で確認 → 保存 ──
   if (action === "confirm_ai_plant" && pendingId && plantId) {
-    const lineUserId: string = event.source?.userId ?? "";
     console.log(`[AI] ユーザー確認: confirm plant_id=${plantId} pendingId=${pendingId}`);
     await savePlantPhotoAndAdvise(supabase, lineToken, replyToken, lineUserId, pendingId, plantId);
     return;
@@ -685,7 +713,11 @@ async function handlePostback(event: any, lineToken: string) {
       .update({ status: "selecting_plant" })
       .eq("id", pendingId);
 
-    const plants = await fetchActivePlants(supabase);
+    if (!householdId) {
+      await replyToLine(lineToken, replyToken, [{ type: "text", text: NOT_LINKED_TEXT }]);
+      return;
+    }
+    const plants = await fetchActivePlants(supabase, householdId);
     const items = buildPlantPageItems(plants, pendingId, 0);
     const totalPages = Math.ceil(plants.length / PLANT_PAGE_SIZE);
     console.log(`[Plants] reject_ai_plant page=1/${totalPages} 表示件数=${items.length}`);
@@ -704,7 +736,11 @@ async function handlePostback(event: any, lineToken: string) {
   if (action === "more_plants" && pendingId) {
     const page = parseInt(params.get("page") ?? "1", 10);
 
-    const plants = await fetchActivePlants(supabase);
+    if (!householdId) {
+      await replyToLine(lineToken, replyToken, [{ type: "text", text: NOT_LINKED_TEXT }]);
+      return;
+    }
+    const plants = await fetchActivePlants(supabase, householdId);
     const totalPages = Math.ceil(plants.length / PLANT_PAGE_SIZE);
 
     const hasPrevLog = page > 0;
@@ -726,7 +762,6 @@ async function handlePostback(event: any, lineToken: string) {
 
   // ── 植物が選ばれた → plant_photos に登録 → AI アドバイス送信 ──
   if (action === "select_plant" && pendingId && plantId) {
-    const lineUserId: string = event.source?.userId ?? "";
     console.log(`[DB] plant_id=${plantId} pendingId=${pendingId}`);
     await savePlantPhotoAndAdvise(supabase, lineToken, replyToken, lineUserId, pendingId, plantId);
     return;
@@ -734,7 +769,6 @@ async function handlePostback(event: any, lineToken: string) {
 
   // ── バッチ：植物が選ばれた → 全枚数を一括保存 ──────────────────
   if (action === "select_plant_batch" && batchSessionId && plantId) {
-    const lineUserId: string = event.source?.userId ?? "";
     console.log(`[Batch] 植物選択 batchId=${batchSessionId} plant_id=${plantId}`);
     await saveBatchPhotosAndAdvise(supabase, lineToken, replyToken, lineUserId, batchSessionId, plantId);
     return;
@@ -743,7 +777,11 @@ async function handlePostback(event: any, lineToken: string) {
   // ── バッチ：植物選択のページング ───────────────────────────────
   if (action === "more_plants_batch" && batchSessionId) {
     const page = parseInt(params.get("page") ?? "0", 10);
-    const plants = await fetchActivePlants(supabase);
+    if (!householdId) {
+      await replyToLine(lineToken, replyToken, [{ type: "text", text: NOT_LINKED_TEXT }]);
+      return;
+    }
+    const plants = await fetchActivePlants(supabase, householdId);
     const items = buildBatchPlantPageItems(plants, batchSessionId, page);
     await replyToLine(lineToken, replyToken, [
       {
@@ -758,7 +796,6 @@ async function handlePostback(event: any, lineToken: string) {
   // ── 不確定写真：植物を選んで保存 → 次の要確認写真へ ───────────
   if (action === "select_plant_uncertain") {
     const photoId = params.get("photo_id");
-    const lineUserId: string = event.source?.userId ?? "";
     if (!batchSessionId || !photoId || !plantId) return;
 
     const { data: photo } = await supabase.from("pending_line_photos").select().eq("id", photoId).single();
@@ -811,8 +848,8 @@ async function handlePostback(event: any, lineToken: string) {
       .eq("batch_session_id", batchSessionId)
       .eq("status", "needs_selection");
 
-    const plants = await fetchActivePlants(supabase);
-    const items = buildUncertainPlantPageItems(plants, batchSessionId, nextPhoto.id, 0);
+    const uncertainPlants = householdId ? await fetchActivePlants(supabase, householdId) : [];
+    const items = buildUncertainPlantPageItems(uncertainPlants, batchSessionId, nextPhoto.id, 0);
 
     await replyToLine(lineToken, replyToken, [
       { type: "text", text: `${plantName}として保存しました✅` },
@@ -828,8 +865,8 @@ async function handlePostback(event: any, lineToken: string) {
     if (!batchSessionId || !photoId) return;
     const page = parseInt(params.get("page") ?? "0", 10);
 
-    const plants = await fetchActivePlants(supabase);
-    const items = buildUncertainPlantPageItems(plants, batchSessionId, photoId, page);
+    const uncertainPagePlants = householdId ? await fetchActivePlants(supabase, householdId) : [];
+    const items = buildUncertainPlantPageItems(uncertainPagePlants, batchSessionId, photoId, page);
 
     const { data: photo } = await supabase.from("pending_line_photos").select().eq("id", photoId).single();
     const msgs: any[] = [];
@@ -938,7 +975,12 @@ export async function POST(req: Request) {
 
         await supabase.from("line_batch_sessions").update({ status: "selecting_plant" }).eq("id", batchSession.id);
 
-        const plants = await fetchActivePlants(supabase);
+        const batchHouseholdId = await getLinkedHouseholdId(supabase, lineUserId);
+        if (!batchHouseholdId) {
+          await replyToLine(lineToken, replyToken, [{ type: "text", text: NOT_LINKED_TEXT }]);
+          return NextResponse.json({ ok: true });
+        }
+        const plants = await fetchActivePlants(supabase, batchHouseholdId);
         const plantsForAI = plants.map((p: any) => ({
           id: p.id,
           name: getPlantLabel(p.plant_type),
@@ -1028,15 +1070,16 @@ export async function POST(req: Request) {
       // バッチ中でなければ AI チャットへ流す
     }
 
-    // ── コマンド：登録 ──────────────────────────────────────────────
+    // ── コマンド：登録（コードなし）──────────────────────────────────
     if (userMessage === "登録") {
       const { data: existing } = await supabase
         .from("line_notification_users")
-        .select("id, is_active, has_tested_notification")
+        .select("id, is_active, has_tested_notification, household_id")
         .eq("line_user_id", lineUserId)
         .maybeSingle();
 
       const hasTested = existing?.has_tested_notification === true;
+      const hasHousehold = !!(existing as any)?.household_id;
 
       if (existing) {
         await supabase
@@ -1044,13 +1087,29 @@ export async function POST(req: Request) {
           .update({ is_active: true, updated_at: new Date().toISOString() })
           .eq("line_user_id", lineUserId);
       } else {
+        // レコードがない場合も作成（LINE Login後にhousehold_idが更新されるケースに備える）
         await supabase
           .from("line_notification_users")
           .insert({ line_user_id: lineUserId, is_active: true });
       }
 
-      console.log(`[LINE] register completed userId=${lineUserId}`);
-      console.log(`[LINE] register reply includes notification test=${!hasTested}`);
+      console.log(`[LINE] register completed userId=${lineUserId} hasHousehold=${hasHousehold}`);
+
+      if (!hasHousehold) {
+        // 植物ページと未紐づき → コード入力を案内
+        await replyToLine(lineToken, replyToken, [
+          {
+            type: "text",
+            text: "登録しました🌱\n\nまだ植物ページと連携されていません。\nWebアプリのLINE通知カードに表示されているコードを送ると、あなたの植物ページの通知が届くようになります。\n\n例：通知 ABC123",
+            quickReply: {
+              items: [
+                { type: "action", action: { type: "message", label: "通知テスト", text: "通知テスト" } },
+              ],
+            },
+          },
+        ]);
+        return NextResponse.json({ ok: true });
+      }
 
       if (hasTested) {
         await replyToLine(lineToken, replyToken, [
@@ -1063,10 +1122,7 @@ export async function POST(req: Request) {
             text: "登録しました🌱\n明日から毎朝の植物通知が届きます。\n\n今すぐ試したい場合は、下の『通知テスト』を押してください。",
             quickReply: {
               items: [
-                {
-                  type: "action",
-                  action: { type: "message", label: "通知テスト", text: "通知テスト" },
-                },
+                { type: "action", action: { type: "message", label: "通知テスト", text: "通知テスト" } },
               ],
             },
           },
@@ -1177,11 +1233,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    // ── コマンド：参加 <コード> ────────────────────────────────────
-    const joinMatch = userMessage.match(/^参加[\s　]+(\S+)/);
+    // ── コマンド：通知/参加/登録 <コード> ────────────────────────────
+    // 「通知 CODE」「登録 CODE」→ recipient_role: "owner"（自分で登録する意図）
+    // 「参加 CODE」 → recipient_role: "family"（他者のgardenに参加する意図）
+    const joinMatch = userMessage.match(/^(通知|参加|登録)[\s　]+(\S+)/);
     if (joinMatch) {
-      const code = joinMatch[1].trim().toUpperCase();
-      console.log(`[LINE] join code attempt userId=${lineUserId} code=${code}`);
+      const keyword = joinMatch[1];
+      const code = joinMatch[2].trim().toUpperCase();
+      const newRole: "owner" | "family" = keyword === "参加" ? "family" : "owner";
+      console.log(`[LINE] join code attempt userId=${lineUserId} keyword=${keyword} code=${code} role=${newRole}`);
 
       const { data: joinCodeRow } = await supabase
         .from("household_line_join_codes")
@@ -1194,7 +1254,7 @@ export async function POST(req: Request) {
         await replyToLine(lineToken, replyToken, [
           {
             type: "text",
-            text: "参加コードが見つかりませんでした。オーナーに最新のコードを確認してください。",
+            text: "コードが見つかりませんでした。Webアプリに表示されている最新のコードを確認してください。",
           },
         ]);
         return NextResponse.json({ ok: true });
@@ -1212,7 +1272,7 @@ export async function POST(req: Request) {
           .update({
             household_id: joinCodeRow.household_id,
             is_active: true,
-            recipient_role: "family",
+            recipient_role: newRole,
             updated_at: new Date().toISOString(),
           })
           .eq("line_user_id", lineUserId);
@@ -1223,17 +1283,15 @@ export async function POST(req: Request) {
             line_user_id: lineUserId,
             household_id: joinCodeRow.household_id,
             is_active: true,
-            recipient_role: "family",
+            recipient_role: newRole,
           });
       }
 
-      console.log(`[LINE] join success userId=${lineUserId} household=${joinCodeRow.household_id}`);
-      await replyToLine(lineToken, replyToken, [
-        {
-          type: "text",
-          text: "この家庭のLINE通知に参加しました。明日の朝から植物メモをお届けします🌱",
-        },
-      ]);
+      console.log(`[LINE] join success userId=${lineUserId} household=${joinCodeRow.household_id} role=${newRole}`);
+      const successText = newRole === "owner"
+        ? "植物ページと連携しました🌱\n翌朝からあなたの植物メモが届きます。"
+        : "植物ページのLINE通知に参加しました🌱\n翌朝から植物メモをお届けします。";
+      await replyToLine(lineToken, replyToken, [{ type: "text", text: successText }]);
       return NextResponse.json({ ok: true });
     }
 
@@ -1250,7 +1308,8 @@ export async function POST(req: Request) {
 
     // 3. 管理中の植物と今日の豆知識をコンテキストとして渡す
     const todayJst = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo" }).format(new Date());
-    const activePlants = await fetchActivePlants(supabaseChat);
+    const chatHouseholdId = await getLinkedHouseholdId(supabaseChat, lineUserId);
+    const activePlants = chatHouseholdId ? await fetchActivePlants(supabaseChat, chatHouseholdId) : [];
     const plantContext: PlantContext[] = activePlants.map((p: any) => ({
       name: getPlantLabel(p.plant_type),
       plantType: p.plant_type ?? null,

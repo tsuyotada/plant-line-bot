@@ -21,7 +21,7 @@ export function LineJoinCard({
 
   function handleCopy() {
     if (!code) return;
-    navigator.clipboard.writeText(`参加 ${code}`).then(() => {
+    navigator.clipboard.writeText(`通知 ${code}`).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
@@ -91,7 +91,7 @@ export function LineJoinCard({
       {code ? (
         <div>
           <p style={{ fontSize: 12, color: "#555", margin: "0 0 12px", lineHeight: 1.7 }}>
-            以下の手順でLINEに通知を追加できます。
+            このコードで、あなたのLINEと植物ページをつなぎます。
           </p>
 
           {/* ── ステップ① ── */}
@@ -130,7 +130,7 @@ export function LineJoinCard({
           {/* ── ステップ② ── */}
           <div style={{ marginBottom: 12 }}>
             <p style={{ fontSize: 11, fontWeight: 700, color: "#4b7a5a", margin: "0 0 6px" }}>
-              ステップ② LINEでメッセージを送る
+              ステップ② 以下をLINEで送る
             </p>
             <div
               style={{
@@ -157,7 +157,7 @@ export function LineJoinCard({
                   whiteSpace: "nowrap",
                 }}
               >
-                参加 {code}
+                通知 {code}
               </span>
               <button
                 onClick={handleCopy}
@@ -181,7 +181,7 @@ export function LineJoinCard({
           </div>
 
           <p style={{ fontSize: 11, color: "#7a8a7a", margin: "0 0 12px", lineHeight: 1.6 }}>
-            翌朝からあなたの植物メモが届きます。
+            送信後、翌朝から植物メモが届きます。
           </p>
 
           <div style={{ display: "flex", gap: 6 }}>
