@@ -85,13 +85,13 @@ export function LineJoinCard({
             flexShrink: 0,
           }}
         />
-        LINE 通知に家族を追加
+        LINEで通知を受け取る
       </h2>
 
       {code ? (
         <div>
           <p style={{ fontSize: 12, color: "#555", margin: "0 0 12px", lineHeight: 1.7 }}>
-            家族に以下の手順を伝えてください。
+            以下の手順でLINEに通知を追加できます。
           </p>
 
           {/* ── ステップ① ── */}
@@ -181,7 +181,7 @@ export function LineJoinCard({
           </div>
 
           <p style={{ fontSize: 11, color: "#7a8a7a", margin: "0 0 12px", lineHeight: 1.6 }}>
-            翌朝からこの家庭の植物メモが届きます。
+            翌朝からあなたの植物メモが届きます。
           </p>
 
           <div style={{ display: "flex", gap: 6 }}>
@@ -224,7 +224,7 @@ export function LineJoinCard({
       ) : (
         <div>
           <p style={{ fontSize: 12, color: "#555", margin: "0 0 12px", lineHeight: 1.6 }}>
-            参加コードを発行すると、家族がLINEで「参加 &lt;コード&gt;」と送るだけでこの家庭の朝通知を受け取れます。
+            参加コードを使うと、LINEで朝の植物メモを受け取れます。通知はあとから設定しても大丈夫です。
           </p>
           <button
             onClick={handleCreate}

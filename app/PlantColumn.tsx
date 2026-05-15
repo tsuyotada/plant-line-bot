@@ -212,6 +212,245 @@ const TAG_TODO: Record<string, string> = {
 
 const TAG_PRIORITY_ORDER = ["水やり", "液体肥料", "観察", "剪定", "収穫", "環境確認", "写真記録"];
 
+// ── 初回登録ウィザード（植物0件のオーナーのみ表示） ────────────────────────────
+
+function OnboardingWizard({
+  addPlantAction,
+}: {
+  addPlantAction: (formData: FormData) => Promise<void>;
+}) {
+  type WizardStep = "welcome" | "name" | "photo" | "details" | "done";
+  const [step, setStep] = useState<WizardStep>("welcome");
+  const [name, setName] = useState("");
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [location, setLocation] = useState("");
+  const [memo, setMemo] = useState("");
+  const [isPending, startTransition] = useTransition();
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
+
+  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhoto(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      if (typeof ev.target?.result === "string") setPhotoPreview(ev.target.result as string);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function handleSubmit() {
+    if (!name.trim()) return;
+    setStep("done");
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.set("name", name.trim());
+      if (location.trim()) fd.set("location", location.trim());
+      if (memo.trim()) fd.set("memo", memo.trim());
+      if (photo) {
+        try {
+          const compressed = await compressImage(photo);
+          fd.set("photo", new File([compressed], photo.name.replace(/\.[^/.]+$/, "") + ".jpg", { type: "image/jpeg" }));
+        } catch {
+          fd.set("photo", photo);
+        }
+      }
+      await addPlantAction(fd);
+    });
+  }
+
+  const stepNum = step === "name" ? 1 : step === "photo" ? 2 : step === "details" ? 3 : null;
+
+  return (
+    <div style={{ padding: "8px 0" }}>
+      <style>{`
+        .wizard-btn-primary {
+          width: 100%; padding: 10px; background: #4b7a5a; color: #fff;
+          border: none; border-radius: 8px; font-size: 13px; font-weight: 700;
+          cursor: pointer; font-family: ${fontFamily};
+        }
+        .wizard-btn-primary:disabled { background: #9ca3af; cursor: not-allowed; }
+        .wizard-btn-secondary {
+          width: 100%; padding: 10px; background: #f2faf4; color: #4b7a5a;
+          border: 1.5px solid #93c9a0; border-radius: 8px; font-size: 12px;
+          font-weight: 600; cursor: pointer; font-family: ${fontFamily};
+        }
+      `}</style>
+
+      {step === "welcome" && (
+        <div style={{ textAlign: "center", padding: "24px 8px 16px" }}>
+          <div style={{ fontSize: 38, marginBottom: 14 }}>🌿</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#1a3320", marginBottom: 8, lineHeight: 1.4 }}>
+            まずは、1鉢置いてみましょう
+          </div>
+          <div style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.8, marginBottom: 28 }}>
+            名前と写真だけでも大丈夫です。<br />
+            あとから少しずつ整えられます。
+          </div>
+          <button
+            type="button"
+            onClick={() => setStep("name")}
+            style={{
+              padding: "10px 32px", background: "#4b7a5a", color: "#fff",
+              border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700,
+              cursor: "pointer", fontFamily,
+            }}
+          >
+            はじめる →
+          </button>
+        </div>
+      )}
+
+      {stepNum !== null && (
+        <div>
+          {/* ステップインジケーター */}
+          <div style={{ display: "flex", justifyContent: "center", gap: 6, marginBottom: 20 }}>
+            {[1, 2, 3].map((n) => (
+              <div key={n} style={{
+                width: 32, height: 4, borderRadius: 2,
+                background: n < stepNum ? "#4b7a5a" : n === stepNum ? "#48b06a" : "#e5e7eb",
+                transition: "background 0.25s",
+              }} />
+            ))}
+          </div>
+
+          {step === "name" && (
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#2d4a3e", marginBottom: 4, lineHeight: 1.5 }}>
+                この植物を、なんと呼んでいますか？
+              </div>
+              <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 12 }}>正式な名前でなくても大丈夫です。</div>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="例：ミニトマト、パキラ、モンステラ"
+                className="form-input"
+                autoFocus
+                onKeyDown={(e) => { if (e.key === "Enter" && name.trim()) setStep("photo"); }}
+                style={{ marginBottom: 14 }}
+              />
+              <button
+                type="button"
+                className="wizard-btn-primary"
+                onClick={() => name.trim() && setStep("photo")}
+                disabled={!name.trim()}
+              >
+                次へ →
+              </button>
+            </div>
+          )}
+
+          {step === "photo" && (
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#2d4a3e", marginBottom: 4, lineHeight: 1.5 }}>
+                いまの姿を1枚残しておきませんか？
+              </div>
+              <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 12 }}>
+                あとで変化に気づきやすくなります。写真はあとから追加しても大丈夫です。
+              </div>
+              {photoPreview && (
+                <img
+                  src={photoPreview}
+                  alt="プレビュー"
+                  style={{ width: "100%", height: 120, objectFit: "cover", borderRadius: 8, display: "block", marginBottom: 10 }}
+                />
+              )}
+              <button
+                type="button"
+                className="form-photo-pick-btn"
+                onClick={() => photoInputRef.current?.click()}
+                style={{ marginBottom: 12 }}
+              >
+                {photoPreview ? "📷 写真を変更する" : "📷 写真を選ぶ / 撮る"}
+              </button>
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                style={{ display: "none" }}
+                onChange={handlePhotoChange}
+              />
+              <button
+                type="button"
+                className="wizard-btn-primary"
+                onClick={() => setStep("details")}
+              >
+                次へ →
+              </button>
+              {!photoPreview && (
+                <button
+                  type="button"
+                  onClick={() => setStep("details")}
+                  style={{
+                    display: "block", width: "100%", marginTop: 8, background: "none",
+                    border: "none", padding: 0, fontSize: 11, color: "#9ca3af",
+                    cursor: "pointer", fontFamily, textAlign: "center",
+                  }}
+                >
+                  写真はあとで追加する
+                </button>
+              )}
+            </div>
+          )}
+
+          {step === "details" && (
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#2d4a3e", marginBottom: 4, lineHeight: 1.5 }}>
+                どこに置いているか、軽く残しておけます。
+              </div>
+              <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 12 }}>どちらも任意です。あとから追加しても大丈夫です。</div>
+              <div style={{ marginBottom: 10 }}>
+                <label className="form-label">置き場所</label>
+                <input
+                  type="text"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="例：南向きベランダ、窓際"
+                  className="form-input"
+                />
+              </div>
+              <div style={{ marginBottom: 16 }}>
+                <label className="form-label">ひとことメモ</label>
+                <textarea
+                  value={memo}
+                  onChange={(e) => setMemo(e.target.value)}
+                  placeholder="気になることや覚えておきたいことなど"
+                  className="form-textarea"
+                />
+              </div>
+              <button
+                type="button"
+                className="wizard-btn-primary"
+                onClick={handleSubmit}
+                disabled={isPending}
+                style={{ opacity: isPending ? 0.7 : 1, cursor: isPending ? "not-allowed" : "pointer" }}
+              >
+                {isPending ? "登録中…" : "この1鉢を置く"}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {step === "done" && (
+        <div style={{ textAlign: "center", padding: "24px 8px 16px" }}>
+          <div style={{ fontSize: 38, marginBottom: 14 }}>🌱</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#1a3320", marginBottom: 8 }}>
+            最初の1鉢を置きました。
+          </div>
+          <div style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.8 }}>
+            今日から、少しずつ様子を残していけます。<br />
+            詳しい設定や通知は、あとからいつでも整えられます。
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function PlantColumn({
   plants,
   archivedPlants,
@@ -1010,9 +1249,13 @@ export function PlantColumn({
             <p style={{ color: "#b91c1c", margin: 0, fontSize: 13 }}>植物データの取得でエラーが出ました</p>
           </div>
         ) : localPlants.length === 0 ? (
-          <div className="todo-card">
-            <p style={{ color: "#9ca3af", margin: 0, fontSize: 13 }}>まだ植物は登録されていません</p>
-          </div>
+          !readOnly && addPlantAction ? (
+            <OnboardingWizard addPlantAction={addPlantAction} />
+          ) : (
+            <div className="todo-card">
+              <p style={{ color: "#9ca3af", margin: 0, fontSize: 13 }}>まだ植物は登録されていません</p>
+            </div>
+          )
         ) : (
           (() => {
             const cards = localPlants.map((plant) => {
@@ -1311,8 +1554,20 @@ export function PlantColumn({
           })()
         )}
 
-        {/* Add plant form: オーナーのみ */}
-        {!readOnly && (!isFormOpen ? (
+        {/* 1〜2件のときは柔らかいメッセージを表示 */}
+        {localPlants.length > 0 && localPlants.length <= 2 && !readOnly && (
+          <div style={{
+            marginTop: 10, padding: "10px 12px",
+            background: "#f9fcf9", borderRadius: 8,
+            fontSize: 11, color: "#7a9a7a", lineHeight: 1.75,
+            border: "1px solid #e8f5e9",
+          }}>
+            今日も、気になったときに様子を見てみましょう。
+          </div>
+        )}
+
+        {/* Add plant form: オーナーのみ。0件はウィザードを使うため非表示 */}
+        {!readOnly && localPlants.length > 0 && (!isFormOpen ? (
           <button type="button" className="btn-add-plant-toggle" onClick={() => setIsFormOpen(true)}>
             ＋ 植物を追加する
           </button>

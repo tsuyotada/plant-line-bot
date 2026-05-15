@@ -103,13 +103,13 @@ export function ShareLinkCard({
             flexShrink: 0,
           }}
         />
-        わが家の植物ページ
+        植物ページを共有する
       </h2>
 
       {shareUrl ? (
         <div>
           <p style={{ fontSize: 12, color: "#555", margin: "0 0 10px", lineHeight: 1.6 }}>
-            このリンクを家族に送ると、ログインなしでわが家の植物ページを見ることができます。
+            このリンクを送ると、ログインなしで植物の記録を見てもらえます。
           </p>
           <div
             style={{
@@ -217,7 +217,7 @@ export function ShareLinkCard({
       ) : (
         <div>
           <p style={{ fontSize: 12, color: "#555", margin: "0 0 12px", lineHeight: 1.6 }}>
-            家族に共有リンクを送ると、ログインなしでわが家の植物ページを見せることができます。
+            共有リンクを使うと、ログインなしで植物ページを見てもらえます。一緒に植物を楽しむ人がいれば、リンクを発行してみましょう。
           </p>
           <button
             onClick={handleCreate}

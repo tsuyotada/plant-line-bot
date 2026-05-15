@@ -465,7 +465,7 @@ export default async function Home({
               margin: "0 0 10px",
             }}
           >
-            家庭の植物ページを作りましょう
+            あなたの植物ページを作りましょう
           </h1>
           <p
             style={{
@@ -475,9 +475,9 @@ export default async function Home({
               margin: "0 0 24px",
             }}
           >
-            家族みんなで植物を管理できるページを作ります。
+            育てている植物を記録するページを作ります。
             <br />
-            ページ名を入力してはじめましょう。
+            名前はあとからいつでも変えられます。
           </p>
           <form action={createHousehold}>
             {setup_error && (
@@ -498,7 +498,7 @@ export default async function Home({
             <input
               type="text"
               name="name"
-              placeholder="例：田中家のガーデン"
+              placeholder="例：ベランダの植物、My Garden"
               maxLength={50}
               style={{
                 width: "100%",
@@ -736,6 +736,9 @@ export default async function Home({
 
           {/* ── 今日の1枚（モバイルでは最上部に来る） ── */}
           <div className="spotlight-section">
+
+          {plants.length >= 3 ? (
+            <>
           <div className="col-board">
             <h2 className="col-heading">Today's pick</h2>
 
@@ -790,7 +793,7 @@ export default async function Home({
             )}
           </div>
 
-          {/* ── まとめてやるケア ── */}
+          {/* ── まとめてやるケア（3件以上のみ） ── */}
           {summaryStats.total > 0 && (() => {
             const { fertilizerCount, waterCount, observationCount } = summaryStats;
             const hasGrouped = fertilizerCount >= 2 || waterCount >= 2 || observationCount >= 2;
@@ -847,13 +850,25 @@ export default async function Home({
               </div>
             );
           })()}
+            </>
+          ) : plants.length > 0 ? (
+            /* 1〜2件：植物をゆっくり見る体験を優先 */
+            <div className="col-board">
+              <p style={{ fontSize: 13, color: "#5a7a5a", lineHeight: 1.8, margin: "0 0 8px" }}>
+                まずはこの植物を、ゆっくり見ていきましょう。
+              </p>
+              <p style={{ fontSize: 12, color: "#9ca3af", lineHeight: 1.7, margin: 0 }}>
+                少しずつ様子を残していくと、変化に気づきやすくなります。今日も、気になったときに覗いてみてください。
+              </p>
+            </div>
+          ) : null}
           </div>{/* /spotlight-section */}
 
           {/* ── サイドバー: 全体サマリー・共有リンク・LINE（モバイルでは植物カードの下） ── */}
           <div className="sidebar-section">
 
-          {/* ── 全体サマリー ── */}
-          {summaryStats.total > 0 && (
+          {/* ── 全体サマリー（3件以上のみ） ── */}
+          {plants.length >= 3 && summaryStats.total > 0 && (
             <div className="col-board">
               <h2 className="col-heading">Care summary</h2>
 

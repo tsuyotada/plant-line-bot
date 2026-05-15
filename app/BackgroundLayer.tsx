@@ -15,6 +15,9 @@ const DEFAULT_BG_LIST = [
   "/images/bg-9.jpg.jpg",
   "/images/bg-10.jpg.jpg",
   "/images/bg-11.jpg.jpg",
+  "/images/bg-12.jpg.jpg",
+  "/images/bg-13.jpg.jpg",
+  "/images/bg-14.jpg.jpg",
 ];
 
 export function BackgroundLayer() {
@@ -54,6 +57,22 @@ export function BackgroundLayer() {
               }
         }
       />
+      {/* Subtle overlay for white-text legibility — desktop light, mobile slightly darker */}
+      <div
+        className="app-bg-overlay"
+        style={{
+          position: "fixed",
+          top: 0, right: 0, bottom: 0, left: 0,
+          zIndex: -1,
+          background: "rgba(0,0,0,0.18)",
+          pointerEvents: "none",
+        }}
+      />
+      <style>{`
+        @media (max-width: 768px) {
+          .app-bg-overlay { background: rgba(0,0,0,0.28) !important; }
+        }
+      `}</style>
     </>
   );
 }
