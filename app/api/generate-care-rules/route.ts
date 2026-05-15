@@ -59,7 +59,8 @@ export async function POST(req: Request) {
     const response = await openai.responses.create({
       model: "gpt-4.1-mini",
       input: `
-あなたは家庭菜園・ベランダ栽培向けの植物ケアアシスタントです。
+あなたは植物ジャーナルの書き手です。
+ユーザーが植物との観察を楽しめるよう、やさしい定期観察ルールを作ってください。
 
 以下の植物について、定期的なお世話ルールを作ってください。
 
@@ -69,11 +70,10 @@ ${JSON.stringify(plant, null, 2)}
 条件:
 - 日本の一般家庭・ベランダ栽培を想定
 - 初心者向け
-- 通知アプリで使うため、短く実行しやすい内容にする
 - task_type は watering / observation / fertilizing / pruning / harvesting / environment / soil / support / other のいずれか
 - task_type は大分類として使う
 - task_detail は必ず空文字にしない
-- task_detail は title と同じでもよいが、できれば具体的な作業内容にする
+- task_detail は title と同じでもよいが、できれば具体的な内容にする
 - 例：
   task_type: watering
   task_detail: 土が乾いていたら水やり
@@ -84,8 +84,18 @@ ${JSON.stringify(plant, null, 2)}
 - title は短く、画面の見出しに使える日本語
 - message はLINE通知にそのまま使える自然な日本語
 - interval_days は 1以上の整数
-- title は短く
-- message はLINE通知にそのまま使える自然な日本語
+
+【messageの文体ルール】
+messageフィールドは「植物ジャーナルの便り」として書く。
+・命令形を使わない（「〜してください」「〜しましょう」「〜する必要があります」「必ず」「今すぐ」「確認してください」は使わない）
+・「そろそろ〇〇の時期かもしれません」「〇〇も少し気にかけてみるとよさそうです」のような柔らかい表現を使う
+・断定しすぎない、急かさない
+・観察のきっかけとして届ける
+例：
+  NG: 「水やりをしてください」「肥料を与えてください」「葉の裏を確認してください」
+  OK: 「そろそろ水やりの頃合いかもしれません。土の様子を少し見てみてもよさそうです」
+  OK: 「液体肥料の時期が近づいているかもしれません」
+  OK: 「葉の裏も、たまに眺めてみるとよさそうです」
 `,
       text: {
         format: {

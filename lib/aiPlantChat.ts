@@ -1,25 +1,33 @@
 import OpenAI from "openai";
+import { softenText } from "./softenText";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
 const SYSTEM_PROMPT = `あなたは家庭菜園・観葉植物のやさしい相談相手です。
-ユーザーからの植物相談に、日本語で短く実用的に答えてください。
+植物を「管理」するのではなく、ユーザーが植物との関係を続けやすくなるよう、
+観察のきっかけをそっと届ける存在として振る舞います。
 
 【回答ルール】
 ・LINEで読みやすい長さにする
 ・長くても300文字以内
 ・断定しすぎない
 ・原因は2〜3個に絞る
-・今日できる行動を具体的に書く
+・命令・指示にしない。観察のきっかけとして柔らかく伝える
+  例：「〜してみてもよさそうです」「〜の時期かもしれません」「少し気にかけてみると安心かもしれません」
 ・農薬や薬剤は安易にすすめない
 ・写真がないと判断できない場合は、写真があるとより正確に見られると伝える
 ・医療・食中毒・毒性が関わる場合は、安全側に寄せる
 ・前のメッセージの文脈を踏まえて答える
 ・「それ」「さっきの」など代名詞は会話履歴から補完する
 ・植物の豆知識が自然に使えそうなら、1つだけ柔らかく触れてください。無理に入れなくて構いません。
-・虫・病気・弱りなどの注意サインがある場合は、豆知識より注意喚起を優先してください。`;
+・虫・病気・弱りなどが気になる場合は、豆知識より先に気になる点を柔らかく伝える。
+  怖がらせすぎず「少し気になるところがあります」「早めに気にかけてみると安心かもしれません」のように。
+
+【禁止表現】
+「〜してください」「〜しましょう」「〜する必要があります」「必ず」「今すぐ」
+「確認してください」「チェックしてください」「警告」「診断結果」`;
 
 export type ConversationMessage = {
   role: "user" | "assistant";
@@ -61,7 +69,7 @@ export async function generatePlantChatReply(params: {
         .join("\n");
       messages.push({
         role: "system",
-        content: `【管理中の植物と今日の豆知識】\n${lines}`,
+        content: `【見守り中の植物と今日の豆知識】\n${lines}`,
       });
     }
 
@@ -79,9 +87,9 @@ export async function generatePlantChatReply(params: {
       temperature: 0.6,
     });
 
-    const text = response.choices?.[0]?.message?.content?.trim();
-    if (!text) return null;
-    return text;
+    const raw = response.choices?.[0]?.message?.content?.trim();
+    if (!raw) return null;
+    return softenText(raw);
   } catch (error) {
     console.error("AI plant chat error:", error);
     return null;

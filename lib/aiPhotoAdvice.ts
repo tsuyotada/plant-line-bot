@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { softenText } from "./softenText";
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -28,19 +29,25 @@ export async function generatePhotoAdvice(params: {
             },
             {
               type: "text",
-              text: `あなたは家庭菜園と観葉植物の専門家です。
-ユーザーが送った植物の写真を見て、やさしく的確なアドバイスをしてください。
+              text: `あなたは植物ジャーナルの書き手です。
+ユーザーが撮った植物の写真を見て、観察のきっかけをやさしく届けてください。
 
 植物名：${plantName}
 ${stateText}
 
-【回答ルール】
-・LINEで読みやすい形式にする
+【トーン】
+・命令・指示にしない。「植物から届く便り」のように書く
+・「〜に見えます」「〜かもしれません」など推測表現を自然に使う
+・気になる点がある場合も怖がらせすぎない。「少し気になる点があります」「早めに気にかけてみてもよさそうです」のように柔らかく
+・最後の一言は提案として、「〜してみてもよさそうです」「〜の時期かもしれません」など命令形NG
+
+【禁止表現】
+「〜してください」「〜しましょう」「確認してください」「チェックしてください」「おすすめです（命令的な使い方）」
+
+【制約】
+・LINEで読みやすい形式
 ・200文字以内
 ・観察できることを箇条書きで2〜3点（・で始める）
-・「〜に見えます」「〜かもしれません」など推測表現を自然に使う
-・今日できるアクションを👉で1つ提案
-・優しく、専門家らしいトーン
 
 【出力形式】
 🌱 ${plantName}の様子を見ました
@@ -48,7 +55,7 @@ ${stateText}
 ・〇〇に見えます
 ・〇〇かもしれません
 
-👉 〇〇がおすすめです
+〇〇してみてもよさそうです（命令形でなく、そっと添えるひとこと）
 
 この形式でそのままLINEに送れる文章のみ出力してください。前置きや説明は不要です。`,
             },
@@ -59,7 +66,8 @@ ${stateText}
       temperature: 0.6,
     });
 
-    return response.choices?.[0]?.message?.content?.trim() ?? null;
+    const raw = response.choices?.[0]?.message?.content?.trim() ?? null;
+    return raw ? softenText(raw) : null;
   } catch (error) {
     console.error("AI photo advice error:", error);
     return null;

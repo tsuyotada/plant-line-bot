@@ -860,7 +860,7 @@ export default async function Home({
               {(summaryStats.waterCount > 0 || summaryStats.fertilizerCount > 0) && (
                 <div style={{ marginBottom: 10 }}>
                   <p style={{ fontSize: 11, fontWeight: 700, color: "#3d6b3d", margin: "0 0 4px 0" }}>
-                    🌿 今日の主なお世話
+                    🌿 今日の気にかけどころ
                   </p>
                   <div style={{ background: "#f0fdf4", borderRadius: 8, padding: "8px 10px", fontSize: 12, color: "#374151", lineHeight: 1.75 }}>
                     {summaryStats.waterCount > 0 && summaryStats.fertilizerCount > 0 ? (
@@ -871,7 +871,7 @@ export default async function Home({
                       <>液体肥料のタイミングが<b>{summaryStats.fertilizerCount}件</b>あります。</>
                     )}
                     {(summaryStats.waterCount + summaryStats.fertilizerCount) >= 5 && (
-                      <><br /><span style={{ color: "#6b7280" }}>対象が多めなので、まずはよく育っている植物や最近元気のない植物から確認しましょう。</span></>
+                      <><br /><span style={{ color: "#6b7280" }}>対象が多めですね。気になる植物や元気のなさそうな植物から、ゆっくり眺めてみてもよさそうです。</span></>
                     )}
                   </div>
                 </div>
@@ -892,7 +892,7 @@ export default async function Home({
               {summaryStats.photoCount > 0 && (
                 <div style={{ marginBottom: 10 }}>
                   <p style={{ fontSize: 11, fontWeight: 700, color: "#7c3aed", margin: "0 0 4px 0" }}>
-                    📸 写真記録のおすすめ
+                    📸 写真を残してみると◎
                   </p>
                   <div style={{ background: "#faf5ff", borderRadius: 8, padding: "8px 10px", fontSize: 12, color: "#374151", lineHeight: 1.75 }}>
                     <b>{summaryStats.photoCount}件</b>の植物がしばらく写真のない状態です。
@@ -909,7 +909,7 @@ export default async function Home({
               )}
 
               <p style={{ margin: 0, fontSize: 11, color: "#9ca3af", lineHeight: 1.5 }}>
-                詳しくは各植物カードのケアメモを確認してください。
+                各植物カードに、より詳しい観察メモがあります。
               </p>
             </div>
           )}

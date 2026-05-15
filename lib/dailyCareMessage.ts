@@ -37,11 +37,11 @@ export function getCarePriority(days: number | null): CarePriority {
 const APP_LINK_PHRASES = [
   "余力があれば、水やり前に1枚写真を残しておくと変化に気づきやすいです👇",
   "写真を残しておくと、次の変化に気づきやすいです👇",
-  "今日のお世話ついでに、1枚だけ記録しておきましょう👇",
+  "今日のついでに、1枚だけ記録しておくとよさそうです👇",
   "水やり前の様子を残しておくと、あとで見返しやすいです👇",
-  "植物の変化を写真で残しておきましょう👇",
-  "今日のお世話をアプリで確認する👇",
-  "写真つきで今日のお世話を確認する👇",
+  "植物の変化を写真で残しておくとよさそうです👇",
+  "今日の植物の様子をアプリで眺めてみる👇",
+  "写真つきで植物の様子を眺めてみる👇",
 ];
 
 function datePick<T>(items: T[], dateStr: string, salt: number): T {
@@ -110,11 +110,11 @@ function classifyPlant(plant: PlantWithRecency, rules: CareRule[]): ClassifiedPl
       ? notableRule.title
       : notableRule.message.slice(0, 35) + "…";
     summary = ruleText;
-    if (needsWater && needsFertilizer) summary += "、水やりと液体肥料も";
-    else if (needsWater) summary += "、水やりも確認を";
-    else if (needsFertilizer) summary += "、液体肥料のタイミングも";
+    if (needsWater && needsFertilizer) summary += "、水やりと液体肥料の頃合いも";
+    else if (needsWater) summary += "、水やりも少し気にかけてみると◎";
+    else if (needsFertilizer) summary += "、液体肥料の時期も近いかも";
   } else if (actionType === "both") {
-    summary = "水やりと液体肥料のタイミングです";
+    summary = "水やりと液体肥料の頃合いかもしれません";
   } else if (actionType === "water") {
     const bestRule = rules
       .filter(r => r.is_active && r.task_type !== "fertilizing")
@@ -122,10 +122,10 @@ function classifyPlant(plant: PlantWithRecency, rules: CareRule[]): ClassifiedPl
     if (bestRule?.title && bestRule.title.length <= 20) {
       summary = bestRule.title;
     } else {
-      summary = priority === "urgent" ? "土が乾いていたら水やりを" : "水やりのタイミングを確認して";
+      summary = priority === "urgent" ? "土の乾き具合を少し眺めてみると◎" : "水やりの頃合いかもしれません";
     }
   } else if (actionType === "fertilizer") {
-    summary = "液体肥料をあげるタイミングです";
+    summary = "液体肥料の頃合いかもしれません";
   } else {
     const obsRule = rules.find(r => r.is_active && r.task_type === "observation" && r.confidence !== "low");
     summary = obsRule?.title ?? "今日は観察中心で";
@@ -214,11 +214,11 @@ export function buildDailyCareMessage(
 
   // Care block
   if (!anyAction) {
-    lines.push("今日は全体的に大丈夫そうです。ゆっくり様子を見てあげてください。");
+    lines.push("今日は特に気になるところはなさそうです。ゆっくり植物の様子を眺めてみてもよさそうです。");
   } else {
     // ⚠️ Notable: always shown individually
     if (notableItems.length > 0) {
-      lines.push("⚠️ 気になるサイン");
+      lines.push("⚠️ 少し気になるところ");
       notableItems.forEach(c => lines.push(`・${c.plant.display_name}：${c.summary}`));
     }
 
@@ -266,7 +266,7 @@ export function buildDailyCareMessage(
 
     if (routineLines.length > 0) {
       if (notableItems.length > 0) lines.push(""); // separator between ⚠️ and 🌿
-      lines.push("🌿 今日のケア");
+      lines.push("🌿 今日の気にかけどころ");
       lines.push(...routineLines);
     }
 
