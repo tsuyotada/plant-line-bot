@@ -34,7 +34,6 @@ export async function middleware(request: NextRequest) {
 
   const isPublic =
     pathname === "/login" ||
-    pathname === "/about" ||
     pathname === "/privacy" ||
     pathname === "/terms" ||
     pathname === "/open-in-browser" ||
