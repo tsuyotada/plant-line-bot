@@ -1,10 +1,14 @@
-// Server Component — no client JS needed for a simple anchor link.
+"use client";
+
+import { trackEvent } from "@/lib/analytics";
+
 const ff = 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 
 export function LineSignInButton() {
   return (
     <a
       href="/api/auth/line/authorize"
+      onClick={() => trackEvent("click_line_login", { source: "login" })}
       style={{
         display: "flex",
         alignItems: "center",

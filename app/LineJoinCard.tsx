@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { trackEvent } from "@/lib/analytics";
 
 type Props = {
   code: string | null;
@@ -24,6 +25,7 @@ export function LineJoinCard({
     navigator.clipboard.writeText(`通知 ${code}`).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+      trackEvent("line_join_code_copied", { role: "owner" });
     });
   }
 

@@ -2,8 +2,10 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/src/lib/supabase-ssr";
 import { BackgroundLayer } from "@/app/BackgroundLayer";
+import { AnalyticsPageView } from "@/app/AnalyticsPageView";
 import { LineSignInButton } from "./LineSignInButton";
 import { GoogleSignInButton } from "./GoogleSignInButton";
+import { TrackableSampleLink } from "./TrackableSampleLink";
 
 async function sendMagicLink(formData: FormData) {
   "use server";
@@ -188,6 +190,7 @@ export default async function LoginPage({
         .login-about-link:hover { color: rgba(255,255,255,0.65); }
       `}</style>
 
+      <AnalyticsPageView pagePath="/login" />
       <BackgroundLayer overlayStrength="medium" />
 
       <main
@@ -251,15 +254,10 @@ export default async function LoginPage({
               気になったときに少しずつ。
             </p>
 
-            <a
-              href={SAMPLE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="login-sample-link"
-            >
+            <TrackableSampleLink href={SAMPLE_URL} className="login-sample-link">
               サンプルを見る
               <span style={{ fontSize: 10 }}>↗</span>
-            </a>
+            </TrackableSampleLink>
 
             <Link href="/about" className="login-about-link">
               Plant Care について →
@@ -337,10 +335,18 @@ export default async function LoginPage({
               )}
 
               <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid #f0ebe2" }}>
-                <p style={{ fontSize: 11, color: "#b0b8b0", margin: 0, lineHeight: 1.65 }}>
+                <p style={{ fontSize: 11, color: "#b0b8b0", margin: "0 0 10px", lineHeight: 1.65 }}>
                   共有リンクを受け取った方はログイン不要です。
                   リンクから直接開いてください。
                 </p>
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                  <Link href="/privacy" style={{ fontSize: 11, color: "#b0b8b0", textDecoration: "none", borderBottom: "1px solid #e5e7eb" }}>
+                    プライバシーポリシー
+                  </Link>
+                  <Link href="/terms" style={{ fontSize: 11, color: "#b0b8b0", textDecoration: "none", borderBottom: "1px solid #e5e7eb" }}>
+                    利用規約
+                  </Link>
+                </div>
               </div>
             </div>
           </div>

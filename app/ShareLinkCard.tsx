@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { QRCodeSVG } from "qrcode.react";
+import { trackEvent } from "@/lib/analytics";
 
 type Props = {
   shareUrl: string | null;
@@ -28,6 +29,7 @@ export function ShareLinkCard({
     navigator.clipboard.writeText(shareUrl).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+      trackEvent("share_link_copied", { role: "owner" });
     });
   }
 

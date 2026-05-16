@@ -3,6 +3,7 @@ import { supabaseServer as supabase } from "@/src/lib/supabase-server";
 import { fetchHouseholdData } from "@/lib/fetchHouseholdData";
 import { AppHeader } from "@/app/AppHeader";
 import { PlantColumn } from "@/app/PlantColumn";
+import { AnalyticsPageView } from "@/app/AnalyticsPageView";
 
 async function verifyShareToken(token: string): Promise<string | null> {
   const { data } = await supabase
@@ -140,6 +141,12 @@ export default async function SharePage({
         }
       `}</style>
 
+      {/* Token is never passed to AnalyticsPageView — path is hardcoded to masked form */}
+      <AnalyticsPageView
+        pagePath="/share/[token]"
+        event="share_page_viewed"
+        eventProps={{ role: "anonymous" }}
+      />
       <AppHeader mode="share" householdName={householdName} />
 
       <main style={{ minHeight: "100vh", padding: "14px 20px 48px", fontFamily }}>

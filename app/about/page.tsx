@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { BackgroundLayer } from "@/app/BackgroundLayer";
+import { AnalyticsPageView } from "@/app/AnalyticsPageView";
+import { TrackableSampleLink } from "./TrackableSampleLink";
 
 const ff =
   'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
@@ -388,6 +390,7 @@ export default function AboutPage() {
         }
       `}</style>
 
+      <AnalyticsPageView pagePath="/about" event="view_about" />
       <BackgroundLayer overlayStrength="medium" fixedBg="/images/bg-14.jpg.jpg" />
 
       <main style={{ minHeight: "100vh", padding: "0 20px 80px", fontFamily: ff }}>
@@ -519,9 +522,9 @@ export default function AboutPage() {
             <p style={{ fontSize: 13, color: "rgba(255,255,255,0.70)", lineHeight: 1.8, margin: "0 0 16px", textShadow: "0 1px 4px rgba(0,0,0,0.28)" }}>
               サンプルの植物ページを公開しています。どんなヒントが届くか、どんな見え方になるか、登録前に確認できます。
             </p>
-            <a href={SAMPLE_URL} target="_blank" rel="noopener noreferrer" className="about-sample-link">
+            <TrackableSampleLink href={SAMPLE_URL} className="about-sample-link">
               サンプルの植物ページを見る <span style={{ fontSize: 10 }}>↗</span>
-            </a>
+            </TrackableSampleLink>
           </div>
         </div>
 
@@ -541,6 +544,24 @@ export default function AboutPage() {
             </Link>
             <Link href="/login" className="about-back-link">
               ログイン画面へ →
+            </Link>
+          </div>
+        </div>
+
+        {/* ── フッター：法的リンク ── */}
+        <div style={{ maxWidth: 560, margin: "0 auto", width: "100%", paddingTop: 48, paddingBottom: 8 }}>
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+            <Link
+              href="/privacy"
+              style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", textDecoration: "none", borderBottom: "1px solid rgba(255,255,255,0.15)", paddingBottom: 1, textShadow: "0 1px 3px rgba(0,0,0,0.25)", transition: "color 0.15s" }}
+            >
+              プライバシーポリシー
+            </Link>
+            <Link
+              href="/terms"
+              style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", textDecoration: "none", borderBottom: "1px solid rgba(255,255,255,0.15)", paddingBottom: 1, textShadow: "0 1px 3px rgba(0,0,0,0.25)", transition: "color 0.15s" }}
+            >
+              利用規約
             </Link>
           </div>
         </div>

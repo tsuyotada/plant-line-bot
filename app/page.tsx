@@ -9,6 +9,7 @@ import { ShareLinkCard } from "./ShareLinkCard";
 import { LineJoinCard } from "./LineJoinCard";
 import { HouseholdSetupForm } from "./HouseholdSetupForm";
 import { BackgroundLayer } from "./BackgroundLayer";
+import { AnalyticsPageView } from "./AnalyticsPageView";
 
 // DB migration required (run once):
 // alter table plants add column if not exists sort_order integer;
@@ -502,8 +503,19 @@ export default async function Home() {
 
   console.log(`[Page] total render ${Date.now() - pageStart}ms`);
 
+  const plantCountBucket = plants.length === 0 ? "0" : plants.length <= 2 ? "1-2" : plants.length <= 5 ? "3-5" : "6+";
+
   return (
     <>
+      <AnalyticsPageView
+        pagePath="/"
+        event="owner_home_viewed"
+        eventProps={{
+          role: "owner",
+          plant_count_bucket: plantCountBucket as "0" | "1-2" | "3-5" | "6+",
+          has_line_connected: !!user.user_metadata?.line_user_id,
+        }}
+      />
       <style>{`
         /* ─── Board grid ─── */
         /* 1280px+: My plants (main) 2:1 Today's pick (sub) */

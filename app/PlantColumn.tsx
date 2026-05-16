@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition, useEffect } from "react";
+import { trackEvent } from "@/lib/analytics";
 import { useRouter } from "next/navigation";
 import {
   DndContext,
@@ -243,6 +244,7 @@ function OnboardingWizard({
   function handleSubmit() {
     if (!plantType.trim()) return;
     startTransition(async () => {
+      const hasPhoto = !!photo;
       const fd = new FormData();
       fd.set("name", plantType.trim());
       if (location.trim()) fd.set("location", location.trim());
@@ -257,6 +259,8 @@ function OnboardingWizard({
       }
       try { sessionStorage.setItem("pc-welcome", "1"); } catch { /* ignore */ }
       await addPlantAction(fd);
+      trackEvent("plant_created", { role: "owner", has_photo: hasPhoto });
+      if (hasPhoto) trackEvent("plant_created_with_photo", { role: "owner" });
     });
   }
 
@@ -809,6 +813,7 @@ export function PlantColumn({
     if (!addPlantAction) return;
     startTransition(async () => {
       const rawFile = formData.get("photo") as File | null;
+      const hasPhoto = !!(rawFile && rawFile.size > 0);
       if (rawFile && rawFile.size > 0) {
         try {
           const compressed = await compressImage(rawFile);
@@ -820,6 +825,8 @@ export function PlantColumn({
       setIsFormOpen(false);
       setIsDetailsOpen(false);
       setFormPhotoPreview(null);
+      trackEvent("plant_created", { role: "owner", has_photo: hasPhoto });
+      if (hasPhoto) trackEvent("plant_created_with_photo", { role: "owner" });
     });
   }
 
