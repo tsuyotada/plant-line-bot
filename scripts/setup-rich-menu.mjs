@@ -99,6 +99,8 @@ const RICH_MENU = {
 // アイコンはすべて ~220×175px の同一バウンディングボックスに統一
 // 各パネル中央 x: 416, 1249, 2082
 // アイコン中心 y: ~295, テキスト baseline y: 500 / 608
+// アイコン上端 y=152、テキスト baseline y=548/668
+// アイコン下端〜テキスト上端の余白: カメラ/バブル≈155px、葉≈120px（モバイル換算≈23/18px）
 const MENU_SVG = `
 <svg width="2500" height="843" xmlns="http://www.w3.org/2000/svg">
 
@@ -112,69 +114,68 @@ const MENU_SVG = `
   <line x1="833"  y1="50" x2="833"  y2="793" stroke="rgba(255,255,255,0.13)" stroke-width="2"/>
   <line x1="1667" y1="50" x2="1667" y2="793" stroke="rgba(255,255,255,0.13)" stroke-width="2"/>
 
-  <!-- ══ Panel 1: Camera icon (center x=416, icon bbox y=210-385) ══ -->
-  <!-- Body: 220×165 -->
-  <rect x="306" y="213" width="220" height="165" rx="20"
-        fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="10"/>
+  <!-- ══ Panel 1: Camera (center x=416, icon top y=152, bottom y=315) ══ -->
   <!-- Viewfinder bump -->
-  <rect x="350" y="193" width="70" height="22" rx="10"
+  <rect x="350" y="132" width="68" height="22" rx="10"
         fill="rgba(255,255,255,0.85)"/>
-  <!-- Lens outer r=50 -->
-  <circle cx="416" cy="296" r="50"
+  <!-- Body: 220×163 -->
+  <rect x="306" y="152" width="220" height="163" rx="20"
+        fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="10"/>
+  <!-- Lens outer r=48 centered at y=234 -->
+  <circle cx="416" cy="234" r="48"
           fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="10"/>
   <!-- Lens inner -->
-  <circle cx="416" cy="296" r="20" fill="rgba(255,255,255,0.35)"/>
+  <circle cx="416" cy="234" r="19" fill="rgba(255,255,255,0.35)"/>
 
-  <text x="416" y="500"
+  <text x="416" y="548"
         text-anchor="middle" fill="rgba(255,255,255,0.96)"
         font-size="82" font-weight="700"
         font-family="'Yu Gothic','Hiragino Sans','Meiryo',sans-serif">写真を追加</text>
-  <text x="416" y="608"
+  <text x="416" y="668"
         text-anchor="middle" fill="rgba(255,255,255,0.40)"
         font-size="48"
         font-family="'Yu Gothic','Hiragino Sans','Meiryo',sans-serif">今日の様子をそのまま送る</text>
 
-  <!-- ══ Panel 2: Chat bubble icon (center x=1249, icon bbox y=210-385) ══ -->
-  <!-- Body: 220×155 -->
-  <rect x="1139" y="213" width="220" height="155" rx="26"
+  <!-- ══ Panel 2: Chat bubble (center x=1249, icon top y=152, bottom y=315) ══ -->
+  <!-- Body: 220×158 -->
+  <rect x="1139" y="152" width="220" height="158" rx="26"
         fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="10"/>
   <!-- Tail -->
-  <path d="M1175,368 L1148,418 L1228,368" fill="rgba(255,255,255,0.85)"/>
-  <!-- Dots at y=291 -->
-  <circle cx="1193" cy="291" r="16" fill="rgba(255,255,255,0.85)"/>
-  <circle cx="1249" cy="291" r="16" fill="rgba(255,255,255,0.85)"/>
-  <circle cx="1305" cy="291" r="16" fill="rgba(255,255,255,0.85)"/>
+  <path d="M1172,310 L1145,368 L1225,310" fill="rgba(255,255,255,0.85)"/>
+  <!-- Dots at y=231 -->
+  <circle cx="1193" cy="231" r="16" fill="rgba(255,255,255,0.85)"/>
+  <circle cx="1249" cy="231" r="16" fill="rgba(255,255,255,0.85)"/>
+  <circle cx="1305" cy="231" r="16" fill="rgba(255,255,255,0.85)"/>
 
-  <text x="1249" y="500"
+  <text x="1249" y="548"
         text-anchor="middle" fill="rgba(255,255,255,0.96)"
         font-size="82" font-weight="700"
         font-family="'Yu Gothic','Hiragino Sans','Meiryo',sans-serif">相談する</text>
-  <text x="1249" y="608"
+  <text x="1249" y="668"
         text-anchor="middle" fill="rgba(255,255,255,0.40)"
         font-size="48"
         font-family="'Yu Gothic','Hiragino Sans','Meiryo',sans-serif">気になることをひとこと</text>
 
-  <!-- ══ Panel 3: Leaf icon (center x=2082, icon bbox y=210-385) ══ -->
-  <!-- Leaf: width ~220px, height ~178px -->
-  <!-- Top (2082,213) → widest at y=296 (±110px) → bottom (2082,388) -->
-  <path d="M2082,213
-           C2082,213 1972,255 1972,300
-           C1972,345 2082,388 2082,388
-           C2082,388 2192,345 2192,300
-           C2192,255 2082,213 2082,213 Z"
+  <!-- ══ Panel 3: Leaf (center x=2082, top y=150, bottom y=338, stem to y=385) ══ -->
+  <!-- Leaf body: 214px wide at widest, 188px tall -->
+  <path d="M2082,150
+           C2082,150 1975,195 1975,255
+           C1975,310 2082,338 2082,338
+           C2082,338 2189,310 2189,255
+           C2189,195 2082,150 2082,150 Z"
         fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="10"/>
   <!-- Midrib -->
-  <path d="M2082,223 Q2082,310 2082,388"
+  <path d="M2082,160 Q2082,260 2082,338"
         fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="6"/>
   <!-- Stem -->
-  <line x1="2082" y1="388" x2="2082" y2="430"
+  <line x1="2082" y1="338" x2="2082" y2="385"
         stroke="rgba(255,255,255,0.85)" stroke-width="10" stroke-linecap="round"/>
 
-  <text x="2082" y="500"
+  <text x="2082" y="548"
         text-anchor="middle" fill="rgba(255,255,255,0.96)"
         font-size="82" font-weight="700"
         font-family="'Yu Gothic','Hiragino Sans','Meiryo',sans-serif">ガーデンを見る</text>
-  <text x="2082" y="608"
+  <text x="2082" y="668"
         text-anchor="middle" fill="rgba(255,255,255,0.40)"
         font-size="48"
         font-family="'Yu Gothic','Hiragino Sans','Meiryo',sans-serif">Webアプリで記録を確認</text>

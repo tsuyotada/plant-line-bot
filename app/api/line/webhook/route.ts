@@ -440,25 +440,50 @@ async function handleImageMessage(event: any, lineToken: string) {
   const messageId: string = event.message.id;
   const replyToken: string = event.replyToken;
 
-  console.log(`[LINE] 画像受信 userId=${lineUserId}`);
-  console.log(`[LINE] messageId=${messageId}`);
+  // ── ログ: 受信確認（Vercel logs でここを見て A/B の切り分けができる） ──
+  console.log(`[IMAGE] ===== 画像受信 ===== userId=${lineUserId} messageId=${messageId} ts=${new Date().toISOString()}`);
 
   // household が紐づいていない場合は案内して終了
   const householdId = await getLinkedHouseholdId(supabase, lineUserId);
   if (!householdId) {
-    await replyToLine(lineToken, replyToken, [{ type: "text", text: NOT_LINKED_TEXT }]);
+    console.log(`[IMAGE] household未紐づき userId=${lineUserId}`);
+    await replyToLine(lineToken, replyToken, [
+      {
+        type: "text",
+        text:
+          "Plant Careとの連携がまだ見つかりませんでした。\n" +
+          "先にガーデン画面を開いて、LINE連携の状態を確認してみてください。",
+      },
+    ]);
+    return;
+  }
+
+  // ── 即時確認メッセージ（replyToken を消費）────────────────────────────
+  // AI 識別に 10〜30 秒かかるため、まず「受け取った」ことを返す。
+  // 以降の応答はすべて pushToLine で送る。
+  await replyToLine(lineToken, replyToken, [
+    { type: "text", text: "写真を受け取りました 🌿\n少しお待ちください…" },
+  ]);
+
+  // lineUserId が取れない場合は push 不可なのでここで終了
+  if (!lineUserId || lineUserId === "unknown") {
+    console.error("[IMAGE] lineUserId 不明のため以降の push 不可");
     return;
   }
 
   // 1. LINE から画像バイナリを取得
   const image = await fetchLineImage(messageId, lineToken);
   if (!image) {
-    // fetchLineImage 内で詳細ログ済み
-    await replyToLine(lineToken, replyToken, [
-      { type: "text", text: "画像の取得に失敗しました。もう一度お試しください🌱" },
+    console.error(`[IMAGE] 画像取得失敗 messageId=${messageId}`);
+    await pushToLine(lineToken, lineUserId, [
+      {
+        type: "text",
+        text: "写真を受け取れませんでした。\n少し時間をおいて、もう一度送ってみてください。",
+      },
     ]);
     return;
   }
+  console.log(`[IMAGE] 画像取得成功 size=${image.binary.byteLength}bytes contentType=${image.contentType}`);
 
   // 2. Supabase Storage に一時保存
   const ext = image.contentType.includes("png") ? "png" : "jpg";
@@ -472,14 +497,16 @@ async function handleImageMessage(event: any, lineToken: string) {
     });
 
   if (uploadError) {
-    console.error(`[Storage] upload失敗 path=${storagePath}`, uploadError);
-    await replyToLine(lineToken, replyToken, [
-      { type: "text", text: "画像の保存に失敗しました。もう一度お試しください🌱" },
+    console.error(`[IMAGE] Storage upload失敗 path=${storagePath}`, uploadError);
+    await pushToLine(lineToken, lineUserId, [
+      {
+        type: "text",
+        text: "写真を受け取れませんでした。\n少し時間をおいて、もう一度送ってみてください。",
+      },
     ]);
     return;
   }
-
-  console.log(`[Storage] upload成功 path=${storagePath}`);
+  console.log(`[IMAGE] Storage upload成功 path=${storagePath}`);
 
   // 3. pending_line_photos に記録
   const { data: pending, error: insertError } = await supabase
@@ -494,16 +521,18 @@ async function handleImageMessage(event: any, lineToken: string) {
     .single();
 
   if (insertError || !pending) {
-    console.error(`[DB] pending_line_photos insert失敗 messageId=${messageId}`, insertError);
-    await replyToLine(lineToken, replyToken, [
-      { type: "text", text: "エラーが発生しました。もう一度お試しください🌱" },
+    console.error(`[IMAGE] pending_line_photos insert失敗 messageId=${messageId}`, insertError);
+    await pushToLine(lineToken, lineUserId, [
+      {
+        type: "text",
+        text: "写真を受け取れませんでした。\n少し時間をおいて、もう一度送ってみてください。",
+      },
     ]);
     return;
   }
+  console.log(`[IMAGE] pending insert成功 id=${pending.id}`);
 
-  console.log(`[DB] pending_line_photos insert成功 id=${pending.id} storagePath=${storagePath}`);
-
-  // 4. バッチモード確認 → アクティブなら一時蓄積して返す
+  // 4. バッチモード確認 → アクティブなら一時蓄積
   const batchSession = await getActiveBatchSession(supabase, lineUserId);
   if (batchSession) {
     await supabase
@@ -518,23 +547,23 @@ async function handleImageMessage(event: any, lineToken: string) {
       .eq("status", "batching");
 
     const photoCount = count ?? 1;
-    console.log(`[Batch] 蓄積 userId=${lineUserId} batchId=${batchSession.id} count=${photoCount}`);
-    await replyToLine(lineToken, replyToken, [
-      { type: "text", text: `${photoCount}枚目を受け取りました📷\n続けて送るか、「完了」で植物を選んでください。` },
+    console.log(`[Batch] 蓄積 batchId=${batchSession.id} count=${photoCount}`);
+    await pushToLine(lineToken, lineUserId, [
+      { type: "text", text: `${photoCount}枚目を受け取りました 📷\n続けて送るか、「完了」で植物を選んでください。` },
     ]);
     return;
   }
 
-  // 5. AI で植物を推定 → 確認メッセージ送信
+  // 5. 植物一覧取得
   const plants = await fetchActivePlants(supabase, householdId);
-
   if (plants.length === 0) {
-    await replyToLine(lineToken, replyToken, [
+    await pushToLine(lineToken, lineUserId, [
       { type: "text", text: "登録されている植物がありません。先にWebアプリで植物を追加してください🌱" },
     ]);
     return;
   }
 
+  // 6. AI で植物を推定
   const { data: imageUrlData } = supabase.storage.from("plant-photos").getPublicUrl(storagePath);
   const imageUrl = imageUrlData.publicUrl;
 
@@ -545,15 +574,12 @@ async function handleImageMessage(event: any, lineToken: string) {
     memo: p.memo ?? null,
   }));
 
-  console.log(`[AI] 識別候補植物数=${plantsForAI.length}: ${plantsForAI.map((p: any) => p.name).join(", ")}`);
-
+  console.log(`[IMAGE] AI識別開始 候補=${plantsForAI.length}件: ${plantsForAI.map((p: any) => p.name).join(", ")}`);
   const aiResult = await identifyPlantFromPhoto({ imageUrl, plants: plantsForAI });
-
-  console.log(`[AI] 識別結果: matchedPlantId=${aiResult?.matchedPlantId ?? "null"} matchedPlantName=${aiResult?.matchedPlantName ?? "null"} confidence=${aiResult?.confidence ?? "null"} reason=${aiResult?.reason ?? ""}`);
+  console.log(`[IMAGE] AI識別完了 matched=${aiResult?.matchedPlantName ?? "null"} confidence=${aiResult?.confidence ?? "null"}`);
 
   if (aiResult && aiResult.confidence >= CONFIDENCE_THRESHOLD) {
-    // AI が信頼度高く推定できた → ユーザーに確認
-    await replyToLine(lineToken, replyToken, [
+    await pushToLine(lineToken, lineUserId, [
       {
         type: "text",
         text: `この写真は${aiResult.matchedPlantName}っぽいです🌿\n（${aiResult.reason}）\n\n${aiResult.matchedPlantName}として保存しますか？`,
@@ -591,20 +617,15 @@ async function handleImageMessage(event: any, lineToken: string) {
       },
     ]);
   } else {
-    // AI が判断できなかった → 直接植物選択フローへ
-    console.log(`[AI] 推定失敗 or 信頼度低 (${aiResult?.confidence ?? "null"}) → 植物選択フローへ`);
-
+    console.log(`[IMAGE] AI推定失敗 or 低信頼度 (${aiResult?.confidence ?? "null"}) → 植物選択フローへ`);
     await supabase
       .from("pending_line_photos")
       .update({ status: "selecting_plant" })
       .eq("id", pending.id);
 
     const items = buildPlantPageItems(plants, pending.id, 0);
-    const totalPages = Math.ceil(plants.length / PLANT_PAGE_SIZE);
-    const hasMoreFirst = plants.length > PLANT_PAGE_SIZE;
-    console.log(`[Plants] page=1/${totalPages} 表示件数=${items.length} 前へ=なし 次へ=${hasMoreFirst}`);
-
-    await replyToLine(lineToken, replyToken, [
+    console.log(`[IMAGE] 植物選択QR 表示件数=${items.length}`);
+    await pushToLine(lineToken, lineUserId, [
       {
         type: "text",
         text: "どの植物か判断が難しかったので、植物を選んでください🌱",
