@@ -627,6 +627,60 @@ async function handlePostback(event: any, lineToken: string) {
   // 植物一覧が必要なアクションには household 紐づきが必要
   const householdId = await getLinkedHouseholdId(supabase, lineUserId);
 
+  // ── リッチメニュー: 写真を追加 ────────────────────────────────────
+  if (action === "add_photo") {
+    await replyToLine(lineToken, replyToken, [
+      {
+        type: "text",
+        text:
+          "気になる植物の写真を、このトークにそのまま送ってください 🌿\n\n" +
+          "送ってもらった写真は、Plant Careの記録として残せます。\n" +
+          "植物名が分かるときは、ひとこと添えてもらえると見返しやすいです。\n\n" +
+          "例：\nローズマリー\n葉の色が少し気になる",
+      },
+    ]);
+    return;
+  }
+
+  // ── リッチメニュー: 相談する ───────────────────────────────────────
+  if (action === "start_consultation") {
+    let bodyText: string;
+
+    if (!householdId) {
+      bodyText =
+        "どの植物のことを見てみましょうか？🌿\n\n" +
+        "植物の名前と、気になることをそのまま送ってください。\n" +
+        "写真も一緒にあると、様子を見やすいです。\n\n" +
+        "例：\nローズマリー\n葉先が少し茶色い";
+    } else {
+      const plants = await fetchActivePlants(supabase, householdId);
+      if (plants.length === 0) {
+        bodyText =
+          "どの植物のことを見てみましょうか？🌿\n\n" +
+          "植物の名前と、気になることをそのまま送ってください。\n" +
+          "写真も一緒にあると、様子を見やすいです。";
+      } else {
+        const MAX = 5;
+        const shown = plants
+          .slice(0, MAX)
+          .map((p: any) => `・${getPlantLabel(p.plant_type)}`)
+          .join("\n");
+        const hasMore = plants.length > MAX;
+        bodyText =
+          "どの植物のことを見てみましょうか？🌿\n\n" +
+          "登録している植物なら、名前を送ってください。\n" +
+          "写真も一緒にあると、様子を見やすいです。\n\n" +
+          "たとえば：\n" +
+          shown +
+          (hasMore ? "\nほか" : "") +
+          "\n\n登録していない植物でも大丈夫です。\n気になることをそのまま送ってください。";
+      }
+    }
+
+    await replyToLine(lineToken, replyToken, [{ type: "text", text: bodyText }]);
+    return;
+  }
+
   // ── 「追加する」が押された → 植物一覧を Quick Reply で表示 ──
   if (action === "confirm_photo" && pendingId) {
     const { data: pending, error } = await supabase
