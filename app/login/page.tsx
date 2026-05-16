@@ -110,33 +110,6 @@ export default async function LoginPage({
       <style>{`
         html { scroll-behavior: smooth; }
 
-        /* ─── Top bar ─── */
-        .login-topbar {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          max-width: 860px;
-          margin: 0 auto;
-          width: 100%;
-          padding: 24px 0 0;
-        }
-        .login-brand {
-          font-size: 11px;
-          font-weight: 700;
-          letter-spacing: 1.5px;
-          color: rgba(255,255,255,0.38);
-          text-shadow: 0 1px 4px rgba(0,0,0,0.30);
-          text-transform: uppercase;
-        }
-        .login-sample-toplink {
-          font-size: 11px;
-          color: rgba(255,255,255,0.38);
-          text-decoration: none;
-          text-shadow: 0 1px 3px rgba(0,0,0,0.25);
-          transition: color 0.15s;
-        }
-        .login-sample-toplink:hover { color: rgba(255,255,255,0.65); }
-
         /* ─── Hero: 2-col grid ─── */
         .login-hero {
           min-height: 80vh;
@@ -511,14 +484,6 @@ export default async function LoginPage({
 
       <main style={{ minHeight: "100vh", padding: "0 20px 80px", fontFamily: ff }}>
 
-        {/* ── Top bar ── */}
-        <div className="login-topbar">
-          <span className="login-brand">Plant Care</span>
-          <TrackableSampleLink href={SAMPLE_URL} className="login-sample-toplink">
-            サンプルを見る ↗
-          </TrackableSampleLink>
-        </div>
-
         {/* ── Hero: h1 left + login card right ── */}
         <div className="login-hero">
           <div className="login-hero-grid">
@@ -547,8 +512,8 @@ export default async function LoginPage({
             {/* Right: login card */}
             <div className="login-hero-right">
               <div className="login-card">
-                <p className="login-card-brand">Plant Care</p>
-                <p className="login-card-sub">LINEアカウントで始められます</p>
+                <p className="login-card-brand">Plant Careをはじめる</p>
+                <p className="login-card-sub">LINEログインで、植物の記録と相談をはじめられます。</p>
 
                 {lineError && (
                   <p style={{ fontSize: 13, color: "#dc2626", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "10px 12px", margin: "0 0 12px" }}>
@@ -600,17 +565,9 @@ export default async function LoginPage({
                 )}
 
                 <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid #f0ebe2" }}>
-                  <p style={{ fontSize: 11, color: "#b0b8b0", margin: "0 0 10px", lineHeight: 1.65 }}>
+                  <p style={{ fontSize: 11, color: "#b0b8b0", margin: 0, lineHeight: 1.65 }}>
                     共有リンクを受け取った方はログイン不要です。リンクから直接開いてください。
                   </p>
-                  <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                    <Link href="/privacy" style={{ fontSize: 11, color: "#b0b8b0", textDecoration: "none", borderBottom: "1px solid #e5e7eb" }}>
-                      プライバシーポリシー
-                    </Link>
-                    <Link href="/terms" style={{ fontSize: 11, color: "#b0b8b0", textDecoration: "none", borderBottom: "1px solid #e5e7eb" }}>
-                      利用規約
-                    </Link>
-                  </div>
                 </div>
               </div>
             </div>
