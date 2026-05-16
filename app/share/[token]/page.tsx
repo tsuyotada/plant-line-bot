@@ -4,6 +4,7 @@ import { fetchHouseholdData } from "@/lib/fetchHouseholdData";
 import { AppHeader } from "@/app/AppHeader";
 import { PlantColumn } from "@/app/PlantColumn";
 import { AnalyticsPageView } from "@/app/AnalyticsPageView";
+import { SharePageCTA } from "@/app/share/SharePageCTA";
 
 async function verifyShareToken(token: string): Promise<string | null> {
   const { data } = await supabase
@@ -148,8 +149,9 @@ export default async function SharePage({
         eventProps={{ role: "anonymous" }}
       />
       <AppHeader mode="share" householdName={householdName} />
+      <SharePageCTA />
 
-      <main style={{ minHeight: "100vh", padding: "14px 20px 48px", fontFamily }}>
+      <main style={{ minHeight: "100vh", padding: "14px 20px 88px", fontFamily }}>
         <div className="board-grid" style={{ maxWidth: 1440, margin: "0 auto" }}>
           {/* ── Column 1: 育てている植物 (2/3幅) ── */}
           <div className="col-plants">
