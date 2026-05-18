@@ -506,6 +506,12 @@ export default async function Home() {
   const plantCountBucket = plants.length === 0 ? "0" : plants.length <= 2 ? "1-2" : plants.length <= 5 ? "3-5" : "6+";
   const isWizard = plants.length === 0;
 
+  const isAdmin = (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim())
+    .filter(Boolean)
+    .includes(user.email ?? "");
+
   return (
     <>
       <AnalyticsPageView
@@ -652,6 +658,7 @@ export default async function Home() {
         updateNameAction={updateHouseholdName}
         signOutAction={signOut}
         lineLinked={!!user.user_metadata?.line_user_id}
+        isAdmin={isAdmin}
       />
 
       <main style={{ minHeight: "100vh", padding: isWizard ? "8vh 20px 60px" : "14px 20px 48px", fontFamily, overflowX: "hidden" }}>

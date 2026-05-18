@@ -29,6 +29,7 @@ type Props =
       updateNameAction: (name: string) => Promise<void>;
       signOutAction: () => Promise<void>;
       lineLinked?: boolean;
+      isAdmin?: boolean;
     }
   | {
       mode: "share";
@@ -163,6 +164,19 @@ export function AppHeader(props: Props) {
           <div
             style={{ display: "flex", alignItems: "center", gap: 2, marginLeft: "auto" }}
           >
+            {/* Admin link — admin users only, always visible */}
+            {props.isAdmin && (
+              <>
+                <a
+                  href="/admin"
+                  style={{ ...ctrlBtn, color: "rgba(255,255,255,0.75)", textDecoration: "none" }}
+                >
+                  Admin
+                </a>
+                <span className="app-header-admin-sep" style={sep} />
+              </>
+            )}
+
             {/* Decorative: 背景を変更 / リセット — hidden on mobile */}
             <div className="app-header-bg-controls" style={{ display: "contents" }}>
               <input
