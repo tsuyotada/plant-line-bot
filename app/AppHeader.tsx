@@ -37,6 +37,7 @@ type Props =
 
 export function AppHeader(props: Props) {
   const [bgImage, setBgImage] = useState<string | null>(null);
+  const [isSigningOut, startSignOutTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -212,11 +213,18 @@ export function AppHeader(props: Props) {
             <span style={sep} />
 
             {/* ログアウト — always visible */}
-            <form action={props.signOutAction} style={{ display: "inline-flex", alignItems: "center" }}>
-              <button type="submit" style={ctrlBtn}>
-                ログアウト
-              </button>
-            </form>
+            <button
+              type="button"
+              disabled={isSigningOut}
+              style={{
+                ...ctrlBtn,
+                opacity: isSigningOut ? 0.55 : 1,
+                cursor: isSigningOut ? "default" : "pointer",
+              }}
+              onClick={() => startSignOutTransition(() => props.signOutAction())}
+            >
+              {isSigningOut ? "ログアウト中…" : "ログアウト"}
+            </button>
           </div>
         </div>
       )}
