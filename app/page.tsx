@@ -1,5 +1,6 @@
 import { supabaseServer as supabase } from "../src/lib/supabase-server";
 import { getAuthedHouseholdId, createSupabaseServerClient } from "../src/lib/supabase-ssr";
+import { checkIsAdmin } from "@/lib/isAdminUser";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { AppHeader } from "./AppHeader";
@@ -506,11 +507,7 @@ export default async function Home() {
   const plantCountBucket = plants.length === 0 ? "0" : plants.length <= 2 ? "1-2" : plants.length <= 5 ? "3-5" : "6+";
   const isWizard = plants.length === 0;
 
-  const isAdmin = (process.env.ADMIN_EMAILS ?? "")
-    .split(",")
-    .map((e) => e.trim())
-    .filter(Boolean)
-    .includes(user.email ?? "");
+  const isAdmin = await checkIsAdmin(user);
 
   return (
     <>

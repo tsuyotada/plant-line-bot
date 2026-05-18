@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/src/lib/supabase-ssr";
 import { supabaseServer as supabase } from "@/src/lib/supabase-server";
+import { checkIsAdmin } from "@/lib/isAdminUser";
 import { BackgroundLayer } from "@/app/BackgroundLayer";
 
 const ff = 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
@@ -16,12 +17,7 @@ export default async function AdminPage() {
   const { data: { user } } = await authClient.auth.getUser();
   if (!user) redirect("/login");
 
-  const adminEmails = (process.env.ADMIN_EMAILS ?? "")
-    .split(",")
-    .map((e) => e.trim())
-    .filter(Boolean);
-
-  if (!adminEmails.includes(user.email ?? "")) redirect("/");
+  if (!(await checkIsAdmin(user))) redirect("/");
 
   // ── Data fetch (all parallel) ─────────────────────────────────────────────
   const [
