@@ -324,6 +324,7 @@ async function saveBatchPhotosAndAdvise(
   const advice = await generatePhotoAdvice({
     imageUrl: urlData.publicUrl,
     plantName,
+    plantType: plant?.plant_type ?? null,
     initialStateType: plant?.initial_state_type ?? null,
     initialStateNote: plant?.initial_state_note ?? null,
   });
@@ -402,6 +403,7 @@ async function savePlantPhotoAndAdvise(
   const advice = await generatePhotoAdvice({
     imageUrl,
     plantName,
+    plantType: plant?.plant_type ?? null,
     initialStateType: plant?.initial_state_type ?? null,
     initialStateNote: plant?.initial_state_note ?? null,
   });
@@ -409,6 +411,89 @@ async function savePlantPhotoAndAdvise(
   if (advice && lineUserId) {
     await pushToLine(lineToken, lineUserId, [{ type: "text", text: advice }]);
   }
+}
+
+// ── 家族ユーザー向けリッチメニュー ────────────────────────────────
+// 家族が「参加 CODE」で登録した際、household の /share/{token} URL を持つ
+// 個別リッチメニューを自動作成して LINE ユーザーに割り当てる。
+const LINE_API_ORIGIN = "https://api.line.me";
+const LINE_DATA_API_ORIGIN = "https://api-data.line.me";
+
+async function createFamilyRichMenu(
+  channelToken: string,
+  shareUrl: string,
+): Promise<string | null> {
+  const auth = { Authorization: `Bearer ${channelToken}` };
+
+  // デフォルトリッチメニューの画像を取得して再利用する
+  let imageBytes: ArrayBuffer | null = null;
+  try {
+    const defaultRes = await fetch(`${LINE_API_ORIGIN}/v2/bot/user/all/richmenu`, { headers: auth });
+    if (defaultRes.ok) {
+      const { richMenuId: defaultId } = await defaultRes.json() as { richMenuId?: string };
+      if (defaultId) {
+        const imgRes = await fetch(`${LINE_DATA_API_ORIGIN}/v2/bot/richmenu/${defaultId}/content`, { headers: auth });
+        if (imgRes.ok) imageBytes = await imgRes.arrayBuffer();
+      }
+    }
+  } catch {
+    // 画像取得失敗時は画像なしで続行（メニュー定義だけ作成）
+  }
+
+  const menu = {
+    size: { width: 2500, height: 843 },
+    selected: true,
+    name: "Plant Care 家族メニュー",
+    chatBarText: "メニューを開く",
+    areas: [
+      {
+        bounds: { x: 0, y: 0, width: 833, height: 843 },
+        action: { type: "postback", label: "写真を追加", data: "action=add_photo", displayText: "📸 写真を追加" },
+      },
+      {
+        bounds: { x: 833, y: 0, width: 834, height: 843 },
+        action: { type: "postback", label: "相談する", data: "action=start_consultation", displayText: "💬 相談する" },
+      },
+      {
+        bounds: { x: 1667, y: 0, width: 833, height: 843 },
+        action: { type: "uri", label: "ガーデンを見る", uri: shareUrl },
+      },
+    ],
+  };
+
+  const createRes = await fetch(`${LINE_API_ORIGIN}/v2/bot/richmenu`, {
+    method: "POST",
+    headers: { ...auth, "Content-Type": "application/json" },
+    body: JSON.stringify(menu),
+  });
+  if (!createRes.ok) {
+    console.error("[FamilyMenu] リッチメニュー作成失敗:", await createRes.text());
+    return null;
+  }
+  const { richMenuId } = await createRes.json() as { richMenuId: string };
+
+  if (imageBytes) {
+    const uploadRes = await fetch(`${LINE_DATA_API_ORIGIN}/v2/bot/richmenu/${richMenuId}/content`, {
+      method: "POST",
+      headers: { ...auth, "Content-Type": "image/png" },
+      body: imageBytes,
+    });
+    if (!uploadRes.ok) {
+      console.warn("[FamilyMenu] 画像アップロード失敗 richMenuId=", richMenuId);
+      // 画像なしのメニューは LINE が表示しないので削除して null を返す
+      await fetch(`${LINE_API_ORIGIN}/v2/bot/richmenu/${richMenuId}`, { method: "DELETE", headers: auth }).catch(() => {});
+      return null;
+    }
+  }
+
+  return richMenuId;
+}
+
+async function assignRichMenuToUser(channelToken: string, userId: string, richMenuId: string): Promise<void> {
+  await fetch(`${LINE_API_ORIGIN}/v2/bot/user/${userId}/richmenu/${richMenuId}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${channelToken}` },
+  });
 }
 
 // ── 友だち追加時のウェルカムメッセージ ──────────────────────────
@@ -1367,6 +1452,37 @@ export async function POST(req: Request) {
         ? "植物ページと連携しました🌱\n翌朝からあなたの植物メモが届きます。"
         : "植物ページのLINE通知に参加しました🌱\n翌朝から植物メモをお届けします。";
       await replyToLine(lineToken, replyToken, [{ type: "text", text: successText }]);
+
+      // 家族ユーザーにはシェアページ URL を持つ個別リッチメニューを割り当てる
+      if (newRole === "family") {
+        try {
+          const { data: shareLinkRow } = await supabase
+            .from("household_share_links")
+            .select("token")
+            .eq("household_id", joinCodeRow.household_id)
+            .eq("enabled", true)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          const shareToken = (shareLinkRow as { token: string } | null)?.token;
+          if (shareToken) {
+            const base = process.env.NEXT_PUBLIC_APP_URL ?? "https://plant-line-bot-forme.vercel.app";
+            const shareUrl = `${base}/share/${shareToken}`;
+            const familyMenuId = await createFamilyRichMenu(lineToken, shareUrl);
+            if (familyMenuId) {
+              await assignRichMenuToUser(lineToken, lineUserId, familyMenuId);
+              console.log(`[FamilyMenu] 割り当て完了 userId=${lineUserId} richMenuId=${familyMenuId} shareUrl=${shareUrl}`);
+            } else {
+              console.warn(`[FamilyMenu] 作成失敗 userId=${lineUserId}`);
+            }
+          } else {
+            console.warn(`[FamilyMenu] シェアトークン未設定 household=${joinCodeRow.household_id}`);
+          }
+        } catch (err) {
+          console.error("[FamilyMenu] エラー:", err);
+        }
+      }
+
       return NextResponse.json({ ok: true });
     }
 

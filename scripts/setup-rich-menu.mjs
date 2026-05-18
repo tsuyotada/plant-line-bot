@@ -25,6 +25,14 @@ const ROOT = join(__dirname, '..');
 // ── 本番URL（LINE URI アクションは https:// のみ対応） ───────────────────────
 const PRODUCTION_URL = 'https://plant-line-bot-forme.vercel.app';
 
+// ── URL 設計メモ ─────────────────────────────────────────────────────────────
+// このスクリプトが作成するデフォルトリッチメニュー（全ユーザー共通）は
+// オーナーユーザー向けを想定し、GARDEN_URL = メインアプリ URL を使用します。
+//
+// 家族ユーザー（「参加 CODE」で登録）には、webhook が参加登録時に
+// household の /share/{token} URL を含む個別リッチメニューを自動作成・割り当てます。
+// → app/api/line/webhook/route.ts の createFamilyRichMenu() を参照。
+
 // ── .env.local を読み込む ────────────────────────────────────────────────────
 const envPath = join(ROOT, '.env.local');
 if (!existsSync(envPath)) {
@@ -55,7 +63,7 @@ if (!TOKEN) {
 
 const appUrl = env.NEXT_PUBLIC_APP_URL ?? '';
 const GARDEN_URL = appUrl.startsWith('https://') ? appUrl : PRODUCTION_URL;
-console.log(`📡 ガーデンURL: ${GARDEN_URL}\n`);
+console.log(`📡 ガーデンURL (オーナー向けデフォルトメニュー): ${GARDEN_URL}\n`);
 
 // ── リッチメニュー定義 ────────────────────────────────────────────────────────
 // Panel 1, 2: postback action（webhook で専用ハンドラが処理）
