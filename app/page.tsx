@@ -504,6 +504,7 @@ export default async function Home() {
   console.log(`[Page] total render ${Date.now() - pageStart}ms`);
 
   const plantCountBucket = plants.length === 0 ? "0" : plants.length <= 2 ? "1-2" : plants.length <= 5 ? "3-5" : "6+";
+  const isWizard = plants.length === 0;
 
   return (
     <>
@@ -628,6 +629,21 @@ export default async function Home() {
           border: 1px dashed #c8e6cc;
         }
 
+        /* ─── Wizard mode: center single card on PC, unchanged on mobile ─── */
+        @media (min-width: 768px) {
+          .board-grid.wizard-mode {
+            display: flex;
+            justify-content: center;
+          }
+          .board-grid.wizard-mode .col-plants {
+            max-width: 540px;
+            width: 100%;
+          }
+          .board-grid.wizard-mode .col-right {
+            display: none;
+          }
+        }
+
       `}</style>
 
       <AppHeader
@@ -638,8 +654,8 @@ export default async function Home() {
         lineLinked={!!user.user_metadata?.line_user_id}
       />
 
-      <main style={{ minHeight: "100vh", padding: "14px 20px 48px", fontFamily, overflowX: "hidden" }}>
-        <div className="board-grid" style={{ maxWidth: 1440, margin: "0 auto" }}>
+      <main style={{ minHeight: "100vh", padding: isWizard ? "8vh 20px 60px" : "14px 20px 48px", fontFamily, overflowX: "hidden" }}>
+        <div className={`board-grid${isWizard ? " wizard-mode" : ""}`} style={{ maxWidth: 1440, margin: "0 auto" }}>
           {/* ── Column 1: 育てている植物 (2/3幅) ── */}
           <div className="col-plants">
             <PlantColumn
