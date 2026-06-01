@@ -1,34 +1,10 @@
 import OpenAI from "openai";
 import { softenText } from "./softenText";
+import { classifyPlantGroup, type PlantGroup } from "./plantClassify";
+
+export { classifyPlantGroup };
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-type PlantGroup =
-  | "herb"
-  | "leafy"
-  | "root_vegetable"
-  | "fruit_tree"
-  | "flower"
-  | "fruit_vegetable"
-  | "houseplant"
-  | "general";
-
-export function classifyPlantGroup(
-  plantType: string | null | undefined,
-  plantName: string,
-): PlantGroup {
-  const s = `${plantType ?? ""} ${plantName}`.toLowerCase();
-
-  if (/mint|ミント|basil|バジル|rosemary|ローズマリー|coriander|コリアンダー|パクチー|thyme|タイム|sage|セージ|oregano|オレガノ|shiso|大葉|青じそ|perilla|えごま|italian_parsley|パセリ/.test(s)) return "herb";
-  if (/negi|ネギ|kujo_negi|green_onion|spinach|ほうれん草|ホウレンソウ|lettuce|レタス|komatsuna|小松菜/.test(s)) return "leafy";
-  if (/radish|ラディッシュ|二十日大根|kohlrabi|コールラビ|carrot|ニンジン|turnip|カブ|beet|ビーツ/.test(s)) return "root_vegetable";
-  if (/makrut_lime|コブミカン|fig|イチジク|strawberry|イチゴ|citrus|柑橘|lemon|レモン|blueberry|ブルーベリー/.test(s)) return "fruit_tree";
-  if (/calendula|カレンジュラ|marigold|マリーゴールド|pansy|パンジー|viola|ビオラ|petunia|ペチュニア/.test(s)) return "flower";
-  if (/tomato|トマト|pepper|ピーマン|eggplant|ナス|cucumber|キュウリ|zucchini|ズッキーニ|pumpkin|カボチャ|bean|インゲン|pea|エンドウ/.test(s)) return "fruit_vegetable";
-  if (/観葉|houseplant|pothos|ポトス|monstera|モンステラ|ficus|フィカス|cactus|サボテン|succulent|多肉|aloe|アロエ/.test(s)) return "houseplant";
-
-  return "general";
-}
 
 // タイプ別・基本観察ポイント
 const GROUP_OBSERVATION_HINTS: Record<PlantGroup, string> = {

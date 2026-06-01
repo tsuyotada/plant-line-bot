@@ -1,4 +1,5 @@
 import { getCarePriority, type CarePriority, type CareRule } from "./dailyCareMessage";
+import { getHarvestLabel } from "./plantClassify";
 
 export type CareTag =
   | "水やり"
@@ -7,6 +8,7 @@ export type CareTag =
   | "写真記録"
   | "剪定"
   | "収穫"
+  | "摘み取り"
   | "環境確認";
 
 export type PlantAdviceInput = {
@@ -156,17 +158,22 @@ export function buildPlantCareCards(
     // 1. 具体的なアクション
     if (needsWater) tags.push("水やり");
     if (needsFertilizer) tags.push("液体肥料");
-    // 2. 最も具体的なルールベースのタグ（収穫 > 剪定 > 環境確認）
-    const specificRuleTagMap: Partial<Record<string, CareTag>> = {
-      harvesting: "収穫",
+    // 2. 最も具体的なルールベースのタグ（収穫/摘み取り > 剪定 > 環境確認）
+    const staticRuleTagMap: Partial<Record<string, CareTag>> = {
       pruning: "剪定",
       environment: "環境確認",
     };
     const specificRuleRank: Record<string, number> = { harvesting: 1, pruning: 2, environment: 3 };
     const bestSpecificRule = rules
-      .filter(r => r.is_active && r.task_type in specificRuleTagMap)
+      .filter(r => r.is_active && (r.task_type in staticRuleTagMap || r.task_type === "harvesting"))
       .sort((a, b) => (specificRuleRank[a.task_type] ?? 9) - (specificRuleRank[b.task_type] ?? 9))[0] ?? null;
-    if (bestSpecificRule && tags.length < 3) tags.push(specificRuleTagMap[bestSpecificRule.task_type]!);
+    if (bestSpecificRule && tags.length < 3) {
+      const tag: CareTag =
+        bestSpecificRule.task_type === "harvesting"
+          ? getHarvestLabel(plant.plantType, plant.display_name)
+          : staticRuleTagMap[bestSpecificRule.task_type]!;
+      tags.push(tag);
+    }
     // 3. 写真記録：他に具体的なタグがない場合のみ
     if (needsPhoto && tags.length === 0) tags.push("写真記録");
     // 4. 観察：他に何もない最終手段のみ

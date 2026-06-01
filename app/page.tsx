@@ -720,6 +720,7 @@ export default async function Home() {
                           "写真記録": { bg: "#ede9fe", color: "#5b21b6" },
                           "剪定":     { bg: "#dcfce7", color: "#166534" },
                           "収穫":     { bg: "#d1fae5", color: "#065f46" },
+                          "摘み取り": { bg: "#d1fae5", color: "#065f46" },
                           "環境確認": { bg: "#f1f5f9", color: "#475569" },
                         };
                         const c = tagCfg[tag] ?? { bg: "#f1f5f9", color: "#475569" };
