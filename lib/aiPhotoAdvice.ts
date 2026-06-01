@@ -26,6 +26,30 @@ const GROUP_OBSERVATION_HINTS: Record<PlantGroup, string> = {
     "【観察ポイント】葉の色・土の乾き・全体的な勢いを中心に観察してください。",
 };
 
+// タイプ別・乾きやすさ観察ポイント（写真から読み取れる場合のみ言及。成長段階を問わず使用可）
+const GROUP_DRYNESS_HINTS: Partial<Record<PlantGroup, string>> = {
+  herb: `【乾きやすさの観察ポイント（ハーブ）】
+写真から読み取れるものがあれば、観察のきっかけとして柔らかく添えてください：
+・鉢が小さそう・浅そうに見える場合 → 「小さめの鉢なので、土が乾くのが少し早そうです」
+・葉がしなびている・垂れているように見える場合 → 「葉がしなっとしているように見えます。水切れのサインかもしれません」
+・土の表面が乾いて白っぽく見える場合 → 「表面が乾いて見えるので、夕方にもう一度土の様子を見てもよさそうです」
+・写真から上記のいずれも読み取れない場合は省略する`,
+
+  leafy: `【乾きやすさの観察ポイント（葉もの・ネギ類）】
+写真から読み取れるものがあれば、観察のきっかけとして柔らかく添えてください：
+・浅いプランター・小さい鉢に見える場合 → 「浅いプランターなら、暑い日は毎日土の様子を見てもよさそうです」
+・葉先が乾いている・全体的に元気がなさそうな場合 → 「葉先が少し乾いているように見えます。水切れかもしれません」
+・鉢に対して株が密集しているように見える場合 → 「鉢に対して株が茂っているので、乾きが早い時期かもしれません」
+・写真から上記のいずれも読み取れない場合は省略する`,
+
+  root_vegetable: `【乾きやすさの観察ポイント（根菜類）】
+写真から読み取れるものがあれば、観察のきっかけとして柔らかく添えてください：
+・葉がしなびている・垂れているように見える場合 → 「葉がしなっとしているように見えます。ラディッシュは水切れで葉がしなびやすいので、今日は土の乾き具合を見てもよさそうです」
+・鉢が浅そう・密植されているように見える場合 → 「鉢に対して葉がよく茂っているので、水切れしやすい時期かもしれません」
+・土の表面が乾いて見える場合 → 「表面が乾いているように見えます。少し水を足してあげるとよさそうです」
+・写真から上記のいずれも読み取れない場合は省略する`,
+};
+
 // タイプ別・間引き／土寄せ／混み合いチェックポイント（早期段階では使用しない）
 const GROUP_THINNING_HINTS: Record<PlantGroup, string> = {
   root_vegetable: `【間引き・土寄せのチェックポイント（根菜類）】
@@ -73,6 +97,7 @@ export async function generatePhotoAdvice(params: {
   const group = classifyPlantGroup(plantType, plantName);
   const observationHint = GROUP_OBSERVATION_HINTS[group];
   const thinningHint = GROUP_THINNING_HINTS[group];
+  const drynessHint = GROUP_DRYNESS_HINTS[group] ?? "";
 
   try {
     const response = await client.chat.completions.create({
@@ -105,7 +130,7 @@ ${observationHint}
   - 間引き・土寄せへの言及も避けること（まだ株元が確認できない段階）
 ・成長段階が「本葉が出始めた」以降で株が密集して見える場合：
   - 後述のチェックポイントも参照して助言に含めること
-${thinningHint ? "\n" + thinningHint : ""}
+${thinningHint ? "\n" + thinningHint : ""}${drynessHint ? "\n" + drynessHint : ""}
 
 【トーン】
 ・命令・指示にしない。「植物から届く便り」のように書く

@@ -1,5 +1,5 @@
 import { getCarePriority, type CarePriority, type CareRule } from "./dailyCareMessage";
-import { getHarvestLabel } from "./plantClassify";
+import { getHarvestLabel, classifyPlantGroup } from "./plantClassify";
 
 export type CareTag =
   | "水やり"
@@ -99,6 +99,19 @@ const WATER_ATTENTION_PHRASES = [
   "水やりのタイミングが近づいているかもしれません。土の様子を少し眺めてみてもよさそうです。",
 ];
 
+// ハーブ・葉物・根菜など乾きやすい植物向けフレーズ
+const WATER_URGENT_PHRASES_FAST_DRY = [
+  "葉がしなっとしている日は、水切れのサインかもしれません。土の乾き具合を少し眺めてみてもよさそうです。",
+  "小さめの鉢や浅いプランターは土が乾くのが少し早めです。葉と土の様子をちらっと眺めてみてもよさそうです。",
+  "土の表面が乾いていたら、少し水を足してあげるとよさそうです。",
+];
+
+const WATER_ATTENTION_PHRASES_FAST_DRY = [
+  "そろそろ土の乾き具合を見てもよさそうです。表面が乾いていたら、少し水を足してあげると安心かもしれません。",
+  "ハーブや葉物は水切れで元気がなくなりやすいので、今日は土の様子を少し眺めてみてもよさそうです。",
+  "乾きが早い植物なので、表面が乾いていたら少し水を足してあげてもよさそうです。",
+];
+
 const FERTILIZER_PHRASES = [
   "そろそろ液体肥料の頃合いかもしれません。",
   "液体肥料の時期が来ているかもしれません。",
@@ -186,10 +199,17 @@ export function buildPlantCareCards(
     const rule = bestAdviceRule(rules);
     if (rule) parts.push(rule.message);
 
+    const isFastDry = ["herb", "leafy", "root_vegetable"].includes(
+      classifyPlantGroup(plant.plantType, plant.display_name)
+    );
+
     if (needsWater && needsFertilizer) {
       parts.push("水やりと液体肥料の頃合いかもしれません。");
     } else if (needsWater) {
-      const phrases = priority === "urgent" ? WATER_URGENT_PHRASES : WATER_ATTENTION_PHRASES;
+      const phrases =
+        priority === "urgent"
+          ? (isFastDry ? WATER_URGENT_PHRASES_FAST_DRY : WATER_URGENT_PHRASES)
+          : (isFastDry ? WATER_ATTENTION_PHRASES_FAST_DRY : WATER_ATTENTION_PHRASES);
       parts.push(datePick(phrases, seed + ":water"));
     } else if (needsFertilizer) {
       parts.push(datePick(FERTILIZER_PHRASES, seed + ":fert"));
