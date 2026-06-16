@@ -330,27 +330,12 @@ export default async function LoginPage({
         .lp-chevron { font-size: 9px; transition: transform var(--dur-short) var(--ease-out); }
         .lp-admin[open] .lp-chevron { transform: rotate(180deg); }
 
-        /* ─── Scroll hint ─── */
-        .lp-scroll-hint {
+        /* ─── Section spacing after hero ─── */
+        .lp-hero-spacer {
           max-width: 860px;
           margin: 0 auto;
           width: 100%;
-          padding-bottom: 12px;
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-        .lp-scroll-rule {
-          flex: none;
-          width: 28px;
-          height: 1px;
-          background: var(--color-accent);
-          opacity: 0.45;
-        }
-        .lp-scroll-text {
-          font-size: 11px;
-          font-weight: 500;
-          color: var(--color-ink-3);
+          padding-bottom: 20px;
         }
 
         /* ─── Section wrappers ─── */
@@ -660,11 +645,7 @@ export default async function LoginPage({
           </div>
         </div>
 
-        {/* Scroll hint */}
-        <div className="lp-scroll-hint">
-          <span className="lp-scroll-rule" />
-          <span className="lp-scroll-text">植物ごとのケアのヒントについて</span>
-        </div>
+        <div className="lp-hero-spacer" />
 
         {/* ── Section 1: できること ── */}
         <div id="features" className="lp-section">
