@@ -21,7 +21,16 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-type PhotoHistoryItem = { id: string; url: string; takenAt: string };
+type PhotoHistoryItem = {
+  id: string;
+  url: string;
+  takenAt: string;
+  siteComment:     string | null;
+  changeSummary:   string | null;
+  careAdvice:      string | null;
+  watchPoint:      string | null;
+  analysisVersion: number | null;
+};
 
 type BatchItem = {
   id: string;
@@ -1463,6 +1472,36 @@ export function PlantColumn({
                       </div>
                     )}
 
+                    {/* ── 最新写真の観察メモ ── */}
+                    {(() => {
+                      const latestPhoto = photoHistories[plant.id]?.[0];
+                      const comment = latestPhoto?.siteComment;
+                      if (!comment) return null;
+                      return (
+                        <div style={{ marginTop: 7, paddingTop: 7, borderTop: "1px solid #f0ebe2" }}>
+                          <div style={{ fontSize: 10, color: "#9ca3af", marginBottom: 3, fontFamily }}>
+                            📸 最新の観察
+                          </div>
+                          <div style={{
+                            fontSize: 11,
+                            color: "#5a7a6a",
+                            lineHeight: 1.65,
+                            overflow: "hidden",
+                            display: "-webkit-box",
+                            WebkitLineClamp: 3,
+                            WebkitBoxOrient: "vertical",
+                          }}>
+                            {comment}
+                          </div>
+                          {latestPhoto?.watchPoint && (
+                            <div style={{ fontSize: 10, color: "#a0b8a0", marginTop: 4, lineHeight: 1.5 }}>
+                              次に見るポイント：{latestPhoto.watchPoint}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
                     {/* ── ケアメモ ── */}
                     {careCard && (() => {
                       const isExpanded = expandedCareIds.has(plant.id);
@@ -1720,6 +1759,69 @@ export function PlantColumn({
                 );
               }
               const urls = history.map((p) => p.url);
+              // 観察メモがある写真が1枚でもあればリスト形式にする
+              const hasAnyAnalysis = history.some((p) => p.siteComment || p.changeSummary);
+              if (hasAnyAnalysis) {
+                // 縦並びリスト形式（分析情報付き）
+                return (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20 }}>
+                    {history.map((photo, photoIdx) => (
+                      <div key={photo.id} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                        {/* サムネイル */}
+                        <div style={{ position: "relative", flexShrink: 0 }}>
+                          <img
+                            src={photo.url}
+                            alt={photo.takenAt}
+                            loading="lazy"
+                            decoding="async"
+                            style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 8, display: "block", cursor: "zoom-in" }}
+                            onClick={() => setLightbox({ urls, index: photoIdx })}
+                          />
+                          {deletePhotoAction && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeletePhoto(photo.id)}
+                              aria-label="写真を削除"
+                              style={{
+                                position: "absolute", top: 3, right: 3,
+                                width: 18, height: 18, borderRadius: "50%",
+                                background: "rgba(0,0,0,0.55)", border: "none",
+                                color: "#fff", fontSize: 12, lineHeight: 1, cursor: "pointer",
+                                display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+                              }}
+                            >×</button>
+                          )}
+                        </div>
+                        {/* 分析情報 */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 10, color: "#a0a8a2", marginBottom: 3, fontFamily }}>{photo.takenAt}</div>
+                          {photo.changeSummary && (
+                            <div style={{ fontSize: 11, color: "#4a7a5a", lineHeight: 1.6, marginBottom: 3, fontFamily, fontWeight: 600 }}>
+                              📊 {photo.changeSummary}
+                            </div>
+                          )}
+                          {photo.siteComment && (
+                            <div style={{ fontSize: 11, color: "#5a7a6a", lineHeight: 1.65, marginBottom: 3, fontFamily }}>
+                              {photo.siteComment}
+                            </div>
+                          )}
+                          {photo.careAdvice && (
+                            <div style={{ fontSize: 10, color: "#7a9a7a", lineHeight: 1.5, marginBottom: 2, fontFamily }}>
+                              🌿 {photo.careAdvice}
+                            </div>
+                          )}
+                          {photo.watchPoint && (
+                            <div style={{ fontSize: 10, color: "#a0b8a0", lineHeight: 1.5, fontFamily }}>
+                              次に見るポイント：{photo.watchPoint}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              }
+              // 分析情報なし（旧データ）: グリッド形式
               return (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(90px, 1fr))", gap: 8, marginBottom: 20 }}>
                   {history.map((photo, photoIdx) => (

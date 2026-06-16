@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { generatePlantChatReply, ConversationMessage, PlantContext } from "@/lib/aiPlantChat";
 import { getPlantTrivia } from "@/lib/plantTrivias";
 import { fetchLineImage, replyToLine, pushToLine } from "@/lib/linePhotoUtils";
-import { generatePhotoAdvice } from "@/lib/aiPhotoAdvice";
+import { generatePhotoAdvice, MAX_PAST_PHOTOS, type PastPhotoContext } from "@/lib/aiPhotoAdvice";
 import { identifyPlantFromPhoto } from "@/lib/aiPlantIdentify";
 import { buildDailyNotificationMessage, buildFinalMessage } from "@/lib/buildDailyNotification";
 import { createClient } from "@supabase/supabase-js";
@@ -318,18 +318,68 @@ async function saveBatchPhotosAndAdvise(
     { type: "text", text: `${plantName}の写真${batchPhotos.length}枚を保存しました🌱\n少しお待ちください…` },
   ]);
 
-  // 1枚目の画像でAIアドバイス
+  // 1枚目の画像でAIアドバイス（バッチ前に取得した過去写真と比較）
+  const { data: pastPhotosRaw } = await supabase
+    .from("plant_photos")
+    .select("id, image_url, taken_at, site_comment")
+    .eq("plant_id", plantId)
+    .order("taken_at", { ascending: false })
+    .limit(MAX_PAST_PHOTOS);
+
+  const pastPhotos: PastPhotoContext[] = (pastPhotosRaw ?? [])
+    .filter((p: any) => !!p.image_url)
+    .reverse()
+    .map((p: any) => ({
+      imageUrl: p.image_url as string,
+      takenAt: String(p.taken_at ?? "").slice(0, 10),
+      siteComment: p.site_comment as string | null,
+    }));
+
+  const comparedWithPhotoId: string | null =
+    pastPhotosRaw && pastPhotosRaw.length > 0 ? (pastPhotosRaw[0].id as string) : null;
+
   const firstPhoto = batchPhotos[0];
   const { data: urlData } = supabase.storage.from("plant-photos").getPublicUrl(firstPhoto.storage_path);
-  const advice = await generatePhotoAdvice({
-    imageUrl: urlData.publicUrl,
+  const firstImageUrl = urlData.publicUrl;
+  const today = new Date().toISOString().slice(0, 10);
+
+  const result = await generatePhotoAdvice({
+    imageUrl: firstImageUrl,
     plantName,
     plantType: plant?.plant_type ?? null,
     initialStateType: plant?.initial_state_type ?? null,
     initialStateNote: plant?.initial_state_note ?? null,
+    pastPhotos,
+    today,
   });
-  if (advice && lineUserId) {
-    await pushToLine(lineToken, lineUserId, [{ type: "text", text: advice }]);
+
+  if (result) {
+    // 最初の写真に分析結果を保存（バッチ保存後に最新のIDを取得）
+    const { data: newestPhoto } = await supabase
+      .from("plant_photos")
+      .select("id")
+      .eq("plant_id", plantId)
+      .eq("image_url", firstImageUrl)
+      .order("taken_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (newestPhoto?.id) {
+      await supabase
+        .from("plant_photos")
+        .update({
+          line_message:           result.lineMessage,
+          site_comment:           result.siteComment,
+          change_summary:         result.changeSummary,
+          care_advice:            result.careAdvice,
+          watch_point:            result.watchPoint,
+          compared_with_photo_id: comparedWithPhotoId,
+          analysis_version:       result.analysisVersion,
+        })
+        .eq("id", newestPhoto.id);
+    }
+
+    await pushToLine(lineToken, lineUserId, [{ type: "text", text: result.lineMessage }]);
   }
 }
 
@@ -363,14 +413,39 @@ async function savePlantPhotoAndAdvise(
   const imageUrl: string = urlData.publicUrl;
   console.log(`[DB] 画像URL生成 imageUrl=${imageUrl}`);
 
-  const { error: photoError } = await supabase.from("plant_photos").insert({
-    plant_id: plantId,
-    image_url: imageUrl,
-    storage_path: pending.storage_path,
-    taken_at: new Date().toISOString(),
-  });
+  // 新しい写真を保存する前に、同じ植物の過去写真を取得する（比較分析に使う）
+  const { data: pastPhotosRaw } = await supabase
+    .from("plant_photos")
+    .select("id, image_url, taken_at, site_comment")
+    .eq("plant_id", plantId)
+    .order("taken_at", { ascending: false })
+    .limit(MAX_PAST_PHOTOS);
 
-  if (photoError) {
+  const pastPhotos: PastPhotoContext[] = (pastPhotosRaw ?? [])
+    .filter((p: any) => !!p.image_url)
+    .reverse() // 古い順にする（AI に時系列で渡すため）
+    .map((p: any) => ({
+      imageUrl: p.image_url as string,
+      takenAt: String(p.taken_at ?? "").slice(0, 10),
+      siteComment: p.site_comment as string | null,
+    }));
+
+  const comparedWithPhotoId: string | null =
+    pastPhotosRaw && pastPhotosRaw.length > 0 ? (pastPhotosRaw[0].id as string) : null;
+
+  // 写真を保存し、IDを取得する
+  const { data: insertedPhoto, error: photoError } = await supabase
+    .from("plant_photos")
+    .insert({
+      plant_id: plantId,
+      image_url: imageUrl,
+      storage_path: pending.storage_path,
+      taken_at: new Date().toISOString(),
+    })
+    .select("id")
+    .single();
+
+  if (photoError || !insertedPhoto) {
     console.error(`[DB] plant_photos insert失敗 plant_id=${plantId} imageUrl=${imageUrl}`, photoError);
     await replyToLine(lineToken, replyToken, [
       { type: "text", text: "写真の登録に失敗しました。もう一度お試しください🌱" },
@@ -378,7 +453,8 @@ async function savePlantPhotoAndAdvise(
     return;
   }
 
-  console.log(`[DB] plant_photos insert成功 plant_id=${plantId} imageUrl=${imageUrl}`);
+  const newPhotoId: string = insertedPhoto.id as string;
+  console.log(`[DB] plant_photos insert成功 plant_id=${plantId} newPhotoId=${newPhotoId}`);
   revalidatePath("/");
   console.log("[Cache] revalidatePath('/') 実行");
 
@@ -394,22 +470,39 @@ async function savePlantPhotoAndAdvise(
     .single();
 
   const plantName = plant ? getPlantLabel(plant.plant_type) : "植物";
-  console.log(`[Plants] ユーザー選択 plant_id=${plantId} plantName=${plantName}`);
+  console.log(`[Plants] ユーザー選択 plant_id=${plantId} plantName=${plantName} 過去写真=${pastPhotos.length}枚`);
 
   await replyToLine(lineToken, replyToken, [
     { type: "text", text: `${plantName}の写真として追加しました🌱\n少しお待ちください…` },
   ]);
 
-  const advice = await generatePhotoAdvice({
+  const today = new Date().toISOString().slice(0, 10);
+  const result = await generatePhotoAdvice({
     imageUrl,
     plantName,
     plantType: plant?.plant_type ?? null,
     initialStateType: plant?.initial_state_type ?? null,
     initialStateNote: plant?.initial_state_note ?? null,
+    pastPhotos,
+    today,
   });
 
-  if (advice && lineUserId) {
-    await pushToLine(lineToken, lineUserId, [{ type: "text", text: advice }]);
+  if (result) {
+    // 構造化分析結果を plant_photos に保存する
+    await supabase
+      .from("plant_photos")
+      .update({
+        line_message:           result.lineMessage,
+        site_comment:           result.siteComment,
+        change_summary:         result.changeSummary,
+        care_advice:            result.careAdvice,
+        watch_point:            result.watchPoint,
+        compared_with_photo_id: comparedWithPhotoId,
+        analysis_version:       result.analysisVersion,
+      })
+      .eq("id", newPhotoId);
+
+    await pushToLine(lineToken, lineUserId, [{ type: "text", text: result.lineMessage }]);
   }
 }
 

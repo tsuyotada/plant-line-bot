@@ -3,7 +3,16 @@ import { getCarePriority, type CareRule } from "./dailyCareMessage";
 import { buildPlantCareCards, type PlantAdviceInput, type PlantCareCard } from "./buildPlantCareAdvice";
 import { getPlantTrivia } from "./plantTrivias";
 
-export type PhotoHistoryItem = { id: string; url: string; takenAt: string };
+export type PhotoHistoryItem = {
+  id: string;
+  url: string;
+  takenAt: string;
+  siteComment:   string | null;
+  changeSummary: string | null;
+  careAdvice:    string | null;
+  watchPoint:    string | null;
+  analysisVersion: number | null;
+};
 
 export type SummaryStats = {
   waterCount: number;
@@ -64,7 +73,7 @@ export async function fetchHouseholdData(householdId: string): Promise<Household
       .order("created_at", { ascending: false }),
     supabase
       .from("plant_photos")
-      .select("id, plant_id, image_url, taken_at")
+      .select("id, plant_id, image_url, taken_at, site_comment, change_summary, care_advice, watch_point, analysis_version")
       .order("taken_at", { ascending: false })
       .limit(500),
     supabase
@@ -96,7 +105,12 @@ export async function fetchHouseholdData(householdId: string): Promise<Household
     photoHistories[photo.plant_id].push({
       id: photo.id,
       url,
-      takenAt: String(photo.taken_at ?? "").slice(0, 10),
+      takenAt:         String(photo.taken_at ?? "").slice(0, 10),
+      siteComment:     (photo.site_comment as string | null) ?? null,
+      changeSummary:   (photo.change_summary as string | null) ?? null,
+      careAdvice:      (photo.care_advice as string | null) ?? null,
+      watchPoint:      (photo.watch_point as string | null) ?? null,
+      analysisVersion: (photo.analysis_version as number | null) ?? null,
     });
   }
 
